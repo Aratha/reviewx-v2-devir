@@ -1,0 +1,18 @@
+apiVersion: v2
+name: dwhcodereview
+description: |
+  DWH Code Review - SQL nesnelerini LLM ile inceleyen FastAPI backend ve
+  Nginx ile servis edilen React (Vite) frontend imajlarını Rancher
+  (Kubernetes) ortamına deploy eden Helm chart'ı.
+type: application
+version: 0.1.0
+appVersion: "latest"
+kubeVersion: ">=1.23.0-0"
+maintainers:
+  - name: KT Vibecoding
+keywords:
+  - dwh
+  - code-review
+  - sql
+  - llm
+  - rancher

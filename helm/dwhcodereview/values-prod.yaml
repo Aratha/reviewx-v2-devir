@@ -1,0 +1,61 @@
+# PROD ortami override'lari
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "v1.0.0"           # prod'da sabit surum
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: "v1.0.0"
+    pullPolicy: Always
+
+persistence:
+  enabled: true
+  size: 20Gi
+
+ingress:
+  enabled: true
+  host: dwhcodereview.ailab.kuveytturk.com.tr
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  tls:
+    enabled: true
+    secretName: dwhcodereview-tls
+
+# Prod: baglanti dizesini/tokenlari chart'a gomme; harici / sealed-secret kullan.
+# Harici Secret, templates/secret.yaml'daki env anahtarlariyla (MSSQL_CONNECTION_STRING,
+# API_ACCESS_TOKEN, LLM_* ...) BIREBIR ayni key'leri icermelidir.
+secrets:
+  create: false
+  existingSecret: dwhcodereview-secrets
+
+# secrets.create=false oldugu icin fail-fast guard'ina takilmaz; appConfig
+# yalnizca beklenen semayi belgeler.
+appConfig:
+  mssqlConnectionString: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=<prod-mssql-host>;DATABASE=master;UID=<prod-user>;PWD=<prod-password>;Encrypt=yes"
+  llmBaseUrl: "http://llm-gateway.ailab.svc.cluster.local/v1"
+  llmChatApi: "api_v1_chat"
+  llmModel: "openai/gpt-oss-120b"
+  llmEnforcePrivateNetwork: true
+  llmLogFullPayloads: false
+  corsOrigins: "https://dwhcodereview.ailab.kuveytturk.com.tr"
+  apiAccessToken: "<prod-api-access-token-min-16-chars>"
+  apiAdminToken: "<prod-api-admin-token-min-16-chars>"
+  apiRateLimitEnabled: true
+  apiRateLimitReviewMax: 30
+
+imagePullSecrets:
+  - name: ghcr-creds

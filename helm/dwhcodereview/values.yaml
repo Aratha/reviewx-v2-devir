@@ -1,0 +1,204 @@
+# ============================================================================
+# DWH Code Review - Helm values (Rancher / Kubernetes deploy).
+# ----------------------------------------------------------------------------
+# Varsayilan (ortak) degerler. Ortama ozgu ayarlar values-test.yaml /
+# values-prod.yaml icinde override edilir.
+#
+# appConfig, backend/config.py (pydantic Settings) tarafindan okunan .env
+# degiskenlerinin BIREBIR karsiligidir; templates/secret.yaml bunlari
+# UPPER_SNAKE_CASE env degiskenlerine cevirip Secret olarak render eder.
+#
+# appConfig.mssqlConnectionString ve appConfig.apiAccessToken BILEREK bos
+# birakildi - dolu olmadan `helm install/template` templates/secret.yaml
+# icindeki `required`/`fail` guard'i yuzunden HATA verir (fail-fast).
+#
+#   helm upgrade --install dwhcodereview ./helm/dwhcodereview \
+#     -f helm/dwhcodereview/values.yaml -f helm/dwhcodereview/values-test.yaml \
+#     --set appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=...' \
+#     --set appConfig.apiAccessToken=... \
+#     --set appConfig.apiAdminToken=...
+# Sonraki upgrade'lerde `--reuse-values` ile devralin, tekrar --set gerekmez.
+# ============================================================================
+
+nameOverride: ""
+fullnameOverride: ""
+
+# GHCR/Harbor private ise: `kubectl create secret docker-registry ghcr-creds ...`
+# olusturup adini buraya yazin. Bossa imagePullSecret set edilmez.
+imagePullSecrets: []
+#  - name: ghcr-creds
+
+# ---------------------------------------------------------------------------
+# Backend (FastAPI + pyodbc / ODBC Driver 18)
+# ---------------------------------------------------------------------------
+backend:
+  replicaCount: 1
+  image:
+    registry: cr-test.kuveytturk.com.tr/ghcr.io.vc
+    repository: kt-vibecoding/dwhcodereview-backend
+    tag: latest
+    # latest gibi degisken tag'lerde Rancher yeni imaji cekmeyebilir -> Always.
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8000
+  # Konteynerin gercekte dinledigi port (uvicorn --port 8000).
+  containerPort: 8000
+  probes:
+    path: /api/health
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # LLM cagrilari uzun surebildigi icin (llmReadTimeoutSeconds=900) pod'un
+  # nazikce kapanmasina izin ver.
+  terminationGracePeriodSeconds: 60
+
+# ---------------------------------------------------------------------------
+# Frontend (Vite build -> Nginx). Nginx /api'yi backend service'ine proxy'ler.
+# ---------------------------------------------------------------------------
+frontend:
+  replicaCount: 1
+  image:
+    registry: cr-test.kuveytturk.com.tr/ghcr.io.vc
+    repository: kt-vibecoding/dwhcodereview-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 80
+  containerPort: 80
+  probes:
+    path: /
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  # Imajdaki /etc/nginx/conf.d/default.conf'u ConfigMap ile ezer. `proxy_pass`
+  # hedefi backend Service'inin cluster ici adiyla render edilir; boylece
+  # docker-compose'daki "backend" host adina bagimlilik ortadan kalkar.  nginxConfig:
+    override: true
+    # SSE (streaming review) icin buffering kapali tutulmali.
+    proxyReadTimeout: 3600
+    proxySendTimeout: 3600
+  # nginx:alpine master process'i port 80'i acmak ve /var/cache/nginx'e yazmak
+  # icin root olarak baslar (worker'lar nginx kullanicisina duser). Bu yuzden
+  # global podSecurityContext burada bilincli olarak gevsetiliyor.
+  podSecurityContext:
+    runAsNonRoot: false
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - CHOWN
+        - SETGID
+        - SETUID
+        - NET_BIND_SERVICE
+
+# ---------------------------------------------------------------------------
+# Backend .env degerleri (config.py Settings alanlariyla birebir).
+# mssqlConnectionString + tokenlar sir icerdigi icin Secret olarak render edilir.
+# Prod'da secrets.create=false + existingSecret ile harici Secret kullanin.
+# ---------------------------------------------------------------------------
+secrets:
+  create: true
+  existingSecret: ""      # doluysa create yerine bu Secret kullanilir
+
+appConfig:
+  # ZORUNLU: bos birakilirsa templates/secret.yaml `required` guard'i ile
+  # helm install/template'i durdurur.
+  # Ornek: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=dwh-sql;DATABASE=master;UID=svc_dwh;PWD=...;TrustServerCertificate=yes"
+  mssqlConnectionString: ""
+
+  # LLM baglantisi (services/llm_review.py)
+  llmBaseUrl: "http://llm-gateway.ailab.svc.cluster.local/v1"
+  # openai | api_v1_chat
+  llmChatApi: "api_v1_chat"
+  llmChatUrl: ""
+  llmModel: "openai/gpt-oss-120b"
+  # Doluysa llmModel'i ezer; model secimini garanti eder.
+  sqlReviewLlmModel: ""
+  llmApiKey: ""
+  # Kume ici LLM icin false; kurumsal proxy uzerinden bulut API ise true.
+  llmHttpTrustEnv: false
+  llmHttpUserAgent: "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"
+  # Kurumsal guvenlik: LLM hedefi private ag icinde olmali.
+  llmEnforcePrivateNetwork: true
+  # Private olmayan ama izin verilen hedefler (virgulle ayrilmis hostname).
+  llmAllowPublicHosts: ""
+  # Ham request/response govdelerini logla (oneri: false - veri sizintisi riski).
+  llmLogFullPayloads: false
+
+  # Review davranisi
+  sqlReviewMaxConcurrentRules: 6
+  llmReadTimeoutSeconds: 900
+  llmRequestRetries: 2
+  sqlReviewTwoPartThresholdChars: 45000
+
+  # CORS: ingress.host ile uyumlu olmali.
+  corsOrigins: "https://dwhcodereview.ailabtest.kuveytturk.com.tr"
+
+  # ZORUNLU: bos birakilirsa /api uclari kimlik dogrulamasiz kalir; guard fail eder.
+  apiAccessToken: ""
+  # Yonetim uclari (rules / llm-config / llm-logs) icin ayri token. Onerilir.
+  apiAdminToken: ""
+
+  # Basit hiz limiti
+  apiRateLimitEnabled: true
+  apiRateLimitWindowSeconds: 60
+  apiRateLimitReviewMax: 30
+
+# Backend /app/data icin kalici depolama (review_rules.json, llm loglari).
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  storageClass: ""
+
+ingress:
+  enabled: true
+  className: ""
+  host: dwhcodereview.ailabtest.kuveytturk.com.tr
+  path: /
+  pathType: Prefix
+  annotations:
+    # SSE (canli review akisi) icin proxy buffering kapali olmali.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  tls:
+    enabled: false
+    secretName: dwhcodereview-tls
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

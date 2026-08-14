@@ -1,0 +1,28 @@
+DWH Code Review "{{ .Release.Name }}" surumu "{{ .Release.Namespace }}" namespace'ine kuruldu.
+
+Bilesenler:
+  backend  : {{ include "dwhcodereview.backend.image" . }}  (Service: {{ include "dwhcodereview.backend.fullname" . }}:{{ .Values.backend.service.port }})
+  frontend : {{ include "dwhcodereview.frontend.image" . }} (Service: {{ include "dwhcodereview.frontend.fullname" . }}:{{ .Values.frontend.service.port }})
+
+{{- if .Values.ingress.enabled }}
+
+Arayuz:
+  {{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.ingress.path }}
+{{- else }}
+
+Ingress kapali. Yerel erisim icin:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "dwhcodereview.frontend.fullname" . }} 8080:{{ .Values.frontend.service.port }}
+{{- end }}
+
+Durum kontrolu:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "dwhcodereview.backend.fullname" . }} -f
+
+{{- if not .Values.secrets.create }}
+
+UYARI: secrets.create=false. "{{ .Values.secrets.existingSecret }}" adli Secret'in
+MSSQL_CONNECTION_STRING, API_ACCESS_TOKEN ve LLM_* anahtarlarini icerdiginden emin olun.
+{{- end }}
+
+/api uclari X-API-Key ile korunmaktadir; yonetim uclari (rules / llm-config / llm-logs)
+ayrica X-Admin-Key ister.

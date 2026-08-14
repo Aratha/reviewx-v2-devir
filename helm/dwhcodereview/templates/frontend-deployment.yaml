@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dwhcodereview.frontend.fullname" . }}
+  labels:
+    {{- include "dwhcodereview.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "dwhcodereview.frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- if .Values.frontend.nginxConfig.override }}
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
+      {{- end }}
+      labels:
+        {{- include "dwhcodereview.frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml (mergeOverwrite (deepCopy .Values.podSecurityContext) .Values.frontend.podSecurityContext) | nindent 8 }}
+      containers:
+        - name: frontend
+          image: {{ include "dwhcodereview.frontend.image" . }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.probes.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.probes.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.failureThreshold }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          {{- if .Values.frontend.nginxConfig.override }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+          {{- end }}
+      {{- if .Values.frontend.nginxConfig.override }}
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "dwhcodereview.frontend.fullname" . }}-nginx
+            items:
+              - key: default.conf
+                path: default.conf
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

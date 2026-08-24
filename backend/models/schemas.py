@@ -148,3 +148,46 @@ class LlmConfigUpdate(BaseModel):
     llm_allow_public_hosts: str | None = None
     llm_log_full_payloads: bool | None = None
     sql_review_max_concurrent_rules: int | None = Field(None, ge=1, le=512)
+
+
+class SqlConfigResponse(BaseModel):
+    """SQL Server bağlantı ayarları (şifre yalnızca ayarlı/ayarsız bilgisi)."""
+
+    mssql_server: str
+    mssql_port: int = Field(ge=1, le=65535)
+    mssql_user: str
+    mssql_trusted_connection: bool
+    mssql_encrypt: bool
+    mssql_trust_server_certificate: bool
+    password_set: bool
+    configured: bool
+
+
+class SqlConfigUpdate(BaseModel):
+    """Kısmi güncelleme; mssql_password boş string = kayıtlı şifreyi sil."""
+
+    mssql_server: str | None = None
+    mssql_port: int | None = Field(None, ge=1, le=65535)
+    mssql_user: str | None = None
+    mssql_password: str | None = None
+    mssql_trusted_connection: bool | None = None
+    mssql_encrypt: bool | None = None
+    mssql_trust_server_certificate: bool | None = None
+
+
+class SqlConfigTestRequest(BaseModel):
+    """Kaydetmeden bağlantı testi; boş alanlar mevcut kayıtlı değerleri kullanır."""
+
+    mssql_server: str | None = None
+    mssql_port: int | None = Field(None, ge=1, le=65535)
+    mssql_user: str | None = None
+    mssql_password: str | None = None
+    mssql_trusted_connection: bool | None = None
+    mssql_encrypt: bool | None = None
+    mssql_trust_server_certificate: bool | None = None
+
+
+class SqlConfigTestResponse(BaseModel):
+    ok: bool
+    message: str
+    databases: list[str] = Field(default_factory=list)

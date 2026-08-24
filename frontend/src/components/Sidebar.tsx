@@ -2,7 +2,7 @@ import { memo, useCallback } from 'react'
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from '../brand'
 import { useReviewAnalysis } from '../contexts/ReviewAnalysisContext'
 
-export type AppView = 'review' | 'paste' | 'rules' | 'llm' | 'logs'
+export type AppView = 'review' | 'paste' | 'rules' | 'llm' | 'sql' | 'logs'
 
 type NavLinkProps = {
   id: AppView
@@ -112,6 +112,12 @@ const SidebarNav = memo(function SidebarNav({
             id="llm"
             label="LLM ayarları"
             isOn={active === 'llm'}
+            onSelect={onSelect}
+          />
+          <NavLink
+            id="sql"
+            label="SQL ayarları"
+            isOn={active === 'sql'}
             onSelect={onSelect}
           />
         </div>

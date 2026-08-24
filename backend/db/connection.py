@@ -2,7 +2,7 @@ import re
 
 import pyodbc
 
-from config import get_settings
+from services.sql_env import resolve_base_connection_string
 
 
 def connection_string_with_database(base: str, database: str) -> str:
@@ -20,18 +20,10 @@ def connection_string_with_database(base: str, database: str) -> str:
 
 
 def get_connection(database: str | None = None) -> pyodbc.Connection:
-    settings = get_settings()
-    if not settings.mssql_connection_string.strip():
-        raise ValueError(
-            "MSSQL_CONNECTION_STRING is empty or missing. "
-            "Copy backend/.env.example to backend/.env and set MSSQL_CONNECTION_STRING "
-            "to your ODBC connection string, then restart the API."
-        )
+    base = resolve_base_connection_string()
     conn_str = (
-        connection_string_with_database(
-            settings.mssql_connection_string, database
-        )
+        connection_string_with_database(base, database)
         if database
-        else settings.mssql_connection_string
+        else base
     )
     return pyodbc.connect(conn_str, timeout=30)

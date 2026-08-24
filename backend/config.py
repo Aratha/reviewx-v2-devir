@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     )
 
     mssql_connection_string: str = ""
+    mssql_server: str = ""
+    mssql_port: int = 1433
+    mssql_user: str = ""
+    mssql_password: str = ""
+    mssql_trusted_connection: bool = False
+    mssql_encrypt: bool = True
+    mssql_trust_server_certificate: bool = True
     llm_base_url: str = "http://localhost:1234/v1"
     # openai: POST .../v1/chat/completions + messages[] | api_v1_chat: POST .../api/v1/chat + system_prompt + input
     llm_chat_api: str = "api_v1_chat"

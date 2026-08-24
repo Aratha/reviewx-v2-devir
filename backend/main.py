@@ -22,6 +22,10 @@ from models.schemas import (
     DbObjectRow,
     LlmConfigResponse,
     LlmConfigUpdate,
+    SqlConfigResponse,
+    SqlConfigTestRequest,
+    SqlConfigTestResponse,
+    SqlConfigUpdate,
     ObjectDefinitionRequest,
     ObjectDefinitionResponse,
     ObjectSelection,
@@ -34,6 +38,7 @@ from services.object_catalog import list_objects
 from services.review_orchestrator import review_pasted_sql, run_reviews
 from services.llm_log import clear_log, get_entry_by_id, list_entries_meta
 from services.llm_env import merge_llm_into_dotenv, read_llm_snapshot
+from services.sql_env import merge_sql_into_dotenv, read_sql_snapshot, test_sql_connection
 from services.rules_store import RuleBundle, RulesState, load_state, publish_draft, save_draft
 from services.sql_fetcher import fetch_definition
 
@@ -41,7 +46,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 _RATE_LIMIT_LOCK = threading.Lock()
 _RATE_LIMIT_HITS: dict[str, deque[float]] = defaultdict(deque)
-_ADMIN_PATH_PREFIXES = ("/api/rules", "/api/llm-config", "/api/llm-logs")
+_ADMIN_PATH_PREFIXES = ("/api/rules", "/api/llm-config", "/api/llm-logs", "/api/sql-config")
 _REVIEW_RATE_LIMIT_PREFIXES = (
     "/api/review",
     "/api/object-definition",
@@ -180,6 +185,7 @@ def root():
         "review_script_stream": "/api/review/script/stream",
         "llm_logs": "/api/llm-logs",
         "llm_config": "/api/llm-config",
+        "sql_config": "/api/sql-config",
         "docs": "/docs",
     }
 
@@ -187,7 +193,8 @@ def root():
 @app.get("/api/health")
 def health():
     """İstemcinin güncel API (kurallar uçları dahil) çalıştığını doğrulaması için."""
-    return {"status": "ok", "rules_api": True}
+    snap = read_sql_snapshot()
+    return {"status": "ok", "rules_api": True, "sql_configured": snap["configured"]}
 
 
 @app.get("/api/databases")
@@ -273,6 +280,27 @@ def put_llm_config(body: LlmConfigUpdate):
     patch = body.model_dump(exclude_unset=True)
     merge_llm_into_dotenv(patch)
     return read_llm_snapshot()
+
+
+@app.get("/api/sql-config", response_model=SqlConfigResponse)
+def get_sql_config():
+    """SQL Server bağlantı ayarları (şifre maskeli)."""
+    return read_sql_snapshot()
+
+
+@app.put("/api/sql-config", response_model=SqlConfigResponse)
+def put_sql_config(body: SqlConfigUpdate):
+    """backend/.env içindeki SQL alanlarını günceller; bağlantı anında kullanılır."""
+    patch = body.model_dump(exclude_unset=True)
+    merge_sql_into_dotenv(patch)
+    return read_sql_snapshot()
+
+
+@app.post("/api/sql-config/test", response_model=SqlConfigTestResponse)
+def post_sql_config_test(body: SqlConfigTestRequest):
+    """Kayıtlı veya formdaki değerlerle SQL bağlantısını dener."""
+    overrides = body.model_dump(exclude_unset=True)
+    return test_sql_connection(overrides or None)
 
 
 @app.post("/api/review", response_model=ReviewResponse)

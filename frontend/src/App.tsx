@@ -18,6 +18,9 @@ const RulesPage = lazy(() =>
 const LlmConfigPage = lazy(() =>
   import('./pages/LlmConfigPage').then((m) => ({ default: m.LlmConfigPage })),
 )
+const SqlConfigPage = lazy(() =>
+  import('./pages/SqlConfigPage').then((m) => ({ default: m.SqlConfigPage })),
+)
 const AnalysisHistoryPage = lazy(() =>
   import('./pages/AnalysisHistoryPage').then((m) => ({
     default: m.AnalysisHistoryPage,
@@ -47,6 +50,8 @@ function ActiveView({ view }: { view: AppView }) {
         <RulesPage />
       ) : view === 'llm' ? (
         <LlmConfigPage />
+      ) : view === 'sql' ? (
+        <SqlConfigPage />
       ) : (
         <AnalysisHistoryPage />
       )}

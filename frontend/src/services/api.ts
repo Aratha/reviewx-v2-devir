@@ -474,3 +474,66 @@ export async function putLlmConfig(patch: LlmConfigPatch): Promise<LlmConfig> {
   }
   return res.json()
 }
+
+export type SqlConfig = {
+  mssql_server: string
+  mssql_port: number
+  mssql_user: string
+  mssql_trusted_connection: boolean
+  mssql_encrypt: boolean
+  mssql_trust_server_certificate: boolean
+  password_set: boolean
+  configured: boolean
+}
+
+export type SqlConfigPatch = {
+  mssql_server?: string
+  mssql_port?: number
+  mssql_user?: string
+  mssql_password?: string
+  mssql_trusted_connection?: boolean
+  mssql_encrypt?: boolean
+  mssql_trust_server_certificate?: boolean
+}
+
+export type SqlConfigTestPatch = SqlConfigPatch
+
+export type SqlConfigTestResult = {
+  ok: boolean
+  message: string
+  databases?: string[]
+}
+
+export async function getSqlConfig(): Promise<SqlConfig> {
+  const res = await fetch(`${apiBase()}/api/sql-config`)
+  if (!res.ok) {
+    throw new Error(await readApiError(res))
+  }
+  return res.json()
+}
+
+export async function putSqlConfig(patch: SqlConfigPatch): Promise<SqlConfig> {
+  const res = await fetch(`${apiBase()}/api/sql-config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    throw new Error(await readApiError(res))
+  }
+  return res.json()
+}
+
+export async function postSqlConfigTest(
+  patch: SqlConfigTestPatch = {},
+): Promise<SqlConfigTestResult> {
+  const res = await fetch(`${apiBase()}/api/sql-config/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    throw new Error(await readApiError(res))
+  }
+  return res.json()
+}

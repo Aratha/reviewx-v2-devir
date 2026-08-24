@@ -47,24 +47,22 @@ export function ReviewPage() {
   /** YYYY-MM-DD; boşsa tüm nesneler (API filtre yok) */
   const [fromDate, setFromDate] = useState('')
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
-  useEffect(() => {
-    let cancelled = false
+  const loadDatabases = useCallback(async () => {
     setDbLoading(true)
     setDbError(null)
-    getDatabases()
-      .then((rows) => {
-        if (!cancelled) setDatabases(rows)
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setDbError(e.message || 'Veritabanları yüklenemedi')
-      })
-      .finally(() => {
-        if (!cancelled) setDbLoading(false)
-      })
-    return () => {
-      cancelled = true
+    try {
+      const rows = await getDatabases()
+      setDatabases(rows)
+    } catch (e) {
+      setDbError((e as Error).message || 'Veritabanları yüklenemedi')
+    } finally {
+      setDbLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadDatabases()
+  }, [loadDatabases])
 
   useEffect(() => {
     if (!database) {
@@ -178,9 +176,19 @@ export function ReviewPage() {
       </header>
 
       <div className="mb-6 max-w-md shrink-0">
-        <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Nesne listesi için veritabanı
-        </label>
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Nesne listesi için veritabanı
+          </label>
+          <button
+            type="button"
+            onClick={() => void loadDatabases()}
+            disabled={dbLoading}
+            className="text-xs font-medium text-zinc-600 hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Listeyi yenile
+          </button>
+        </div>
         <select
           value={database}
           onChange={(e) => onDatabaseChange(e.target.value)}

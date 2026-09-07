@@ -5,3 +5,5 @@
 *.tmproj
 *.tgz
 .idea/
+# Render testleri chart paketine girmez; repodan calistirilir.
+tests/

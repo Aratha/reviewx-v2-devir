@@ -12,12 +12,22 @@
 # birakildi - dolu olmadan `helm install/template` templates/secret.yaml
 # icindeki `required`/`fail` guard'i yuzunden HATA verir (fail-fast).
 #
+# ONEMLI: Rancher Apps & Marketplace chart'i kurarken YALNIZCA bu dosyayi
+# yukler; values-test.yaml / values-prod.yaml OTOMATIK UYGULANMAZ. Rancher'dan
+# kurarken zorunlu degerler questions.yaml formundan (veya UI'daki "Edit YAML"
+# alanindan) girilir. Ortam dosyalari yalnizca CLI ile `-f` verildiginde
+# gecerlidir.
+#
+# CLI ile TEST kurulumu:
 #   helm upgrade --install dwhcodereview ./helm/dwhcodereview \
-#     -f helm/dwhcodereview/values.yaml -f helm/dwhcodereview/values-test.yaml \
-#     --set appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=...' \
-#     --set appConfig.apiAccessToken=... \
-#     --set appConfig.apiAdminToken=...
-# Sonraki upgrade'lerde `--reuse-values` ile devralin, tekrar --set gerekmez.
+#     -f helm/dwhcodereview/values-test.yaml \
+#     --set-string appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=...' \
+#     --set-string appConfig.apiAccessToken=... \
+#     --set-string appConfig.apiAdminToken=...
+#
+# Upgrade'de `--reuse-values` sirlarin korunacaginin GARANTISI DEGILDIR; kalici
+# sirlari harici Secret'a baglayin (secrets.create=false + secrets.existingSecret)
+# ya da her upgrade'de ayni degerleri tekrar verin.
 # ============================================================================
 
 nameOverride: ""
@@ -90,7 +100,8 @@ frontend:
       memory: 256Mi
   # Imajdaki /etc/nginx/conf.d/default.conf'u ConfigMap ile ezer. `proxy_pass`
   # hedefi backend Service'inin cluster ici adiyla render edilir; boylece
-  # docker-compose'daki "backend" host adina bagimlilik ortadan kalkar.  nginxConfig:
+  # docker-compose'daki "backend" host adina bagimlilik ortadan kalkar.
+  nginxConfig:
     override: true
     # SSE (streaming review) icin buffering kapali tutulmali.
     proxyReadTimeout: 3600

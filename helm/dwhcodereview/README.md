@@ -114,6 +114,17 @@ helm template dwhcodereview ./helm/dwhcodereview -f helm/dwhcodereview/values-te
 - **Tek Secret kaynağı:** `secrets.create=true` ile `secrets.existingSecret`
   birlikte kullanılamaz; `secrets.create=false` iken `existingSecret` zorunludur.
   Her iki hata da install anında durdurulur.
+- **`appConfigFallback` (yalnızca CLI/pipeline):** helm'de `--set-string`,
+  `-f` ile verilen dosyalardan daha yüksek önceliklidir. Bu yüzden **boş** bir
+  `--set-string appConfig.apiAccessToken=`, `values-test.yaml`'daki geçerli
+  değeri siler ve fail-fast guard'ını yanlış yere tetikler — CI sırrı script'e
+  aktarılmadığında tam olarak bu olur (Azure DevOps secret değişkenleri, task'ın
+  `env:` bloğunda tanımlı değilse boş gelir). `values-test.yaml` zorunlu sırları
+  bu nedenle `appConfigFallback` altında tutar; ilgili `appConfig` alanı boş
+  geldiğinde devreye girer, dolu bir `--set-string` yine önceliği alır.
+  Rancher UI yalnızca kökteki `values.yaml`'ı yükler ve orada bu blok boştur,
+  dolayısıyla UI'dan boş değer girildiğinde guard'lar aynen çalışır. Prod'a
+  **eklemeyin**: prod sırları harici Secret'tan gelir.
 - **SSE:** Canlı review akışı için Ingress annotation'larında
   `proxy-buffering: "off"` ve 3600 sn timeout tanımlıdır; Nginx ConfigMap'inde de
   `proxy_buffering off` korunur.

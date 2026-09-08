@@ -156,6 +156,61 @@ else
 fi
 rm -rf "$pkg_dir"
 
+
+# --- 13) CI'da sir aktarilmadi: bos --set-string dosyadaki degeri EZMEMELI ---
+# helm'de --set-string, -f dosyalarindan daha yuksek onceliklidir. Azure DevOps
+# secret degiskenleri script'e otomatik gecmedigi icin pipeline bos deger
+# gonderir ve values-test.yaml'daki gecerli deger silinir. appConfigFallback
+# bu durumda devreye girer.
+t="bos --set-string values-test.yaml degerini ezmez (CI sir aktarilmadi senaryosu)"
+out="$(render -f "$CHART_DIR/values-test.yaml" \
+  --set-string "appConfig.mssqlConnectionString=" \
+  --set-string "appConfig.apiAccessToken=" \
+  --set-string "appConfig.apiAdminToken=")"
+rc=$?
+if [ $rc -ne 0 ]; then
+  fail "$t" "render durdu: $(printf '%s' "$out" | head -2)"
+elif printf '%s' "$out" | grep -qE '^  MSSQL_CONNECTION_STRING: ""$'; then
+  fail "$t" "MSSQL_CONNECTION_STRING bos render edildi (fallback devreye girmedi)"
+elif printf '%s' "$out" | grep -qE '^  API_ACCESS_TOKEN: ""$'; then
+  fail "$t" "API_ACCESS_TOKEN bos render edildi (fallback devreye girmedi)"
+else
+  pass "$t"
+fi
+
+# --- 14) Fallback Rancher UI guard'ini DELMEZ -------------------------------
+# Rancher yalnizca values.yaml yukler; orada fallback bostur, guard calismali.
+t="fallback Rancher UI guard'ini delmez (values.yaml tek basina bos deger reddedilir)"
+out="$(render --set-string "appConfig.mssqlConnectionString=")"
+if printf '%s' "$out" | grep -q 'mssqlConnectionString'; then
+  pass "$t"
+else
+  fail "$t" "Rancher yolunda bos baglanti dizesi sessizce kabul edildi"
+fi
+
+# --- 15) PROD fallback tasimaz -------------------------------------------
+# Prod sirlari harici Secret'tan (secrets.create=false + existingSecret) gelir;
+# chart orada Secret uretmez. Prod'a appConfigFallback eklemek, git'e
+# commit'lenmis placeholder sirlari canliya tasima riski dogurur.
+t="values-prod.yaml fallback tasimaz (prod sirlari harici Secret'tan gelir)"
+if grep -q 'appConfigFallback' "$CHART_DIR/values-prod.yaml"; then
+  fail "$t" "prod'a appConfigFallback eklenmis; prod sirlari harici Secret'tan gelmeli"
+elif ! grep -qE '^[[:space:]]+create: false' "$CHART_DIR/values-prod.yaml"; then
+  fail "$t" "prod secrets.create=false degil; fallback semantigi degismis olabilir"
+else
+  pass "$t"
+fi
+
+# --- 16) Dolu deger fallback'i ezer (oncelik sirasi) ------------------------
+t="dolu --set-string fallback'i ezer"
+out="$(render -f "$CHART_DIR/values-test.yaml" \
+  --set-string "appConfig.mssqlConnectionString=DRIVER={x};SERVER=gercek-host")"
+if printf '%s' "$out" | grep -q 'SERVER=gercek-host'; then
+  pass "$t"
+else
+  fail "$t" "verilen deger yerine fallback kullanildi"
+fi
+
 printf '\n%s\n' "-----------------------------------------"
 printf 'PASS: %d  FAIL: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

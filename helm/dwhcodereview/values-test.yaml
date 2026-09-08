@@ -34,9 +34,6 @@ secrets:
   create: true
 
 appConfig:
-  # TODO: gercek SQL Server saglandiginda guncelleyin (henuz test DB'si tahsis edilmedi).
-  mssqlConnectionString: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=TBD-DB-NOT-PROVISIONED;DATABASE=master;UID=tbd;PWD=tbd;TrustServerCertificate=yes"
-
   llmBaseUrl: "http://llm-gateway.ailabtest.svc.cluster.local/v1"
   llmChatApi: "api_v1_chat"
   llmModel: "openai/gpt-oss-120b"
@@ -46,12 +43,22 @@ appConfig:
   # ingress.tls.enabled=false ile uyumlu (http)
   corsOrigins: "http://dwhcodereview.ailabtest.kuveytturk.com.tr"
 
+  apiRateLimitEnabled: true
+  apiRateLimitReviewMax: 60
+
+# Zorunlu sirlar BURADA tutulur, appConfig icinde degil.
+#
+# Pipeline `--set-string appConfig.X=...` ile bu degerleri ezer. Ancak CI sirri
+# script'e aktarilmadiysa BOS bir deger gelir ve `--set-string`, `-f`
+# dosyalarindan daha yuksek oncelikli oldugu icin buradaki gecerli degeri
+# silerdi. appConfigFallback yalnizca appConfig alani bos geldiginde devreye
+# girer; dolu bir `--set-string` yine normal sekilde onceligi alir.
+appConfigFallback:
+  # TODO: gercek SQL Server saglandiginda guncelleyin (henuz test DB'si tahsis edilmedi).
+  mssqlConnectionString: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=TBD-DB-NOT-PROVISIONED;DATABASE=master;UID=tbd;PWD=tbd;TrustServerCertificate=yes"
   # Test ortami icin sabit tokenlar (>=16 karakter zorunlu).
   apiAccessToken: "test-Kq7VnZ2sXbLmT4Rd"
   apiAdminToken: "test-Admin-9PwYcH3JeUxA"
-
-  apiRateLimitEnabled: true
-  apiRateLimitReviewMax: 60
 
 imagePullSecrets:
   - name: ghcr-creds

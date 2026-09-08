@@ -33,3 +33,5 @@ Yeni ve genellenebilir bir Helm dersi mevcut maddelerde yoksa aynı hata düzelt
 - Frontend/backend ayrımında eski backend selector, Secret ve PVC kimliklerini koru; aynı-origin `/api` yönlendirmesini ve yalnız frontend imajı değişince diğer Pod şablonlarının değişmediğini gerçek render ile doğrula.
 - Rancher Apps UI'ın yükleyeceği tek dosya chart kökündeki `values.yaml`'dır; zorunlu değerleri `values-test.yaml` gibi ortam dosyasına bırakma, `questions.yaml` ile sor ve guard mesajında UI alan adını da yaz.
 - Chart'ı en az bir gerçek `helm template` renderıyla doğrulamadan commit etme; yorum satırının sonuna yapışan bir anahtar YAML'ı bozmadan sessizce başka bir map'e düşer.
+- `--set-string`, `-f` ile verilen dosyalardan daha yüksek önceliklidir; CI sırrı script'e ulaşmadığında gönderilen **boş** değer ortam dosyasındaki geçerli değeri siler ve fail-fast guard'ını yanlış yere tetikler. Zorunlu sırları ayrı bir fallback bloğunda tut ya da bayrağı yalnızca değer doluysa ekle.
+- `--set-string` değeri virgülden böler; `SERVER=host,1433` içeren bağlantı dizesi hata vermeden kırpılır. Bağlantı dizesi gibi virgül/ters bölü içeren değerleri `--set-file` ile geç.

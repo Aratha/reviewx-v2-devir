@@ -177,6 +177,31 @@ appConfig:
   apiRateLimitReviewMax: 30
 
 # Backend /app/data icin kalici depolama (review_rules.json, llm loglari).
+
+# ---------------------------------------------------------------------------
+# appConfigFallback - YALNIZCA CLI/pipeline kurulumlari icin.
+#
+# helm'de `--set-string` degerleri `-f` ile verilen dosyalardan DAHA YUKSEK
+# onceliklidir. Bu yuzden BOS bir `--set-string appConfig.apiAccessToken=`,
+# values-test.yaml'daki gecerli degeri siler ve templates/secret.yaml'daki
+# fail-fast guard'ini yanlis yere tetikler. Bu, CI sirri script'e
+# aktarilmadiginda gorulur (Azure DevOps secret degiskenleri, task'in `env:`
+# blogunda tanimli degilse bos gelir).
+#
+# Asagidaki alanlar doldurulursa, karsilik gelen appConfig alani BOS geldiginde
+# devreye girer. Ortam dosyalarinda (values-test.yaml) doldurulur.
+#
+# ONEMLI: Rancher Apps UI yalnizca chart kokundeki bu values.yaml'i yukler ve
+# burasi BOS birakilmistir -> UI'dan bos deger girildiginde guard'lar aynen
+# calisir. Prod'a EKLEMEYIN: prod sirlari harici Secret'tan gelir
+# (secrets.create=false + secrets.existingSecret), fallback orada yalnizca
+# git'e commit'lenmis placeholder sirlari canliya tasima riski dogurur.
+# ---------------------------------------------------------------------------
+appConfigFallback:
+  mssqlConnectionString: ""
+  apiAccessToken: ""
+  apiAdminToken: ""
+
 persistence:
   enabled: true
   accessMode: ReadWriteOnce

@@ -8,9 +8,12 @@ imajlarını Rancher/Kubernetes ortamına deploy eder.
 ```
 helm/dwhcodereview/
 ├── Chart.yaml
+├── questions.yaml         # Rancher Apps UI form tanımı (zorunlu alanlar)
 ├── values.yaml            # ortak varsayılanlar (fail-fast guard'lar burada)
-├── values-test.yaml       # TEST override
+├── values-test.yaml       # TEST override (yalnızca CLI'da `-f` ile geçerli)
 ├── values-prod.yaml       # PROD override (harici Secret)
+├── tests/
+│   └── render-test.sh     # chart render/guard testleri
 └── templates/
     ├── _helpers.tpl
     ├── secret.yaml               # backend .env → Secret (env anahtarları)
@@ -24,19 +27,50 @@ helm/dwhcodereview/
     └── NOTES.txt
 ```
 
-## Kurulum (TEST)
+## Kurulum (Rancher UI)
+
+> **Rancher yalnızca chart kökündeki `values.yaml`'ı yükler.**
+> `values-test.yaml` ve `values-prod.yaml` Rancher tarafından **otomatik
+> uygulanmaz**. Zorunlu değerler girilmediğinde install şu hatayla durur:
+>
+> ```
+> Error: execution error at (dwhcodereview/templates/secret.yaml:...):
+> appConfig.mssqlConnectionString bos olamaz ...
+> ```
+
+1. Rancher → **Apps → Charts** altında `DWH Code Review` chart'ını açın.
+2. Açılan formda **Zorunlu Ayarlar** grubunu doldurun:
+   - **SQL Server bağlantı dizesi** (`appConfig.mssqlConnectionString`)
+   - **API erişim tokeni** (`appConfig.apiAccessToken`, en az 16 karakter)
+   - **API yönetim tokeni** (`appConfig.apiAdminToken`, önerilir)
+3. **Ağ / Ingress** grubunda `ingress.host` ve `appConfig.corsOrigins`
+   değerlerini ortamla uyumlu hale getirin.
+4. Install.
+
+Form alanları `questions.yaml` içinde tanımlıdır. Formu kullanmadan
+**Edit YAML** sekmesinden de aynı değerleri girebilirsiniz:
+
+```yaml
+appConfig:
+  mssqlConnectionString: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=<host>;DATABASE=master;UID=<user>;PWD=<pass>;TrustServerCertificate=yes"
+  apiAccessToken: "<en-az-16-karakter>"
+  apiAdminToken: "<en-az-16-karakter>"
+```
+
+## Kurulum (CLI / TEST)
 
 ```powershell
 helm upgrade --install dwhcodereview ./helm/dwhcodereview `
   -n dwhcodereview --create-namespace `
-  -f helm/dwhcodereview/values.yaml `
   -f helm/dwhcodereview/values-test.yaml `
-  --set appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=<host>;DATABASE=master;UID=<user>;PWD=<pass>;TrustServerCertificate=yes' `
-  --set appConfig.apiAccessToken='<en-az-16-karakter>' `
-  --set appConfig.apiAdminToken='<en-az-16-karakter>'
+  --set-string appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=<host>;DATABASE=master;UID=<user>;PWD=<pass>;TrustServerCertificate=yes' `
+  --set-string appConfig.apiAccessToken='<en-az-16-karakter>' `
+  --set-string appConfig.apiAdminToken='<en-az-16-karakter>'
 ```
 
-Sonraki upgrade'lerde `--reuse-values` ile değerleri devralın.
+`--reuse-values` sırların korunacağının garantisi değildir; kalıcı sırlar için
+harici Secret kullanın (aşağıdaki PROD bölümü) veya her upgrade'de aynı
+değerleri tekrar verin.
 
 ## Kurulum (PROD)
 
@@ -57,9 +91,19 @@ kubectl -n dwhcodereview create secret generic dwhcodereview-secrets `
 
 ## Doğrulama
 
+Chart'ta değişiklik yaptıktan sonra render testlerini çalıştırın (repo kökünden):
+
+```bash
+bash helm/dwhcodereview/tests/render-test.sh
+```
+
+Test, Rancher'ın kullandığı yolu (yalnızca `values.yaml` + form değerleri),
+guard'ların negatif davranışını ve paketleme çıktısını doğrular.
+
+Tek seferlik render kontrolü:
+
 ```powershell
-helm lint ./helm/dwhcodereview -f helm/dwhcodereview/values.yaml -f helm/dwhcodereview/values-test.yaml
-helm template dwhcodereview ./helm/dwhcodereview -f helm/dwhcodereview/values.yaml -f helm/dwhcodereview/values-test.yaml
+helm template dwhcodereview ./helm/dwhcodereview -f helm/dwhcodereview/values-test.yaml
 ```
 
 ## Notlar
@@ -67,6 +111,9 @@ helm template dwhcodereview ./helm/dwhcodereview -f helm/dwhcodereview/values.ya
 - **Fail-fast:** `appConfig.mssqlConnectionString` ve `appConfig.apiAccessToken`
   boşsa `helm install/template` hata verir. `apiAccessToken`/`apiAdminToken`
   en az 16 karakter olmalıdır.
+- **Tek Secret kaynağı:** `secrets.create=true` ile `secrets.existingSecret`
+  birlikte kullanılamaz; `secrets.create=false` iken `existingSecret` zorunludur.
+  Her iki hata da install anında durdurulur.
 - **SSE:** Canlı review akışı için Ingress annotation'larında
   `proxy-buffering: "off"` ve 3600 sn timeout tanımlıdır; Nginx ConfigMap'inde de
   `proxy_buffering off` korunur.

@@ -8,6 +8,14 @@ type: application
 version: 0.1.0
 appVersion: "latest"
 kubeVersion: ">=1.23.0-0"
+# Rancher Apps & Marketplace katalog bilgileri. questions.yaml ile birlikte
+# chart'in Rancher UI'da form uretmesini ve dogru release/namespace onermesini
+# saglar.
+annotations:
+  catalog.cattle.io/display-name: "DWH Code Review"
+  catalog.cattle.io/release-name: dwhcodereview
+  catalog.cattle.io/namespace: dwhcodereview
+  catalog.cattle.io/kube-version: ">=1.23.0-0"
 maintainers:
   - name: KT Vibecoding
 keywords:

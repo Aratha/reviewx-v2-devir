@@ -1,80 +1,83 @@
+{{- include "dwhcodereview.validate" . -}}
+{{- $image := include "generated.image" (list "backend" .Values.backend.image) }}
+{{- $persistence := .Values.backend.persistence }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dwhcodereview.backend.fullname" . }}
+  name: {{ include "generated.resourceName" (list . "backend") }}
   labels:
-    {{- include "dwhcodereview.labels" . | nindent 4 }}
-    app.kubernetes.io/component: backend
+    {{- include "generated.workloadLabels" (dict "root" . "component" "backend") | nindent 4 }}
+  annotations:
+    {{- include "generated.annotations" . | nindent 4 }}
 spec:
   replicas: {{ .Values.backend.replicaCount }}
+  {{- if and $persistence.enabled (has $persistence.accessMode (list "ReadWriteOnce" "ReadWriteOncePod")) }}
+  # Tek node'a bağlanan veri hacmi yeni Pod'dan önce eski Pod'un kapanmasını gerektirir.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  {{- end }}
   selector:
     matchLabels:
-      {{- include "dwhcodereview.backend.selectorLabels" . | nindent 6 }}
+      scaffold.kt.internal/workload: {{ include "generated.resourceName" (list . "backend") | quote }}
   template:
     metadata:
-      annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
-        {{- include "dwhcodereview.backend.selectorLabels" . | nindent 8 }}
+        {{- include "generated.workloadLabels" (dict "root" . "component" "backend") | nindent 8 }}
+      annotations:
+        {{- include "generated.annotations" . | nindent 8 }}
+        checksum/config: {{ include "dwhcodereview.backendConfig" . | sha256sum }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: backend
-          image: {{ include "dwhcodereview.backend.image" . }}
-          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ $image | quote }}
+          imagePullPolicy: {{ include "dwhcodereview.imagePullPolicy" .Values.backend.image }}
           ports:
-            - name: http
-              containerPort: {{ .Values.backend.containerPort }}
-              protocol: TCP
+            - {name: http, containerPort: 8000}
           envFrom:
-            - secretRef:
-                name: {{ include "dwhcodereview.secretName" . }}
-          livenessProbe:
-            httpGet:
-              path: {{ .Values.backend.probes.path }}
-              port: http
-            initialDelaySeconds: {{ .Values.backend.probes.initialDelaySeconds }}
-            periodSeconds: {{ .Values.backend.probes.periodSeconds }}
-            timeoutSeconds: {{ .Values.backend.probes.timeoutSeconds }}
-            failureThreshold: {{ .Values.backend.probes.failureThreshold }}
+            - configMapRef: {name: {{ include "generated.resourceName" (list . "backend") | quote }}}
+            - secretRef: {name: "{{ required "backend.existingSecret önceden oluşturulmuş bir Secret'ı adlandırmalıdır" .Values.backend.existingSecret }}"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: data, mountPath: /app/data}
+          # SQL ve LLM çağrıları uzun sürebildiği için canlılık toleransı geniştir.
+          startupProbe:
+            httpGet: {path: /api/health, port: http}
+            periodSeconds: 2
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
-            httpGet:
-              path: {{ .Values.backend.probes.path }}
-              port: http
-            initialDelaySeconds: {{ .Values.backend.probes.initialDelaySeconds }}
-            periodSeconds: {{ .Values.backend.probes.periodSeconds }}
-            timeoutSeconds: {{ .Values.backend.probes.timeoutSeconds }}
-            failureThreshold: {{ .Values.backend.probes.failureThreshold }}
+            httpGet: {path: /api/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /api/health, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
-          volumeMounts:
-            - name: data
-              mountPath: /app/data
-          {{- end }}
-      {{- if .Values.persistence.enabled }}
       volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
         - name: data
+          {{- if $persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "dwhcodereview.backend.fullname" . }}-data
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+            claimName: {{ include "dwhcodereview.dataClaimName" . | quote }}
+          {{- else }}
+          emptyDir: {sizeLimit: 1Gi}
+          {{- end }}

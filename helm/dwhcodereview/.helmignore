@@ -1,9 +1,5 @@
 .DS_Store
 .git/
 .gitignore
-.vscode/
-*.tmproj
-*.tgz
-.idea/
-# Render testleri chart paketine girmez; repodan calistirilir.
-tests/
+*.swp
+*.tmp

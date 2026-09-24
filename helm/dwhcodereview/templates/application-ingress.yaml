@@ -1,0 +1,36 @@
+{{- $className := required "frontend.ingress.className dağıtım ortamınca verilmelidir" .Values.frontend.ingress.className -}}
+{{- $host := required "frontend.ingress.host dağıtım ortamınca verilmelidir" .Values.frontend.ingress.host -}}
+{{- $tlsSecret := required "frontend.ingress.tlsSecretName dağıtım ortamınca verilmelidir" .Values.frontend.ingress.tlsSecretName -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "generated.resourceName" (list . "entry") }}
+  labels:
+    {{- include "generated.workloadLabels" (dict "root" . "component" "frontend") | nindent 4 }}
+  annotations:
+    {{- include "generated.annotations" . | nindent 4 }}
+    # Canlı inceleme akışı (SSE) için yanıt tamponlama kapalı ve zaman aşımı uzun.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: {{ $className | quote }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ $tlsSecret | quote }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "generated.resourceName" (list . "backend") }}
+                port: {name: http}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "generated.resourceName" (list . "frontend") }}
+                port: {name: http}

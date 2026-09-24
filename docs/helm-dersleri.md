@@ -35,3 +35,4 @@ Yeni ve genellenebilir bir Helm dersi mevcut maddelerde yoksa aynı hata düzelt
 - Chart'ı en az bir gerçek `helm template` renderıyla doğrulamadan commit etme; yorum satırının sonuna yapışan bir anahtar YAML'ı bozmadan sessizce başka bir map'e düşer.
 - `--set-string`, `-f` ile verilen dosyalardan daha yüksek önceliklidir; CI sırrı script'e ulaşmadığında gönderilen **boş** değer ortam dosyasındaki geçerli değeri siler ve fail-fast guard'ını yanlış yere tetikler. Zorunlu sırları ayrı bir fallback bloğunda tut ya da bayrağı yalnızca değer doluysa ekle.
 - `--set-string` değeri virgülden böler; `SERVER=host,1433` içeren bağlantı dizesi hata vermeden kırpılır. Bağlantı dizesi gibi virgül/ters bölü içeren değerleri `--set-file` ile geç.
+- Bir sırrı chart guard'ıyla zorunlu kılmadan önce istemcinin onu gerçekten gönderdiğini doğrula; frontend `X-API-Key` göndermezken zorunlu `API_ACCESS_TOKEN` arayüzü 401'e kilitler.

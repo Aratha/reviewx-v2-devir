@@ -1,0 +1,65 @@
+# KT Verim build/push convention; Azure owns the separate Helm deployment.
+# helm/dwhcodereview/deploy.sh deploys the full commit SHA tag published here.
+name: Build & Push
+
+"on":
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dwhcodereview-build-and-push
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: dwhcodereview-backend
+            context: backend
+          - image: dwhcodereview-frontend
+            context: frontend
+    env:
+      IMAGE_NAME: ${{ matrix.image }}
+      BUILD_CONTEXT: ${{ matrix.context }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        run: docker buildx create --use
+
+      - name: Log in to GHCR
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build & push
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repository="ghcr.io/$owner/$IMAGE_NAME"
+          date_tag="$(date -u +'%Y%m%d-%H%M%S')"
+          docker buildx build --platform linux/amd64 --file "$BUILD_CONTEXT/Dockerfile" \
+            --tag "$repository:latest" --tag "$repository:$date_tag" \
+            --tag "$repository:${GITHUB_SHA:0:7}" --tag "$repository:$GITHUB_SHA" \
+            --push "$BUILD_CONTEXT"
+
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io

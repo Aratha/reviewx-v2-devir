@@ -1,82 +1,71 @@
+{{- $image := include "generated.image" (list "frontend" .Values.frontend.image) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "dwhcodereview.frontend.fullname" . }}
+  name: {{ include "generated.resourceName" (list . "frontend") }}
   labels:
-    {{- include "dwhcodereview.labels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
+    {{- include "generated.workloadLabels" (dict "root" . "component" "frontend") | nindent 4 }}
+  annotations:
+    {{- include "generated.annotations" . | nindent 4 }}
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
   selector:
     matchLabels:
-      {{- include "dwhcodereview.frontend.selectorLabels" . | nindent 6 }}
+      scaffold.kt.internal/workload: {{ include "generated.resourceName" (list . "frontend") | quote }}
   template:
     metadata:
-      {{- if .Values.frontend.nginxConfig.override }}
-      annotations:
-        checksum/nginx-config: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
-      {{- end }}
       labels:
-        {{- include "dwhcodereview.frontend.selectorLabels" . | nindent 8 }}
+        {{- include "generated.workloadLabels" (dict "root" . "component" "frontend") | nindent 8 }}
+      annotations:
+        {{- include "generated.annotations" . | nindent 8 }}
+        checksum/nginx-config: {{ printf "%s\n%s" (include "dwhcodereview.frontendNginxMainConfig" .) (include "dwhcodereview.frontendNginxConfig" .) | sha256sum }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      automountServiceAccountToken: false
       securityContext:
-        {{- toYaml (mergeOverwrite (deepCopy .Values.podSecurityContext) .Values.frontend.podSecurityContext) | nindent 8 }}
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: frontend
-          image: {{ include "dwhcodereview.frontend.image" . }}
-          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
-          securityContext:
-            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+          image: {{ $image | quote }}
+          imagePullPolicy: {{ include "dwhcodereview.imagePullPolicy" .Values.frontend.image }}
+          # İmajın root varsayan entrypoint betikleri atlanır; Nginx doğrudan başlar.
+          command: ["nginx", "-g", "daemon off;"]
           ports:
-            - name: http
-              containerPort: {{ .Values.frontend.containerPort }}
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: {{ .Values.frontend.probes.path }}
-              port: http
-            initialDelaySeconds: {{ .Values.frontend.probes.initialDelaySeconds }}
-            periodSeconds: {{ .Values.frontend.probes.periodSeconds }}
-            timeoutSeconds: {{ .Values.frontend.probes.timeoutSeconds }}
-            failureThreshold: {{ .Values.frontend.probes.failureThreshold }}
+            - {name: http, containerPort: 8080}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: nginx-config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: nginx-config, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true}
+            - {name: cache, mountPath: /var/cache/nginx}
+            - {name: run, mountPath: /var/run}
+            - {name: tmp, mountPath: /tmp}
+          startupProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
           readinessProbe:
-            httpGet:
-              path: {{ .Values.frontend.probes.path }}
-              port: http
-            initialDelaySeconds: {{ .Values.frontend.probes.initialDelaySeconds }}
-            periodSeconds: {{ .Values.frontend.probes.periodSeconds }}
-            timeoutSeconds: {{ .Values.frontend.probes.timeoutSeconds }}
-            failureThreshold: {{ .Values.frontend.probes.failureThreshold }}
+            httpGet: {path: /, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
-          {{- if .Values.frontend.nginxConfig.override }}
-          volumeMounts:
-            - name: nginx-config
-              mountPath: /etc/nginx/conf.d
-              readOnly: true
-          {{- end }}
-      {{- if .Values.frontend.nginxConfig.override }}
       volumes:
         - name: nginx-config
           configMap:
-            name: {{ include "dwhcodereview.frontend.fullname" . }}-nginx
-            items:
-              - key: default.conf
-                path: default.conf
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+            name: {{ include "generated.resourceName" (list . "frontend") | quote }}
+        - name: cache
+          emptyDir: {sizeLimit: 64Mi}
+        - name: run
+          emptyDir: {sizeLimit: 8Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 32Mi}

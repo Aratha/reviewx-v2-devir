@@ -1,16 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dwhcodereview.frontend.fullname" . }}
+  name: {{ include "generated.resourceName" (list . "frontend") }}
   labels:
-    {{- include "dwhcodereview.labels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
+    {{- include "generated.workloadLabels" (dict "root" . "component" "frontend") | nindent 4 }}
+  annotations:
+    {{- include "generated.annotations" . | nindent 4 }}
 spec:
-  type: {{ .Values.frontend.service.type }}
-  ports:
-    - port: {{ .Values.frontend.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
+  type: ClusterIP
   selector:
-    {{- include "dwhcodereview.frontend.selectorLabels" . | nindent 4 }}
+    scaffold.kt.internal/workload: {{ include "generated.resourceName" (list . "frontend") | quote }}
+  ports:
+    - {name: http, port: {{ .Values.frontend.service.port }}, targetPort: http}

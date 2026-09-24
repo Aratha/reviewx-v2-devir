@@ -82,6 +82,7 @@ flowchart LR
 | **Sistem yöneticisi** | Bu README + [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) | LLM, güvenlik, EDR/DLP, proxy |
 | **Operasyon / IT** | [docs/KURULUM_CHECKLIST.md](docs/KURULUM_CHECKLIST.md) | Teslim onayı |
 | **Docker ayrıntı** | [docs/DOCKER.md](docs/DOCKER.md) | `host.docker.internal`, volume, sorun giderme |
+| **Kubernetes / DevOps** | [helm/dwhcodereview/README.md](helm/dwhcodereview/README.md) | Helm chart, Azure `deploy.sh`, TLS sertifikası, runtime Secret |
 
 ---
 
@@ -231,6 +232,8 @@ Ayrıntılı tablo: [docs/DOCKER.md](docs/DOCKER.md).
 DWHCodeReview/
 ├── backend/           # FastAPI (+ Dockerfile)
 ├── frontend/          # React build (+ Dockerfile, nginx.conf)
+├── helm/dwhcodereview/ # Kubernetes chart, deploy.sh, certs/
+├── scripts/           # helm-chart-test.sh
 ├── docker-compose.yml
 ├── start-docker.bat
 ├── stop-docker.bat

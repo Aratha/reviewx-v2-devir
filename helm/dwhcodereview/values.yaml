@@ -1,240 +1,107 @@
-# ============================================================================
-# DWH Code Review - Helm values (Rancher / Kubernetes deploy).
-# ----------------------------------------------------------------------------
-# Varsayilan (ortak) degerler. Ortama ozgu ayarlar values-test.yaml /
-# values-prod.yaml icinde override edilir.
-#
-# appConfig, backend/config.py (pydantic Settings) tarafindan okunan .env
-# degiskenlerinin BIREBIR karsiligidir; templates/secret.yaml bunlari
-# UPPER_SNAKE_CASE env degiskenlerine cevirip Secret olarak render eder.
-#
-# appConfig.mssqlConnectionString ve appConfig.apiAccessToken BILEREK bos
-# birakildi - dolu olmadan `helm install/template` templates/secret.yaml
-# icindeki `required`/`fail` guard'i yuzunden HATA verir (fail-fast).
-#
-# ONEMLI: Rancher Apps & Marketplace chart'i kurarken YALNIZCA bu dosyayi
-# yukler; values-test.yaml / values-prod.yaml OTOMATIK UYGULANMAZ. Rancher'dan
-# kurarken zorunlu degerler questions.yaml formundan (veya UI'daki "Edit YAML"
-# alanindan) girilir. Ortam dosyalari yalnizca CLI ile `-f` verildiginde
-# gecerlidir.
-#
-# CLI ile TEST kurulumu:
-#   helm upgrade --install dwhcodereview ./helm/dwhcodereview \
-#     -f helm/dwhcodereview/values-test.yaml \
-#     --set-string appConfig.mssqlConnectionString='DRIVER={ODBC Driver 18 for SQL Server};SERVER=...' \
-#     --set-string appConfig.apiAccessToken=... \
-#     --set-string appConfig.apiAdminToken=...
-#
-# Upgrade'de `--reuse-values` sirlarin korunacaginin GARANTISI DEGILDIR; kalici
-# sirlari harici Secret'a baglayin (secrets.create=false + secrets.existingSecret)
-# ya da her upgrade'de ayni degerleri tekrar verin.
-# ============================================================================
+# Tek değer kaynağı bu dosyadır; ortam dosyası (values-test/prod) yoktur.
+# Azure'da deploy.sh imaj etiketini ve çalışma zamanı Secret adını ayrıca verir.
+# Değer sözleşmesi values.schema.json, çapraz kontroller templates/_validation.tpl.
 
-nameOverride: ""
-fullnameOverride: ""
-
-# GHCR/Harbor private ise: `kubectl create secret docker-registry ghcr-creds ...`
-# olusturup adini buraya yazin. Bossa imagePullSecret set edilmez.
-imagePullSecrets: []
-#  - name: ghcr-creds
-
-# ---------------------------------------------------------------------------
-# Backend (FastAPI + pyodbc / ODBC Driver 18)
-# ---------------------------------------------------------------------------
 backend:
   replicaCount: 1
   image:
-    registry: cr-test.kuveytturk.com.tr/ghcr.io.vc
-    repository: kt-vibecoding/dwhcodereview-backend
+    # İç registry (GHCR proxy-cache) yolu; doğrudan ghcr.io node'da çözülemez.
+    repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-backend
     tag: latest
-    # latest gibi degisken tag'lerde Rancher yeni imaji cekmeyebilir -> Always.
-    pullPolicy: Always
-  service:
-    type: ClusterIP
-    port: 8000
-  # Konteynerin gercekte dinledigi port (uvicorn --port 8000).
-  containerPort: 8000
-  probes:
-    path: /api/health
-    initialDelaySeconds: 30
-    periodSeconds: 30
-    timeoutSeconds: 5
-    failureThreshold: 3
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: "1"
-      memory: 1Gi
-  # LLM cagrilari uzun surebildigi icin (llmReadTimeoutSeconds=900) pod'un
-  # nazikce kapanmasina izin ver.
+    digest: ""
+  # Sırları taşıyan, chart dışında yönetilen Secret (MSSQL_CONNECTION_STRING,
+  # MSSQL_PASSWORD, API_ACCESS_TOKEN, API_ADMIN_TOKEN, LLM_API_KEY).
+  # deploy.sh yoksa oluşturur; pipeline'da dolu verilen anahtarları günceller.
+  existingSecret: dwhcodereview-runtime
+  # Sır olmayan ayarlar (backend/config.py alanlarının env adları); ConfigMap
+  # olarak aktarılır. CORS_ORIGINS boşsa https://<frontend.ingress.host> olur.
+  # MSSQL_SERVER, MSSQL_PORT, MSSQL_USER, MSSQL_ENCRYPT gibi alanlar da eklenebilir.
+  config:
+    LLM_BASE_URL: "http://llm-gateway.ailabtest.svc.cluster.local/v1"
+    LLM_CHAT_API: api_v1_chat
+    LLM_CHAT_URL: ""
+    LLM_MODEL: openai/gpt-oss-120b
+    SQL_REVIEW_LLM_MODEL: ""
+    LLM_HTTP_TRUST_ENV: "false"
+    LLM_HTTP_USER_AGENT: "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"
+    LLM_ENFORCE_PRIVATE_NETWORK: "true"
+    LLM_ALLOW_PUBLIC_HOSTS: ""
+    LLM_LOG_FULL_PAYLOADS: "false"
+    SQL_REVIEW_MAX_CONCURRENT_RULES: "6"
+    LLM_READ_TIMEOUT_SECONDS: "900"
+    LLM_REQUEST_RETRIES: "2"
+    SQL_REVIEW_TWO_PART_THRESHOLD_CHARS: "45000"
+    CORS_ORIGINS: ""
+    API_RATE_LIMIT_ENABLED: "true"
+    API_RATE_LIMIT_WINDOW_SECONDS: "60"
+    API_RATE_LIMIT_REVIEW_MAX: "60"
+  # review_rules.json ve LLM logları (/app/data). ReadWriteOnce iken tek replika
+  # ve Recreate stratejisi kullanılır. PVC adı eski chart ile aynıdır; veri korunur.
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    storageClass: ""
+  # Uzun LLM çağrılarının (LLM_READ_TIMEOUT_SECONDS) kapanırken tamamlanması için.
   terminationGracePeriodSeconds: 60
+  networkPolicy:
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - {protocol: TCP, port: 8000}
+    egress:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - {protocol: UDP, port: 53}
+          - {protocol: TCP, port: 53}
+      # SQL Server ve LLM uç noktası yalnız kurum içi (private) ağda olabilir;
+      # LLM_ENFORCE_PRIVATE_NETWORK ile aynı sınır. Hedefler netleşince CIDR'leri
+      # daraltın; LLM farklı bir portta dinliyorsa portu buraya ekleyin.
+      - to:
+          - ipBlock: {cidr: 10.0.0.0/8}
+          - ipBlock: {cidr: 172.16.0.0/12}
+          - ipBlock: {cidr: 192.168.0.0/16}
+        ports:
+          - {protocol: TCP, port: 1433}
+          - {protocol: TCP, port: 80}
+          - {protocol: TCP, port: 443}
+  service:
+    port: 8000
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: 1000m, memory: 1Gi}
 
-# ---------------------------------------------------------------------------
-# Frontend (Vite build -> Nginx). Nginx /api'yi backend service'ine proxy'ler.
-# ---------------------------------------------------------------------------
 frontend:
   replicaCount: 1
   image:
-    registry: cr-test.kuveytturk.com.tr/ghcr.io.vc
-    repository: kt-vibecoding/dwhcodereview-frontend
+    repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-frontend
     tag: latest
-    pullPolicy: Always
+    digest: ""
+  # Host, certs/ailab-test.crt wildcard sertifikasının (*.ailab-test.kuveytturk.com.tr)
+  # kapsamında olmalıdır. ailab-tls Secret'ı namespace-scoped'tır; eksikse deploy.sh
+  # kt-verim/ailab-tls anahtarını repodaki zincirle doğrulayıp oluşturur.
+  ingress:
+    className: nginx
+    host: dwhcodereview.ailab-test.kuveytturk.com.tr
+    tlsSecretName: ailab-tls
+  networkPolicy:
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - {protocol: TCP, port: 8080}
+    # Frontend yalnız statik dosya sunar; /api Ingress'ten doğrudan backend'e gider.
+    egress: []
   service:
-    type: ClusterIP
-    port: 80
-  containerPort: 80
-  probes:
-    path: /
-    initialDelaySeconds: 10
-    periodSeconds: 30
-    timeoutSeconds: 5
-    failureThreshold: 3
+    port: 8080
   resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 250m
-      memory: 256Mi
-  # Imajdaki /etc/nginx/conf.d/default.conf'u ConfigMap ile ezer. `proxy_pass`
-  # hedefi backend Service'inin cluster ici adiyla render edilir; boylece
-  # docker-compose'daki "backend" host adina bagimlilik ortadan kalkar.
-  nginxConfig:
-    override: true
-    # SSE (streaming review) icin buffering kapali tutulmali.
-    proxyReadTimeout: 3600
-    proxySendTimeout: 3600
-  # nginx:alpine master process'i port 80'i acmak ve /var/cache/nginx'e yazmak
-  # icin root olarak baslar (worker'lar nginx kullanicisina duser). Bu yuzden
-  # global podSecurityContext burada bilincli olarak gevsetiliyor.
-  podSecurityContext:
-    runAsNonRoot: false
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: false
-    capabilities:
-      drop:
-        - ALL
-      add:
-        - CHOWN
-        - SETGID
-        - SETUID
-        - NET_BIND_SERVICE
-
-# ---------------------------------------------------------------------------
-# Backend .env degerleri (config.py Settings alanlariyla birebir).
-# mssqlConnectionString + tokenlar sir icerdigi icin Secret olarak render edilir.
-# Prod'da secrets.create=false + existingSecret ile harici Secret kullanin.
-# ---------------------------------------------------------------------------
-secrets:
-  create: true
-  existingSecret: ""      # doluysa create yerine bu Secret kullanilir
-
-appConfig:
-  # ZORUNLU: bos birakilirsa templates/secret.yaml `required` guard'i ile
-  # helm install/template'i durdurur.
-  # Ornek: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=dwh-sql;DATABASE=master;UID=svc_dwh;PWD=...;TrustServerCertificate=yes"
-  mssqlConnectionString: ""
-
-  # LLM baglantisi (services/llm_review.py)
-  llmBaseUrl: "http://llm-gateway.ailab.svc.cluster.local/v1"
-  # openai | api_v1_chat
-  llmChatApi: "api_v1_chat"
-  llmChatUrl: ""
-  llmModel: "openai/gpt-oss-120b"
-  # Doluysa llmModel'i ezer; model secimini garanti eder.
-  sqlReviewLlmModel: ""
-  llmApiKey: ""
-  # Kume ici LLM icin false; kurumsal proxy uzerinden bulut API ise true.
-  llmHttpTrustEnv: false
-  llmHttpUserAgent: "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"
-  # Kurumsal guvenlik: LLM hedefi private ag icinde olmali.
-  llmEnforcePrivateNetwork: true
-  # Private olmayan ama izin verilen hedefler (virgulle ayrilmis hostname).
-  llmAllowPublicHosts: ""
-  # Ham request/response govdelerini logla (oneri: false - veri sizintisi riski).
-  llmLogFullPayloads: false
-
-  # Review davranisi
-  sqlReviewMaxConcurrentRules: 6
-  llmReadTimeoutSeconds: 900
-  llmRequestRetries: 2
-  sqlReviewTwoPartThresholdChars: 45000
-
-  # CORS: ingress.host ile uyumlu olmali.
-  corsOrigins: "https://dwhcodereview.ailabtest.kuveytturk.com.tr"
-
-  # ZORUNLU: bos birakilirsa /api uclari kimlik dogrulamasiz kalir; guard fail eder.
-  apiAccessToken: ""
-  # Yonetim uclari (rules / llm-config / llm-logs) icin ayri token. Onerilir.
-  apiAdminToken: ""
-
-  # Basit hiz limiti
-  apiRateLimitEnabled: true
-  apiRateLimitWindowSeconds: 60
-  apiRateLimitReviewMax: 30
-
-# Backend /app/data icin kalici depolama (review_rules.json, llm loglari).
-
-# ---------------------------------------------------------------------------
-# appConfigFallback - YALNIZCA CLI/pipeline kurulumlari icin.
-#
-# helm'de `--set-string` degerleri `-f` ile verilen dosyalardan DAHA YUKSEK
-# onceliklidir. Bu yuzden BOS bir `--set-string appConfig.apiAccessToken=`,
-# values-test.yaml'daki gecerli degeri siler ve templates/secret.yaml'daki
-# fail-fast guard'ini yanlis yere tetikler. Bu, CI sirri script'e
-# aktarilmadiginda gorulur (Azure DevOps secret degiskenleri, task'in `env:`
-# blogunda tanimli degilse bos gelir).
-#
-# Asagidaki alanlar doldurulursa, karsilik gelen appConfig alani BOS geldiginde
-# devreye girer. Ortam dosyalarinda (values-test.yaml) doldurulur.
-#
-# ONEMLI: Rancher Apps UI yalnizca chart kokundeki bu values.yaml'i yukler ve
-# burasi BOS birakilmistir -> UI'dan bos deger girildiginde guard'lar aynen
-# calisir. Prod'a EKLEMEYIN: prod sirlari harici Secret'tan gelir
-# (secrets.create=false + secrets.existingSecret), fallback orada yalnizca
-# git'e commit'lenmis placeholder sirlari canliya tasima riski dogurur.
-# ---------------------------------------------------------------------------
-appConfigFallback:
-  mssqlConnectionString: ""
-  apiAccessToken: ""
-  apiAdminToken: ""
-
-persistence:
-  enabled: true
-  accessMode: ReadWriteOnce
-  size: 5Gi
-  storageClass: ""
-
-ingress:
-  enabled: true
-  className: ""
-  host: dwhcodereview.ailabtest.kuveytturk.com.tr
-  path: /
-  pathType: Prefix
-  annotations:
-    # SSE (canli review akisi) icin proxy buffering kapali olmali.
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-  tls:
-    enabled: false
-    secretName: dwhcodereview-tls
-
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 10001
-  fsGroup: 10001
-
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
-  capabilities:
-    drop:
-      - ALL
-
-nodeSelector: {}
-tolerations: []
-affinity: {}
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 250m, memory: 256Mi}

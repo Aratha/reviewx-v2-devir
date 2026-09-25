@@ -11,6 +11,11 @@ RUN apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc \
     && rm -rf /var/lib/apt/lists/*
 
+# Kurum içi LLM uçlarının (*.gpudtx.kuveytturk.com.tr) kök CA'sı; sistem güven deposuna eklenir.
+COPY certs/corporate-inference-root.crt /usr/local/share/ca-certificates/corporate-inference-root.crt
+RUN update-ca-certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 WORKDIR /app
 
 COPY requirements.txt .

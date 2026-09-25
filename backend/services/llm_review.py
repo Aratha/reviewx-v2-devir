@@ -5,10 +5,12 @@ import logging
 import os
 import re
 import socket
+import ssl
 import time
 from urllib.parse import urlparse
 from typing import Any
 
+import certifi
 import httpx
 
 
@@ -29,6 +31,12 @@ from services.llm_log import append_entry, log_timestamp_iso, new_log_id
 
 
 logger = logging.getLogger(__name__)
+
+
+def _llm_ssl_context() -> ssl.SSLContext:
+    """trust_env=False iken httpx SSL_CERT_FILE'ı yok sayıp certifi kullanır; kurum kök CA'sı
+    imajın sistem deposunda olduğundan SSL_CERT_FILE açıkça okunur (yoksa certifi)."""
+    return ssl.create_default_context(cafile=os.environ.get("SSL_CERT_FILE") or certifi.where())
 
 
 def _is_private_or_tailscale_ip(ip_text: str) -> bool:
@@ -2113,6 +2121,7 @@ async def review_sql(
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(read_sec, connect=connect_sec),
         trust_env=settings.llm_http_trust_env,
+        verify=_llm_ssl_context(),
         headers={"User-Agent": ua},
         limits=httpx.Limits(
             max_connections=5000,

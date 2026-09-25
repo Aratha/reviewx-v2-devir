@@ -17,10 +17,12 @@ backend:
   # olarak aktarılır. CORS_ORIGINS boşsa https://<frontend.ingress.host> olur.
   # MSSQL_SERVER, MSSQL_PORT, MSSQL_USER, MSSQL_ENCRYPT gibi alanlar da eklenebilir.
   config:
-    LLM_BASE_URL: "http://llm-gateway.ailabtest.svc.cluster.local/v1"
-    LLM_CHAT_API: api_v1_chat
+    # KT Verim ile aynı kurum içi vLLM ucu (OpenAI uyumlu, anahtar gerektirmez).
+    # Kök CA backend imajında; uç 10.14.3.99:443, aşağıdaki 10.0.0.0/8 egress kuralı kapsar.
+    LLM_BASE_URL: "https://runai.gpudtx.kuveytturk.com.tr/inference/qwen36-35b-a3b-fp8/v1"
+    LLM_CHAT_API: openai
     LLM_CHAT_URL: ""
-    LLM_MODEL: openai/gpt-oss-120b
+    LLM_MODEL: /data/models--Qwen--Qwen36-35B-A3B-FP8
     SQL_REVIEW_LLM_MODEL: ""
     LLM_HTTP_TRUST_ENV: "false"
     LLM_HTTP_USER_AGENT: "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"

@@ -1334,6 +1334,9 @@
                 "type": "null"
               }
             ]
+          },
+          "title": {
+            "type": "string"
           }
         },
         "required": [
@@ -1465,6 +1468,9 @@
                 "type": "null"
               }
             ]
+          },
+          "title": {
+            "type": "string"
           }
         },
         "required": [

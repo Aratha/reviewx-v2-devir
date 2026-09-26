@@ -20,7 +20,8 @@ def _canonicalize(value: Any, path: tuple[str, ...] = ()) -> Any:
         for key in sorted(value):
             if key == "operationId":
                 continue
-            if key == "title" and path != ("info",):
+            # Drop the generated ``title`` metadata, but keep a property that is named ``title``.
+            if key == "title" and path != ("info",) and path[-1:] != ("properties",):
                 continue
             normalized[key] = _canonicalize(value[key], (*path, key))
         return normalized

@@ -2526,6 +2526,7 @@ export interface components {
             /** @enum {string} */
             status: "running" | "completed" | "failed" | "cancelled" | "interrupted";
             subtitle: string | null;
+            title: string;
         };
         ReviewRunPage: {
             items: components["schemas"]["ReviewRunSummary"][];
@@ -2552,6 +2553,7 @@ export interface components {
             /** @enum {string} */
             status: "running" | "completed" | "failed" | "cancelled" | "interrupted";
             subtitle: string | null;
+            title: string;
         };
         /** @description One event of the stream: the JSON on a single ``data:`` line, named by ``phase``. */
         ReviewStreamEvent: components["schemas"]["RunStartedEvent"] | components["schemas"]["ObjectStartEvent"] | components["schemas"]["DefinitionFetchEvent"] | components["schemas"]["SqlReadyEvent"] | components["schemas"]["MetadataFetchEvent"] | components["schemas"]["MetadataReadyEvent"] | components["schemas"]["ObjectErrorEvent"] | components["schemas"]["ObjectDoneEvent"] | components["schemas"]["RulesBatchStartEvent"] | components["schemas"]["RuleStartEvent"] | components["schemas"]["LlmStreamEvent"] | components["schemas"]["RuleDoneEvent"] | components["schemas"]["CompleteEvent"] | components["schemas"]["ErrorEvent"];

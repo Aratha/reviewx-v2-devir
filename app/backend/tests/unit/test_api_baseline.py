@@ -136,6 +136,21 @@ def test_openapi_export_is_offline_and_deterministic(tmp_path: Path) -> None:
     assert f"{get_settings().api_prefix}/auth/login" in schema["paths"]
 
 
+def test_openapi_export_keeps_properties_named_title(tmp_path: Path) -> None:
+    """Only schema ``title`` metadata is dropped; a field called ``title`` stays in the contract."""
+
+    schema = export_openapi(tmp_path / "app-api.yaml")
+    components = schema["components"]["schemas"]
+    for name in ("ReviewRunSummary", "ReviewRunDetail"):
+        component = components[name]
+        assert "title" not in component
+        assert "title" in component["required"]
+        assert component["properties"]["title"] == {"type": "string"}
+    for component in components.values():
+        for field in component.get("properties", {}).values():
+            assert "title" not in field
+
+
 async def test_readiness_reports_database_state(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

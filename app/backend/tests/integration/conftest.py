@@ -4,6 +4,7 @@ import logging
 import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -21,6 +22,7 @@ from app.domain.directory import (
     DirectoryAccount,
     DirectoryCredentialsRejected,
 )
+from app.infrastructure.repositories.user_repository import UserRepository
 from app.main import app
 from app.scripts.create_super_admin import ensure_super_admin
 
@@ -208,3 +210,52 @@ def recorded_logs() -> Iterator[RecordingHandler]:
         for logger, level in zip(loggers, levels, strict=True):
             logger.removeHandler(handler)
             logger.setLevel(level)
+
+
+@dataclass(frozen=True)
+class RoleSession:
+    """A directory user holding one application role, logged in through the real endpoint."""
+
+    headers: dict[str, str]
+    public_id: str
+    display_name: str
+
+
+class RoleSessions:
+    def __init__(self, auth: AuthHarness) -> None:
+        self.auth = auth
+
+    async def login(self, role: str) -> RoleSession:
+        name = f"kisi{uuid4().hex[:8]}"
+        _, password, _ = self.auth.directory.add(name)
+        first = await self.auth.login(name, password)
+        assert first.status_code == 200, first.text
+        user_public_id = first.json()["user"]["public_id"]
+        if role != "inceleyici":
+            async with async_session_factory() as session:
+                users = UserRepository(session)
+                user = await users.get_active_by_public_id(UUID(user_public_id))
+                target_role = await users.get_role(role)
+                assert user is not None and target_role is not None
+                await users.set_application_role(
+                    user, target_role, actor_user_id=user.user_id, now=datetime.now(UTC)
+                )
+                await session.commit()
+        response = await self.auth.login(name, password)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["user"]["role"] == role
+        return RoleSession(
+            self.auth.auth_headers(body), body["user"]["public_id"], body["user"]["display_name"]
+        )
+
+    async def reviewer(self) -> RoleSession:
+        return await self.login("inceleyici")
+
+    async def rule_manager(self) -> RoleSession:
+        return await self.login("kural-yoneticisi")
+
+
+@pytest.fixture
+def role_sessions(auth: AuthHarness) -> RoleSessions:
+    return RoleSessions(auth)

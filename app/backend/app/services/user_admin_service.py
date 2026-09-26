@@ -26,7 +26,7 @@ from app.infrastructure.repositories.refresh_session_repository import (
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.schemas.admin.users import UserPage, UserSummary
 from app.schemas.auth.response import AccountTypeValue, ApplicationRoleValue
-from app.services.auth_service import not_authenticated
+from app.services.request_scope import acting_user, active_tenant
 
 logger = logging.getLogger("app.admin")
 
@@ -67,7 +67,7 @@ class UserAdminService:
     async def list_users(
         self, context: RequestContext, *, page: int, size: int, query: str | None
     ) -> UserPage:
-        tenant = await self._tenant(context)
+        tenant = await active_tenant(self.users, context)
         rows, total = await self.users.list_users(
             tenant_id=tenant.tenant_id,
             query=query.strip() if query and query.strip() else None,
@@ -84,7 +84,7 @@ class UserAdminService:
     async def set_role(
         self, context: RequestContext, target_public_id: UUID, role_code: ApplicationRoleValue
     ) -> ApplicationRoleValue:
-        tenant = await self._tenant(context)
+        tenant = await active_tenant(self.users, context)
         actor = await self._acting_super_admin(context)
         target = await self._target(target_public_id, tenant)
         roles = await self.users.role_codes(target)
@@ -115,7 +115,7 @@ class UserAdminService:
     async def set_active(
         self, context: RequestContext, target_public_id: UUID, active: bool
     ) -> bool:
-        tenant = await self._tenant(context)
+        tenant = await active_tenant(self.users, context)
         actor = await self._acting_super_admin(context)
         target = await self._target(target_public_id, tenant)
         if target.user_id == actor.user_id:
@@ -177,22 +177,8 @@ class UserAdminService:
             now=now,
         )
 
-    async def _tenant(self, context: RequestContext) -> Tenant:
-        if context.tenant_id is None:
-            raise not_authenticated()
-        tenant = await self.users.get_tenant_by_public_id(context.tenant_id)
-        if tenant is None:
-            raise ApplicationError(
-                status.HTTP_404_NOT_FOUND, "tenant_not_found", "Kiracı bulunamadı."
-            )
-        return tenant
-
     async def _acting_super_admin(self, context: RequestContext) -> User:
-        if context.subject is None:
-            raise not_authenticated()
-        actor = await self.users.get_active_by_public_id(context.subject)
-        if actor is None:
-            raise not_authenticated()
+        actor = await acting_user(self.users, context)
         if SUPER_ADMIN_ROLE not in await self.users.role_codes(actor):
             raise _forbidden()
         return actor

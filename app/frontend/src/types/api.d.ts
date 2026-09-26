@@ -524,6 +524,392 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/rule-set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rule Set
+         * @description The draft, its change counter and the latest published version (Requirement 1).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetWorkspace"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/rule-set/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Draft
+         * @description Save the whole draft; the request carries the revision the client saw.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RuleSetDraftUpdate"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetWorkspace"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Taslak başka biri tarafından değiştirildi */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/rule-set/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Versions
+         * @description Published versions, newest first.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    page_size?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetVersionPage"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Publish
+         * @description Publish the draft as the next immutable version; an unchanged draft returns the latest.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RuleSetPublishRequest"];
+                };
+            };
+            responses: {
+                /** @description Taslak en son sürümle aynı; var olan sürüm döner */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Successful Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetVersionDetail"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Taslak başka biri tarafından değiştirildi */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/rule-set/versions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Latest Version
+         * @description The full content of the latest published version.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetVersionDetail"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Yayımlanmış kural yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/rule-set/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Version
+         * @description The full content of one published version.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    number: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RuleSetVersionDetail"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Sürüm yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -568,6 +954,63 @@ export interface components {
         RoleChange: {
             /** @enum {string} */
             role: "inceleyici" | "kural-yoneticisi";
+        };
+        RuleItem: {
+            /** @description KuralNN code. */
+            id: string;
+            /** @default false */
+            requires_metadata: boolean;
+            text: string;
+        };
+        RuleSetDraftUpdate: {
+            base_revision: number;
+            critical?: components["schemas"]["RuleItem"][];
+            normal?: components["schemas"]["RuleItem"][];
+        };
+        RuleSetPublishRequest: {
+            base_revision: number;
+        };
+        RuleSetVersionDetail: {
+            critical: components["schemas"]["RuleItem"][];
+            critical_count: number;
+            normal: components["schemas"]["RuleItem"][];
+            normal_count: number;
+            number: number;
+            /** Format: date-time */
+            published_at: string;
+            /** @description Display name of the publishing rule manager; empty for the import. */
+            published_by_name: string | null;
+            /** @enum {string} */
+            source: "arayuz" | "ice-aktarim";
+        };
+        RuleSetVersionPage: {
+            items: components["schemas"]["RuleSetVersionSummary"][];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        RuleSetVersionSummary: {
+            critical_count: number;
+            normal_count: number;
+            number: number;
+            /** Format: date-time */
+            published_at: string;
+            /** @description Display name of the publishing rule manager; empty for the import. */
+            published_by_name: string | null;
+            /** @enum {string} */
+            source: "arayuz" | "ice-aktarim";
+        };
+        /** @description The draft of the tenant together with the latest published version. */
+        RuleSetWorkspace: {
+            critical: components["schemas"]["RuleItem"][];
+            /** @description True when the draft differs from latest_version. */
+            draft_differs: boolean;
+            latest_version: components["schemas"]["RuleSetVersionSummary"] | null;
+            /** @description First free KuralNN code for a new rule. */
+            next_rule_id: string;
+            normal: components["schemas"]["RuleItem"][];
+            /** @description Draft change counter; save and publish must send it. */
+            revision: number;
         };
         UserPage: {
             items: components["schemas"]["UserSummary"][];

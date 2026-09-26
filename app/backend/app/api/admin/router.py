@@ -1,17 +1,13 @@
 """User administration: list users, assign the application role, activate or deactivate."""
 
-from collections.abc import Callable, Coroutine
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from fastapi.routing import APIRoute
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth.dependencies import CurrentContext, require_super_admin
-from app.core.errors import error_body
+from app.api.validation import envelope_validation_route
 from app.db.session import get_db
 from app.schemas.admin.users import ActiveChange, RoleChange, UserPage
 from app.services.user_admin_service import (
@@ -20,23 +16,8 @@ from app.services.user_admin_service import (
     UserAdminService,
 )
 
-
-class BadRequestOnValidationRoute(APIRoute):
-    """The PRD contract answers malformed admin input with 400 instead of FastAPI's 422."""
-
-    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
-        handler = super().get_route_handler()
-
-        async def route_handler(request: Request) -> Response:
-            try:
-                return await handler(request)
-            except RequestValidationError:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content=error_body("invalid_request", "İstek değerleri geçersiz."),
-                )
-
-        return route_handler
+# The PRD contract answers malformed admin input with 400 instead of FastAPI's 422.
+BadRequestOnValidationRoute = envelope_validation_route(status.HTTP_400_BAD_REQUEST)
 
 
 _ERRORS = {

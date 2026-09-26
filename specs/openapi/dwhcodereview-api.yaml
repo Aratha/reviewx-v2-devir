@@ -146,6 +146,242 @@
         ],
         "type": "object"
       },
+      "RuleItem": {
+        "properties": {
+          "id": {
+            "description": "KuralNN code.",
+            "maxLength": 32,
+            "type": "string"
+          },
+          "requires_metadata": {
+            "default": false,
+            "type": "boolean"
+          },
+          "text": {
+            "maxLength": 16000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "type": "object"
+      },
+      "RuleSetDraftUpdate": {
+        "properties": {
+          "base_revision": {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "critical": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "maxItems": 400,
+            "type": "array"
+          },
+          "normal": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "maxItems": 400,
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_revision"
+        ],
+        "type": "object"
+      },
+      "RuleSetPublishRequest": {
+        "properties": {
+          "base_revision": {
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "base_revision"
+        ],
+        "type": "object"
+      },
+      "RuleSetVersionDetail": {
+        "properties": {
+          "critical": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "type": "array"
+          },
+          "critical_count": {
+            "type": "integer"
+          },
+          "normal": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "type": "array"
+          },
+          "normal_count": {
+            "type": "integer"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "published_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name of the publishing rule manager; empty for the import."
+          },
+          "source": {
+            "enum": [
+              "arayuz",
+              "ice-aktarim"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "published_at",
+          "published_by_name",
+          "source",
+          "critical_count",
+          "normal_count",
+          "critical",
+          "normal"
+        ],
+        "type": "object"
+      },
+      "RuleSetVersionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleSetVersionSummary"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "type": "object"
+      },
+      "RuleSetVersionSummary": {
+        "properties": {
+          "critical_count": {
+            "type": "integer"
+          },
+          "normal_count": {
+            "type": "integer"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "published_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "published_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name of the publishing rule manager; empty for the import."
+          },
+          "source": {
+            "enum": [
+              "arayuz",
+              "ice-aktarim"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "published_at",
+          "published_by_name",
+          "source",
+          "critical_count",
+          "normal_count"
+        ],
+        "type": "object"
+      },
+      "RuleSetWorkspace": {
+        "description": "The draft of the tenant together with the latest published version.",
+        "properties": {
+          "critical": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "type": "array"
+          },
+          "draft_differs": {
+            "description": "True when the draft differs from latest_version.",
+            "type": "boolean"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleSetVersionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_rule_id": {
+            "description": "First free KuralNN code for a new rule.",
+            "type": "string"
+          },
+          "normal": {
+            "items": {
+              "$ref": "#/components/schemas/RuleItem"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "description": "Draft change counter; save and publish must send it.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "critical",
+          "normal",
+          "latest_version",
+          "draft_differs",
+          "next_rule_id"
+        ],
+        "type": "object"
+      },
       "UserPage": {
         "properties": {
           "items": {
@@ -720,6 +956,311 @@
         "summary": "Readiness",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/rule-set": {
+      "get": {
+        "description": "The draft, its change counter and the latest published version (Requirement 1).",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetWorkspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Read Rule Set",
+        "tags": [
+          "rule-set"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/rule-set/draft": {
+      "put": {
+        "description": "Save the whole draft; the request carries the revision the client saw.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetDraftUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetWorkspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "409": {
+            "description": "Taslak ba\u015fka biri taraf\u0131ndan de\u011fi\u015ftirildi"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Save Draft",
+        "tags": [
+          "rule-set"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/rule-set/versions": {
+      "get": {
+        "description": "Published versions, newest first.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "List Versions",
+        "tags": [
+          "rule-set"
+        ]
+      },
+      "post": {
+        "description": "Publish the draft as the next immutable version; an unchanged draft returns the latest.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSetPublishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Taslak en son s\u00fcr\u00fcmle ayn\u0131; var olan s\u00fcr\u00fcm d\u00f6ner"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "409": {
+            "description": "Taslak ba\u015fka biri taraf\u0131ndan de\u011fi\u015ftirildi"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Publish",
+        "tags": [
+          "rule-set"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/rule-set/versions/latest": {
+      "get": {
+        "description": "The full content of the latest published version.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "Yay\u0131mlanm\u0131\u015f kural yok"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Read Latest Version",
+        "tags": [
+          "rule-set"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/rule-set/versions/{number}": {
+      "get": {
+        "description": "The full content of one published version.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSetVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "S\u00fcr\u00fcm yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Read Version",
+        "tags": [
+          "rule-set"
         ]
       }
     }

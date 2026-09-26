@@ -55,6 +55,21 @@ def require_permission(permission: str) -> PermissionChecker:
     return PermissionChecker(permission)
 
 
+class RoleChecker:
+    """Allow a caller holding any of the roles; the super admin passes every role check."""
+
+    def __init__(self, roles: tuple[str, ...]) -> None:
+        self.roles = roles
+
+    async def __call__(self, context: CurrentContext) -> None:
+        if not any(context.has_role(role) for role in self.roles):
+            raise _forbidden()
+
+
+def require_any_role(*roles: str) -> RoleChecker:
+    return RoleChecker(roles)
+
+
 class SuperAdminChecker:
     async def __call__(self, context: CurrentContext) -> None:
         if not context.is_super_admin:

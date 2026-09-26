@@ -203,7 +203,7 @@ log işaretleri `[IMAGE]`, `[RUNTIME]`, `[RELEASE]`, `[MIGRATION]` önekini taş
 - Eski PVC, eski Secret anahtarları (`MSSQL_CONNECTION_STRING`, `API_ACCESS_TOKEN`, `API_ADMIN_TOKEN`
   ve öneksiz diğerleri) ve eski Azure değişkenleri geri alma süresi bitene kadar kalır; sonra işletim
   ekibi tek elle adımla siler (Decision 13).
-- Yedekleme Decision 10'dadır.
+- Veritabanı yedeği ve yedekten geri dönüş bu teslimin kapsamında değildir (Decision 10).
 
 ## Gözlemlenebilirlik
 
@@ -268,10 +268,8 @@ oluşur. Küme tarafında depolama sınıfı ve LDAPS/SQL Server/LLM ağ erişim
   Decision 7'deki fabrika değişikliğinin imaj yolu kuralına uyar.
 - Decision 9: PostgreSQL diski 10Gi'dir; depolama sınıfı KT Verim PostgreSQL diskininkiyle aynıdır ve
   açıkça yazılır; kaynak isteği 100m CPU/256Mi, sınırı 1 CPU/1Gi'dir (Requirement 2).
-- Decision 10: Yedek günlük `pg_dump` ile ayrı 5Gi diske alınır ve 7 gün saklanır; kurumun yedekleme
-  hizmeti varsa o tercih edilir. Decision 7'deki fabrika değişikliği yalnız StatefulSet'i ve göç Job'unu
-  getirdiği için yedek `CronJob`'u (zamanlanmış iş) chart'a, fabrika bu iş yükünü de desteklediğinde bu
-  PRD'nin revizyonuyla girer; o zamana kadar yedek bu teslimin parçası değildir.
+- Decision 10: Proje sahibi veritabanı yedeğini (`pg_dump`) ve yedekten geri dönüşü gereksiz buldu;
+  chart'ta yedek işi yoktur.
 - Decision 11: SQL Server çıkışı yalnız işletim ekibinin verdiği nonprod SQL Server `/32` adresine ve
   yapılandırılan SQL Server portuna (varsayılan 1433) açılır
   ([SQL Server bağlantısı PRD'si](../../../sql-review/PRDs/002-sql-server-connection/PRD.md)
@@ -296,7 +294,8 @@ Belirtim → Plan → Görevler → Uygulama
 
 - Decision 7'deki fabrika değişikliği birleşip projeye alınmadan chart denetimi PostgreSQL ve göç
   Job'u için kırmızı kalır; denetimi projede gevşetmek kuralı sessizce zayıflatmak olur.
-- Tek kopya PostgreSQL'de disk arızası, yedek (Decision 10) devreye girene kadar veri kaybıdır.
+- Tek kopya PostgreSQL'de disk arızası kuralları ve geçmişi kaybettirir; yedek olmadığı için (Decision
+  10) bu risk sahip tarafından kabul edilmiştir.
 - İlk güncelleme eski chart'tan yeni chart'a aynı release'te yapılır; beklenmeyen nesne çakışması
   `--atomic` ile eski sürüme döner ve geçiş ertelenir.
 - Geri almada şema geri inmez; genişletici olmayan göç eski sürümü bozar.

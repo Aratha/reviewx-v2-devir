@@ -3,11 +3,13 @@
 sql-review/PRDs/002-sql-server-connection Requirement 1 (Decision 5 and 6) and
 006-llm-connection Requirement 1 and 2: in nonprod the SQL Server connection must be complete,
 encrypted with a verified certificate and limited to business databases, and the LLM endpoint
-must be https with a model. In every environment configured values must be well formed. Only
-setting names are reported, never values.
+must be https with a model. In nonprod a configured OpenTelemetry collector endpoint must be
+https as well. In every environment configured values must be well formed. Only setting names are
+reported, never values.
 """
 
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from app.core.config import Settings
 from app.domain.llm import LlmEndpointInvalid, resolve_chat_url, validate_endpoint_url
@@ -77,4 +79,7 @@ def integration_setting_errors(settings: Settings) -> list[str]:
         errors.append("DWHCODEREVIEW_LLM_BASE_URL")
     if not settings.llm_model.strip():
         errors.append("DWHCODEREVIEW_LLM_MODEL")
+    telemetry_endpoint = settings.otel_exporter_otlp_endpoint
+    if telemetry_endpoint and urlsplit(telemetry_endpoint).scheme != "https":
+        errors.append("DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT")
     return sorted(set(errors))

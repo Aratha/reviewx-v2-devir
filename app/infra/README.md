@@ -13,8 +13,10 @@ Bütün üçüncü taraf imajları sürüm ve özetle (`@sha256:`) sabitlenmişt
 bu sabit özeti kayıt deposundan kendisi indirir; özet değişmediği için indirilen imaj incelenen
 imajın aynısıdır. Çevrimdışı CI imajları paketten önceden yükler, bu durumda indirme yapılmaz.
 Yayımlanan portlar yalnız geri döngü adresine bağlanır. İsteğe bağlı toplayıcı yalnız yerel Tempo,
-Prometheus ve Loki servislerine aktarır; Grafana panosu yerel olarak hazırlanır. Bu Compose
-katmanını etkinleştirmeden önce Git tarafından yok sayılan `.env` içinde `GRAFANA_ADMIN_PASSWORD`
+Prometheus ve Loki servislerine aktarır; Grafana panosu yerel olarak hazırlanır. Bu katman açıkken
+arka uç izlerini ve ölçümlerini OTLP/gRPC ile iç ağdaki toplayıcıya gönderir
+(`DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT`); katman yoksa arka uç hiçbir sinyal göndermez.
+Bu Compose katmanını etkinleştirmeden önce Git tarafından yok sayılan `.env` içinde `GRAFANA_ADMIN_PASSWORD`
 ayarlayın; anonim erişim, güncelleme denetimi, analiz, Gravatar ve eklenti indirme kapalıdır.
 
 Her çalışma zamanı/temel imaj referansı, kaydedilmiş varsayılanı özetle sabitlenmiş kalan ortam

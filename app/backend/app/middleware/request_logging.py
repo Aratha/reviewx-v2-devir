@@ -11,13 +11,14 @@ from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.core.logging import request_id_var
+from app.core.telemetry import http_server_span
 
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 logger = logging.getLogger("app.http")
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log transport metadata only; never log headers, query strings, or bodies."""
+    """Log and trace transport metadata only; never headers, query strings, or bodies."""
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         supplied = request.headers.get("x-request-id", "")
@@ -26,30 +27,32 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id_token = request_id_var.set(request_id)
         started = monotonic()
         status_code = 500
-        try:
-            response = await call_next(request)
-            status_code = response.status_code
-            response.headers["x-request-id"] = request_id
-            return response
-        finally:
-            route = request.scope.get("route")
-            route_template = getattr(route, "path", "unmatched")
-            api_prefix = get_settings().api_prefix
-            request_path = str(request.scope.get("path", ""))
-            if request_path.startswith(f"{api_prefix}/") and not route_template.startswith(
-                api_prefix
-            ):
-                route_template = f"{api_prefix}{route_template}"
-            logger.info(
-                "request.completed",
-                extra={
-                    "structured_fields": {
-                        "duration_ms": round((monotonic() - started) * 1000, 3),
-                        "http_method": request.method,
-                        "http_route": route_template,
-                        "http_status": status_code,
-                        "request_id": request_id,
-                    }
-                },
-            )
-            request_id_var.reset(request_id_token)
+        with http_server_span(request.method) as span:
+            try:
+                response = await call_next(request)
+                status_code = response.status_code
+                response.headers["x-request-id"] = request_id
+                return response
+            finally:
+                route = request.scope.get("route")
+                route_template = getattr(route, "path", "unmatched")
+                api_prefix = get_settings().api_prefix
+                request_path = str(request.scope.get("path", ""))
+                if request_path.startswith(f"{api_prefix}/") and not route_template.startswith(
+                    api_prefix
+                ):
+                    route_template = f"{api_prefix}{route_template}"
+                span.complete(route_template, status_code)
+                logger.info(
+                    "request.completed",
+                    extra={
+                        "structured_fields": {
+                            "duration_ms": round((monotonic() - started) * 1000, 3),
+                            "http_method": request.method,
+                            "http_route": route_template,
+                            "http_status": status_code,
+                            "request_id": request_id,
+                        }
+                    },
+                )
+                request_id_var.reset(request_id_token)

@@ -14,6 +14,7 @@ from app.api.router import local_environment_router, router
 from app.core.config import Settings, get_settings
 from app.core.errors import ApplicationError, application_error_handler
 from app.core.logging import configure_logging, log_event
+from app.core.telemetry import configure_telemetry, instrument_engine
 from app.db.session import async_session_factory, engine
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.tenant_context import TenantContextMiddleware
@@ -36,6 +37,8 @@ def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextMan
         if invalid:
             log_event(logger, "startup.integration_settings_invalid", settings=",".join(invalid))
             raise UnsafeIntegrationSettings("unsafe integration settings: " + ", ".join(invalid))
+        telemetry_export = configure_telemetry(settings)
+        instrument_engine(engine.sync_engine)
         # sql-review 003 Requirement 16: runs this process never finished were cut off.
         await interrupt_stale_runs(async_session_factory)
         background = [
@@ -58,6 +61,8 @@ def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextMan
                     await task
             close_integrations()
             await engine.dispose()
+            if telemetry_export is not None:
+                telemetry_export.shutdown()
 
     return lifespan
 

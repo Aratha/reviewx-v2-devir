@@ -1,11 +1,16 @@
 """Safe test defaults loaded before application modules."""
 
 import os
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy.engine import make_url
+
+if TYPE_CHECKING:
+    from tests.fakes.telemetry import TelemetryCapture
 
 os.environ.setdefault("DWHCODEREVIEW_ENVIRONMENT", "test")
 if not os.environ.get("DWHCODEREVIEW_JWT_PRIVATE_KEY"):
@@ -19,6 +24,9 @@ if not os.environ.get("DWHCODEREVIEW_JWT_PRIVATE_KEY"):
         )
         .decode("ascii")
     )
+# Tests never export telemetry, even inside the Compose backend whose overlay sets a collector;
+# they assert signals through the in-memory providers of the telemetry_capture fixture.
+os.environ["DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
 # Unit tests never connect; integration runs receive the disposable test database URL explicitly.
 os.environ.setdefault(
     "DWHCODEREVIEW_DATABASE_URL",
@@ -42,3 +50,14 @@ def postgres_database_url() -> str:
     if not database.endswith("_test"):
         pytest.fail("integration tests require a disposable database ending in '_test'")
     return url
+
+
+@pytest.fixture
+def telemetry_capture() -> Iterator["TelemetryCapture"]:
+    """In-memory trace and metric providers for the duration of one test."""
+
+    # Imported here: application modules load only after the safe defaults above.
+    from tests.fakes.telemetry import captured_telemetry
+
+    with captured_telemetry() as capture:
+        yield capture

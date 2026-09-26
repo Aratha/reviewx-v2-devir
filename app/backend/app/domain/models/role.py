@@ -1,5 +1,7 @@
 """Role definitions and tenant-scoped user assignments."""
 
+from collections.abc import Iterable
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -16,6 +18,21 @@ from app.db.base_class import Base
 from app.domain.models.mixins import AuditSoftDeleteMixin, new_public_id
 
 SUPER_ADMIN_ROLE = "super_admin"
+
+# application-foundation/PRDs/001-directory-login Decision 4: every user except the super admin
+# holds at most one of these application roles; the rule manager can do everything the reviewer
+# can.
+ROLE_REVIEWER = "inceleyici"
+ROLE_RULE_MANAGER = "kural-yoneticisi"
+APPLICATION_ROLES = (ROLE_REVIEWER, ROLE_RULE_MANAGER)
+DEFAULT_DIRECTORY_ROLE = ROLE_REVIEWER
+
+
+def application_role_of(role_codes: Iterable[str]) -> str | None:
+    """Return the single application role among assigned role codes, if any."""
+
+    held = [code for code in APPLICATION_ROLES if code in set(role_codes)]
+    return held[-1] if held else None
 
 
 class Role(AuditSoftDeleteMixin, Base):

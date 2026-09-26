@@ -6,6 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base_class import Base
 from app.domain.models.mixins import AuditSoftDeleteMixin, new_public_id
 
+# The single tenant of this deployment (application-foundation 001 Decision 6). The schema
+# migration seeds it; every user and every business row is scoped to it.
+PLATFORM_TENANT_CODE = "platform"
+
 
 class Tenant(AuditSoftDeleteMixin, Base):
     __tablename__ = "tenant"

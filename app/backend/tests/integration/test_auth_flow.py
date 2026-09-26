@@ -2,17 +2,13 @@
 
 import logging
 import secrets
-from collections.abc import Iterator
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import get_settings
-from app.db.session import async_session_factory, engine
+from app.db.session import async_session_factory
 from app.domain.models.tenant import Tenant
 from app.main import app
 from app.scripts.create_super_admin import ensure_super_admin
@@ -20,14 +16,8 @@ from app.scripts.create_super_admin import ensure_super_admin
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture(scope="module")
-def migrated_database(postgres_database_url: str) -> Iterator[None]:
-    del postgres_database_url  # the Alembic environment reads the same typed setting
-    config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
-    command.upgrade(config, "head")
-    command.check(config)
+def test_alembic_upgrade_keeps_application_logging(migrated_database: None) -> None:
     assert logging.getLogger("app.http").disabled is False
-    yield
 
 
 @pytest.mark.asyncio
@@ -117,5 +107,3 @@ async def test_super_admin_authentication_flow(migrated_database: None) -> None:
         )
         assert unknown.status_code == 401
         assert unknown.json() == rejected.json()
-
-    await engine.dispose()

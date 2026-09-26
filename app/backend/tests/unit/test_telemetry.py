@@ -11,7 +11,7 @@ from io import StringIO
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from opentelemetry.trace import SpanKind, StatusCode
 from sqlalchemy import create_engine, text
@@ -304,6 +304,45 @@ def test_server_spans_name_the_route_template_and_logs_carry_the_trace(
     completed = [line for line in lines if line["message"] == "request.completed"]
     assert completed[0]["trace_id"] == format(ok_span.context.trace_id, "032x")
     assert completed[0]["span_id"] == format(ok_span.context.span_id, "016x")
+
+
+def test_server_spans_and_logs_name_the_full_template_behind_router_prefixes(
+    telemetry_capture: TelemetryCapture,
+) -> None:
+    items = APIRouter(prefix="/items")
+
+    @items.get("/{item_id}")
+    async def item(item_id: str) -> dict[str, str]:
+        return {"id": item_id}
+
+    api = APIRouter(prefix="/api/v1")
+    api.include_router(items)
+    application = FastAPI()
+    application.add_middleware(RequestLoggingMiddleware)
+    application.include_router(api)
+
+    stream = StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    http_logger = logging.getLogger("app.http")
+    http_logger.addHandler(handler)
+    http_logger.setLevel(logging.INFO)
+    try:
+        with TestClient(application) as client:
+            assert client.get(f"/api/v1/items/{MARKER}").status_code == 200
+            assert client.get(f"/api/v1/missing/{MARKER}").status_code == 404
+    finally:
+        http_logger.removeHandler(handler)
+
+    (span,) = telemetry_capture.spans("GET /api/v1/items/{item_id}")
+    assert (span.attributes or {})["http.route"] == "/api/v1/items/{item_id}"
+    (unmatched,) = telemetry_capture.spans("GET unmatched")
+    assert (unmatched.attributes or {})["http.route"] == "unmatched"
+    assert MARKER not in telemetry_capture.everything()
+
+    lines = [json.loads(line) for line in stream.getvalue().splitlines()]
+    routes = [line["http_route"] for line in lines if line["message"] == "request.completed"]
+    assert routes == ["/api/v1/items/{item_id}", "unmatched"]
 
 
 def test_logs_outside_a_span_carry_no_trace_fields() -> None:

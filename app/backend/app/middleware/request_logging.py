@@ -6,15 +6,37 @@ from time import monotonic
 from uuid import uuid4
 
 from fastapi import Request
+from fastapi.routing import iter_route_contexts
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+from starlette.routing import Match
 
-from app.core.config import get_settings
 from app.core.logging import request_id_var
 from app.core.telemetry import http_server_span
 
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 logger = logging.getLogger("app.http")
+UNMATCHED_ROUTE = "unmatched"
+
+
+def route_template(request: Request) -> str:
+    """Return the matched route's full path template, never the concrete request path.
+
+    FastAPI records the endpoint's own route, whose path lacks the prefixes of the routers that
+    include it. The application's route contexts carry the full template; the one for the matched
+    route that also matches this request is chosen, so a router included twice keeps each prefix.
+    """
+
+    matched = request.scope.get("route")
+    if matched is None:
+        return UNMATCHED_ROUTE
+    for context in iter_route_contexts(request.app.routes):
+        if context.original_route is not matched:
+            continue
+        match, _ = context.matches(request.scope)
+        if match is not Match.NONE and context.path_format:
+            return context.path_format
+    return UNMATCHED_ROUTE
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -34,22 +56,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 response.headers["x-request-id"] = request_id
                 return response
             finally:
-                route = request.scope.get("route")
-                route_template = getattr(route, "path", "unmatched")
-                api_prefix = get_settings().api_prefix
-                request_path = str(request.scope.get("path", ""))
-                if request_path.startswith(f"{api_prefix}/") and not route_template.startswith(
-                    api_prefix
-                ):
-                    route_template = f"{api_prefix}{route_template}"
-                span.complete(route_template, status_code)
+                template = route_template(request)
+                span.complete(template, status_code)
                 logger.info(
                     "request.completed",
                     extra={
                         "structured_fields": {
                             "duration_ms": round((monotonic() - started) * 1000, 3),
                             "http_method": request.method,
-                            "http_route": route_template,
+                            "http_route": template,
                             "http_status": status_code,
                             "request_id": request_id,
                         }

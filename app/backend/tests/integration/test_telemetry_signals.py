@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 
 from app.api.integrations import get_llm_chat
+from app.core.config import get_settings
 from app.core.telemetry import instrument_engine
 from app.db.session import async_session_factory, engine
 from app.domain.directory import DirectoryUnavailable
@@ -213,6 +214,11 @@ async def test_login_outcomes_are_counted_without_names_or_passwords(
     assert telemetry_capture.value(logins, outcome="invalid_credentials") == 5
     assert telemetry_capture.value(logins, outcome="rate_limited") == 1
     assert telemetry_capture.value(logins, outcome="directory_unavailable") == 1
+    # The server span names the full route template, the /auth router prefix included.
+    login_route = f"{get_settings().api_prefix}/auth/login"
+    login_spans = telemetry_capture.spans(f"POST {login_route}")
+    assert len(login_spans) == 8
+    assert {(span.attributes or {}).get("http.route") for span in login_spans} == {login_route}
     _assert_nothing_forbidden(
         telemetry_capture, name, password, succeeded.json()["access_token"], "baska"
     )

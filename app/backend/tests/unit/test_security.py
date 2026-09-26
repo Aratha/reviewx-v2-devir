@@ -191,7 +191,7 @@ def test_hosted_llm_services_fail_configuration_closed(
 
 def test_disabled_llm_tracing_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
-    assert Settings(_env_file=None).environment == "test"
+    assert Settings(_env_file=None).jwt_algorithm == "ES256"
 
 
 def test_migration_settings_require_only_the_database_boundary() -> None:

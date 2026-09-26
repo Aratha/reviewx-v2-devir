@@ -1,7 +1,7 @@
 # Görevler — directory-login
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti (arka uç 559/559, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+Compose yığınında geçti (arka uç 614/614, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
 yönetişim sapması ve chart adımları dahil). Bu, arka uç ve ön yüz için L1 (otomatik testlerden
 geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) Task 11'dedir.
 
@@ -35,7 +35,9 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   gereksinim dosyaları. Kanıt: `python3 scripts/check-dependency-admission.py`,
   `dependency-admission.json` karar kaydı.
 - [x] Task 9 — API sözleşmesi / Acceptance 1: `specs/openapi/dwhcodereview-api.yaml` ve üretilmiş ön
-  yüz tipleri. Kanıt: `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`.
+  yüz tipleri; dışa aktarım yalnız üretilmiş `title` ve `operationId` anahtarlarını düşürür, `title`
+  adlı alanı korur. Kanıt: `tests/unit/test_openapi_export.py`, `scripts/export-openapi.sh --check`,
+  `scripts/generate-types.sh --check`.
 - [x] Task 10 — Requirement 6 (belleğe alınan belirteç), 13 / Acceptance 1, Acceptance 2: giriş
   ekranı, sessiz yenileme, çıkış, oturum bitince girişe dönüş, süper yönetici kullanıcı yönetimi
   ekranı, Vitest testleri ve tarayıcı senaryosu. Kanıt: `app/frontend/src/lib/authStorage.test.ts`,
@@ -63,7 +65,11 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   yalnız `https`, gözlemlenebilirlik Compose katmanında yerel toplayıcı), istek başına sunucu izi,
   PostgreSQL komut izleri (yalnız komut türü), istek logunda `trace_id`, giriş sonuçları ölçümü
   `dwhcodereview_auth_login_attempts_total{outcome}`; OpenTelemetry paketlerinin bağımlılık kabulü.
-  Kanıt: `tests/unit/test_telemetry.py`, `tests/unit/test_config.py`,
+  Sunucu izinin adı ve istek logunun `http_route` alanı, bütün yönlendirici önekleriyle tam rota
+  şablonunu taşır (`POST /api/dwhcodereview/v1/auth/login`); somut yol değeri hiçbirine girmez.
+  Kanıt: `tests/unit/test_telemetry.py`
+  (`test_server_spans_and_logs_name_the_full_template_behind_router_prefixes`),
+  `tests/unit/test_request_logging.py`, `tests/unit/test_config.py`,
   `tests/unit/test_integration_settings.py`, `tests/integration/test_telemetry_signals.py`
   (`test_login_outcomes_are_counted_without_names_or_passwords`),
   `python3 scripts/check-dependency-admission.py`, `python3 scripts/check-config-sync.py`,

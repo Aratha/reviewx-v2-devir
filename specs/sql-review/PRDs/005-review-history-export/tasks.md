@@ -10,9 +10,11 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   sayfalama ve `422`, kapsam ve rol başına `401`/`403`/`404`, kiracı yalıtımı, ayrıntıda SQL metni
   olmaması, işaret tekrarı, kural sonucu işaret kuralı, silme kapsamı ve LLM özetinin bağının
   boşalması, süren koşumda `409`, "tümünü sil" kapsamı, saklama işinin yalnız süresi dolanı silmesi
-  ve kilitte tek kopya, saklanmış metni olmayan koşumda `409`; `OpenAPI` kayıtlı yapıtla aynı.
+  ve kilitte tek kopya, saklanmış metni olmayan koşumda `409`; `OpenAPI` kayıtlı yapıtla aynı ve
+  koşum özetinde ve ayrıntısında zorunlu `title` alanını taşır.
   Kanıt: `app/backend/tests/integration/test_review_history_api.py`,
-  `scripts/export-openapi.sh --check`.
+  `app/backend/tests/unit/test_api_baseline.py` (`test_openapi_export_keeps_properties_named_title`),
+  `app/backend/tests/unit/test_openapi_export.py`, `scripts/export-openapi.sh --check`.
 - [x] Task 2 — Requirement 7–9 / Acceptance 2: CSV'nin kaynaktaki `buildReviewResultsCsv` çıktısıyla
   bayt bayt aynı olması (kaynak işlev Node ile aynı girdide çalıştırılıp beklenen baytlar
   sabitlendi), formül koruması, hata satırı; SQL yorum bloğundaki her satır numarasının dosyadaki

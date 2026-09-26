@@ -18,16 +18,17 @@ application_modes:
 
 Her proje iskeleti, internet çıkışı olmayan yönetilen, üretim dışı `Kubernetes` kümesini hedefler.
 DevOps standardı gereği tek uygulama `chart`'ı `helm/<ürün-kısa-adı>/` dizinindedir ve dağıtım giriş
-noktası aynı dizindeki `deploy.sh` dosyasıdır. `chart` kendi kendine yeterlidir; yalnız arka uç ve ön
-yüz iş yüklerini içerir. Alt `chart`, ortam katmanı, bağımlılık arşivi veya çalışma zamanı indirmesi
-içermez.
+noktası aynı dizindeki `deploy.sh` dosyasıdır. `chart` kendi kendine yeterlidir; arka uç ve ön yüz iş
+yüklerini, projenin kabul edilmiş `PRD`'si bildirdiğinde ise bir PostgreSQL 17 `StatefulSet`'ini ve bir
+Alembic şema geçişi `Job`'unu içerir. Önbellek, işleyici veya gözlemlenebilirlik iş yükü, alt `chart`,
+ortam katmanı, bağımlılık arşivi veya çalışma zamanı indirmesi içermez.
 Bu hedefi karşılayamayan değişiklik tamamlanmış değildir.
 
 Oluşturulan her iş yükü şu kontrollerin tamamını karşılamalıdır:
 
-- imaj, kanonik iç `GHCR` proxy-cache yolundan gelir; GitHub `main` yapısı tam 40 karakter kaynak
-  commit etiketini yayımlar ve Azure dağıtımı `latest` isteğini aynı `BUILD_SOURCEVERSION` etiketine
-  çözer;
+- arka uç ve ön yüz imajı kanonik iç `GHCR` proxy-cache yolundan gelir; GitHub `main` yapısı tam 40
+  karakter kaynak commit etiketini yayımlar ve Azure dağıtımı `latest` isteğini aynı
+  `BUILD_SOURCEVERSION` etiketine çözer;
 - `chart`, `Secret` yazmaz; değer/katman gizli malzeme içermez; iş yükü önceden oluşturulmuş
   `Secret`'a adıyla bağlanır;
 - kapsayıcı açıkça kök olmayan kullanıcı/grupla çalışır, ayrıcalık yükseltmeyi kapatır, tüm
@@ -44,13 +45,51 @@ Oluşturulan her iş yükü şu kontrollerin tamamını karşılamalıdır:
   oluşturmaz;
 - kalıcı birim istemi boyut bildirir; `Job`, `Always` dışı yeniden başlatma politikası kullanır.
 
-Kanonik `values.yaml` yalnız `backend` ve `frontend` bölümlerini taşır. Her bileşen
+Kanonik `values.yaml` `backend` ve `frontend` bölümlerini, ayrıca varsayılanı kapalı `postgres` ve
+`migration` bölümlerini taşır. `backend` ve `frontend` bölümleri
 `cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/<proje>-<bileşen>` yolunu ve `latest` varsayılanını
 taşır; Azure çağrısında `deploy.sh` bu varsayılanı tam kaynak commit etiketiyle ezer. İstenirse açık
 bir imaj özeti etikete üstün gelir. Önceden oluşturulmuş `Secret`, backend çıkış eşleri ve ingress
 host/TLS değerleri ortam girdisi olarak boş kalır. Backend ve frontend giriş politikaları kanonik RKE2
 controller namespace'i `kube-system` için doğru portu önceden taşır. `scripts/render-charts.sh`,
-kaydedilmiş ortam katmanı kullanmadan sentetik değerlerle yapısal sözleşmeyi kanıtlar.
+kaydedilmiş ortam katmanı kullanmadan sentetik değerlerle yapısal sözleşmeyi hem veritabanı ve geçiş
+kapalıyken hem açıkken kanıtlar.
+
+`postgres.enabled` açıldığında veritabanı iş yükü yukarıdaki kontrollere ek olarak şunları karşılar:
+
+- tek kopya `StatefulSet`'tir ve bileşen etiketi `database`'dir; imaj, yerel Compose'daki PostgreSQL 17
+  imajıyla aynı `sha256` özetiyle sabitlenir, özet boşsa işleme durur; ortam depo yolunu özet
+  değişmeden kurum içi aynaya çevirebilir;
+- veri, boyutu ve depolama sınıfı adı açıkça yazılmış `ReadWriteOnce` kalıcı birim istemindedir;
+  depolama sınıfı ortam girdisidir ve boşsa işleme durur;
+- kapsayıcı `999` kullanıcı/grubuyla kök olmadan çalışır; `/var/run/postgresql` ve `/tmp` boyutu
+  sınırlı birimlerdir; veri sağlama toplamı (`--data-checksums`) açıktır; kapanışa 60 saniye tanınır;
+- kimlik bilgileri yalnız önceden oluşturulmuş `postgres.existingSecret`'tan `envFrom` ile gelir;
+  başlatma/hazırlık/canlılık yoklamaları yapılandırılmış kullanıcıyla gerçek `SELECT 1` sorgusu
+  çalıştırır;
+- `NetworkPolicy` girişi yalnız aynı sürümün backend ve geçiş podlarından veritabanı portuna açar;
+  çıkış listesi boştur, yani her çıkış reddedilir.
+
+`migration.enabled` yalnız `postgres.enabled` ile birlikte açılır; aksi hâlde işleme durur. Geçiş
+`Job`'u şu sözleşmeyi karşılar:
+
+- backend imaj kimliğiyle `alembic upgrade head` çalıştırır; ayrı geçiş imajı yoktur;
+- yeniden başlatma politikası `Never`, `backoffLimit` değeri `0`'dır ve `activeDeadlineSeconds` süre
+  sınırı vardır; başarısız geçiş yeniden denenmez, incelenir;
+- bağlantısını yalnız önceden oluşturulmuş `migration.existingSecret`'tan `envFrom` ile alır; backend
+  bu `Secret`'ı görmez;
+- `NetworkPolicy` girişi kapatır; çıkışı yalnız küme DNS'ine ve veritabanı portuna açar;
+- kimlik bilgisi taşımayan bekleme kapsayıcısı, veritabanı `Service`'i bağlantı kabul edene kadar
+  bekler; `Service` bağlantıyı yalnız `SELECT 1` hazırlık yoklaması geçtikten sonra kabul eder;
+- çalışma sırası geçişin daha önce çalışıp çalışmadığına göre seçilir: önceki bir sürümün oluşturduğu
+  geçiş `NetworkPolicy`'si yoksa (ilk kurulum ya da veritabanını ilk kez ekleyen güncelleme) `Job`
+  veritabanıyla aynı anda oluşturulan sıradan sürüm kaynağıdır; varsa `Job` yeni backend
+  podlarından önce çalışan `pre-upgrade` Helm kancasıdır (`hook`). Geçiş hiçbir durumda backend'in
+  hazır olmasını beklemez; bu yüzden backend hazır olma yoklaması şema güncellenene kadar "hazır
+  değil" yanıtı verebilir ve dağıtım kilitlenmez;
+- `deploy.sh` Helm'i `--atomic --wait --wait-for-jobs` ile çalıştırır; başarısız geçiş sürümü
+  başarısız kılar ve önceki sürüm korunur. Geri almada şema geri indirilmez; geçişler eski sürümün
+  çalışabileceği biçimde genişletici yazılır.
 
 Oluşturulan `.github/workflows/image-build.yml`, backend ve frontend imajlarını `main` üzerinde
 `latest`, UTC tarih, kısa SHA ve tam SHA etiketleriyle `ghcr.io`'ya yayımlar.
@@ -66,6 +105,6 @@ Beklemedeki (`pending-*`) Helm release için önce çalışan işlemin bitmesi b
 `pending-upgrade` veya `pending-rollback` son release'e geri alınır; geri alma başarısızsa upgrade
 yapılmaz. Hizmet vermiş release kaldırılmaz; yalnız hiç kurulmamış `pending-install` kaldırılır.
 
-Çalışma zamanı veritabanı rolü yalnız `DML` yetkilidir. Şema geçişi bu uygulama `chart`'ının parçası
-değildir ve ayrı yönetişim akışında yürütülür. Yayımlanmış `chart` sürümleri değişmezdir. Oluşturma ve
-hazırlık denetimi doğrulamadır; dağıtım yetkisi değildir.
+Çalışma zamanı veritabanı rolü yalnız `DML` yetkilidir; şemayı yalnız geçiş `Job`'unun `Secret`'ındaki
+bağlantı değiştirir. Yayımlanmış `chart` sürümleri değişmezdir. Oluşturma ve hazırlık denetimi
+doğrulamadır; dağıtım yetkisi değildir.

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import re
 import subprocess
 import sys
@@ -27,13 +28,16 @@ EXPECTED_TEMPLATES = {
     "frontend-deployment.yaml",
     "frontend-networkpolicy.yaml",
     "frontend-service.yaml",
+    "migration-job.yaml",
+    "migration-networkpolicy.yaml",
+    "postgres-networkpolicy.yaml",
+    "postgres-service.yaml",
+    "postgres-statefulset.yaml",
 }
+VALUE_SECTIONS = {"backend", "frontend", "postgres", "migration"}
 FORBIDDEN_COMPONENTS = {
-    "postgres",
     "redis",
     "worker",
-    "migrate",
-    "migration",
     "observability",
     "collector",
     "grafana",
@@ -45,6 +49,23 @@ DNS_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 OCI_TAG = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$")
 IMAGE_PROXY = "cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding"
+POSTGRES_MAJOR = re.compile(r"^17(?:\.[0-9]+)?$")
+POSTGRES_UID = 999
+MIGRATION_COMMAND = ["alembic", "upgrade", "head"]
+MIGRATION_MODES = {"bootstrap", "upgrade"}
+HOOK_ANNOTATIONS = {
+    "helm.sh/hook": "pre-upgrade",
+    "helm.sh/hook-weight": "0",
+    "helm.sh/hook-delete-policy": "before-hook-creation",
+}
+WORKLOAD_LABEL = "scaffold.kt.internal/workload"
+DNS_PORTS = [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]
+RKE2_DNS_PEERS = [
+    {
+        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+        "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
+    }
+]
 
 
 class PolicyError(RuntimeError):
@@ -85,7 +106,8 @@ def validate_chart_layout() -> tuple[dict[str, Any], dict[str, Any]]:
         path.relative_to(templates).as_posix() for path in templates.rglob("*") if path.is_file()
     }
     require(
-        template_files == EXPECTED_TEMPLATES, "chart templates must contain backend/frontend only"
+        template_files == EXPECTED_TEMPLATES,
+        "chart templates must contain backend/frontend and the optional database/migration only",
     )
     lowered_paths = "\n".join(sorted(template_files)).lower()
     require(
@@ -112,7 +134,10 @@ def validate_chart_layout() -> tuple[dict[str, Any], dict[str, Any]]:
     )
     require(chart.get("description") == product_name, "rendered product name facts disagree")
 
-    require(set(values) == {"backend", "frontend"}, "values must contain backend/frontend only")
+    require(
+        set(values) == VALUE_SECTIONS,
+        "values must contain backend/frontend and the optional postgres/migration only",
+    )
     backend = values.get("backend")
     frontend = values.get("frontend")
     if not isinstance(backend, dict) or not isinstance(frontend, dict):
@@ -164,7 +189,107 @@ def validate_chart_layout() -> tuple[dict[str, Any], dict[str, Any]]:
         ingress == {"className": "", "host": "", "tlsSecretName": ""},
         "ingress facts must be empty and deployment-environment supplied",
     )
+    validate_optional_defaults(values)
     return chart, values
+
+
+def has_requests_and_limits(resources: object) -> bool:
+    return (
+        isinstance(resources, dict)
+        and bool(resources.get("requests"))
+        and bool(resources.get("limits"))
+    )
+
+
+def validate_optional_defaults(values: dict[str, Any]) -> None:
+    """The optional database and migration stay off until an accepted project PRD enables them."""
+
+    postgres = values.get("postgres")
+    migration = values.get("migration")
+    if not isinstance(postgres, dict) or not isinstance(migration, dict):
+        raise PolicyError("optional postgres/migration values must be mappings")
+    require(postgres.get("enabled") is False, "postgres must be disabled by default")
+    image = postgres.get("image")
+    if not isinstance(image, dict):
+        raise PolicyError("postgres.image must be a mapping")
+    require(
+        set(image) == {"repository", "tag", "digest"}
+        and image.get("repository") == "postgres"
+        and POSTGRES_MAJOR.fullmatch(str(image.get("tag", ""))) is not None,
+        "postgres image defaults must name the PostgreSQL 17 image",
+    )
+    require(
+        DIGEST.fullmatch(str(image.get("digest", ""))) is not None,
+        "postgres image default must pin a sha256 digest",
+    )
+    require(
+        postgres.get("existingSecret") == "",
+        "postgres.existingSecret must not hardcode an environment deployment fact",
+    )
+    require(postgres.get("port") == 5432, "postgres.port must be 5432")
+    database = postgres.get("database")
+    require(
+        isinstance(database, str) and bool(database), "postgres.database must name the database"
+    )
+    persistence = postgres.get("persistence")
+    if not isinstance(persistence, dict):
+        raise PolicyError("postgres.persistence must be a mapping")
+    require(
+        set(persistence) == {"size", "storageClassName", "accessMode"}
+        and bool(persistence.get("size"))
+        and persistence.get("accessMode") == "ReadWriteOnce",
+        "postgres persistence must declare a size and ReadWriteOnce access",
+    )
+    require(
+        persistence.get("storageClassName") == "",
+        "postgres storage class must be empty and deployment-environment supplied",
+    )
+    require(has_requests_and_limits(postgres.get("resources")), "postgres resources incomplete")
+
+    require(migration.get("enabled") is False, "migration must be disabled by default")
+    require(
+        migration.get("existingSecret") == "",
+        "migration.existingSecret must not hardcode an environment deployment fact",
+    )
+    deadline = migration.get("activeDeadlineSeconds")
+    require(
+        isinstance(deadline, int) and not isinstance(deadline, bool) and deadline > 0,
+        "migration.activeDeadlineSeconds must be a positive integer",
+    )
+    require(
+        migration.get("networkPolicy") == {"dns": RKE2_DNS_PEERS},
+        "migration DNS egress must target the canonical RKE2 cluster DNS",
+    )
+    require(has_requests_and_limits(migration.get("resources")), "migration resources incomplete")
+
+
+def merge_values(base: object, override: object) -> Any:
+    """Merge supplied values over chart defaults the way Helm does: maps merge, lists replace."""
+
+    if isinstance(base, dict) and isinstance(override, dict):
+        merged = dict(base)
+        for key, value in override.items():
+            if value is None:
+                merged.pop(key, None)
+            else:
+                merged[key] = merge_values(base.get(key), value)
+        return merged
+    return copy.deepcopy(override)
+
+
+def resource_name(release_name: str, namespace: str, slug: str, component: str) -> str:
+    """Mirror the chart's generated.resourceName helper."""
+
+    def bounded(value: str, limit: int) -> str:
+        value = value[:limit]
+        return value[:-1] if value.endswith("-") else value
+
+    identity = f"{namespace}/{release_name}/{slug}/{component}"
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12]
+    return bounded(
+        f"{bounded(release_name, 18)}-{bounded(slug, 18)}-{component}-{digest}",
+        63,
+    )
 
 
 def deployment_values(values: dict[str, Any], slug: str) -> dict[str, Any]:
@@ -237,6 +362,18 @@ def deployment_values(values: dict[str, Any], slug: str) -> dict[str, Any]:
         ],
         "egress": [],
     }
+    return result
+
+
+def database_deployment_values(values: dict[str, Any], slug: str) -> dict[str, Any]:
+    """Return synthetic facts that also enable the optional database and migration Job."""
+
+    result = deployment_values(values, slug)
+    result["postgres"]["enabled"] = True
+    result["postgres"]["existingSecret"] = "synthetic-database"
+    result["postgres"]["persistence"]["storageClassName"] = "synthetic-storage"
+    result["migration"]["enabled"] = True
+    result["migration"]["existingSecret"] = "synthetic-migration"
     return result
 
 
@@ -317,14 +454,7 @@ def validate_policy_rules(rules: object, peer_key: str, name: str) -> None:
         )
 
 
-def validate_documents(
-    documents: list[dict[str, Any]],
-    values: dict[str, Any],
-    chart: dict[str, Any],
-    *,
-    release_name: str,
-    namespace: str,
-) -> None:
+def expected_resources(values: dict[str, Any]) -> set[tuple[str, str]]:
     expected = {
         ("Deployment", "backend"),
         ("Deployment", "frontend"),
@@ -334,10 +464,356 @@ def validate_documents(
         ("Service", "backend"),
         ("Service", "frontend"),
     }
+    if values["postgres"]["enabled"] is True:
+        expected |= {
+            ("NetworkPolicy", "database"),
+            ("Service", "database"),
+            ("StatefulSet", "database"),
+        }
+    if values["migration"]["enabled"] is True:
+        expected |= {("Job", "migration"), ("NetworkPolicy", "migration")}
+    return expected
+
+
+def image_reference(image: dict[str, Any], name: str) -> str:
+    repository = str(image.get("repository", ""))
+    digest = str(image.get("digest", ""))
+    tag = str(image.get("tag", ""))
+    require(bool(repository), f"{name}: image repository is required")
+    if digest:
+        require(DIGEST.fullmatch(digest) is not None, f"{name}: invalid image digest")
+        return f"{repository}@{digest}"
+    require(OCI_TAG.fullmatch(tag) is not None, f"{name}: invalid image tag")
+    return f"{repository}:{tag}"
+
+
+def component_peer(component: str, workload: str) -> dict[str, Any]:
+    return {
+        "podSelector": {
+            "matchLabels": {
+                "app.kubernetes.io/component": component,
+                WORKLOAD_LABEL: workload,
+            }
+        }
+    }
+
+
+def validate_migration_hook(document: dict[str, Any], name: str, mode: str) -> None:
+    """Bootstrap runs as a release resource beside the database; upgrade runs before new pods."""
+
+    annotations = document.get("metadata", {}).get("annotations", {})
+    hooks = {key: value for key, value in annotations.items() if key.startswith("helm.sh/hook")}
+    if mode == "upgrade":
+        require(
+            hooks == HOOK_ANNOTATIONS,
+            f"{name}: an upgrade migration must run as a pre-upgrade hook",
+        )
+    else:
+        require(
+            not hooks,
+            f"{name}: a bootstrap migration must be created together with the database",
+        )
+
+
+def validate_network_policy(
+    document: dict[str, Any],
+    component: str,
+    values: dict[str, Any],
+    workloads: dict[str, str],
+) -> None:
+    name = str(document["metadata"]["name"])
+    require(
+        document.get("apiVersion") == "networking.k8s.io/v1",
+        f"{name}: unsupported NetworkPolicy API",
+    )
+    policy = document.get("spec", {})
+    require(
+        policy.get("policyTypes") == ["Ingress", "Egress"],
+        f"{name}: ingress/egress policy required",
+    )
+    require("ingress" in policy and "egress" in policy, f"{name}: policy directions incomplete")
+    require(
+        policy.get("podSelector") == {"matchLabels": {WORKLOAD_LABEL: workloads[component]}},
+        f"{name}: policy must select its own workload",
+    )
+    if component == "database":
+        port = values["postgres"]["port"]
+        require(
+            policy["ingress"]
+            == [
+                {
+                    "from": [
+                        component_peer("backend", workloads["backend"]),
+                        component_peer("migration", workloads["migration"]),
+                    ],
+                    "ports": [{"protocol": "TCP", "port": port}],
+                }
+            ],
+            f"{name}: database ingress must admit only backend and migration pods",
+        )
+        validate_policy_rules(policy["ingress"], "from", name)
+        require(policy["egress"] == [], f"{name}: database must default-deny egress")
+        return
+    if component == "migration":
+        require(policy["ingress"] == [], f"{name}: migration Job must default-deny ingress")
+        require(
+            policy["egress"]
+            == [
+                {"to": values["migration"]["networkPolicy"]["dns"], "ports": DNS_PORTS},
+                {
+                    "to": [component_peer("database", workloads["database"])],
+                    "ports": [{"protocol": "TCP", "port": values["postgres"]["port"]}],
+                },
+            ],
+            f"{name}: migration egress must reach only DNS and the database",
+        )
+        validate_policy_rules(policy["egress"], "to", name)
+        return
+    expected_policy = values[component]["networkPolicy"]
+    require(policy.get("ingress") == expected_policy["ingress"], f"{name}: ingress peer drift")
+    require(policy.get("egress") == expected_policy["egress"], f"{name}: egress peer drift")
+    validate_policy_rules(policy["ingress"], "from", name)
+    if component == "backend":
+        validate_policy_rules(policy["egress"], "to", name)
+        ports = {
+            (port.get("protocol"), port.get("port"))
+            for rule in policy["egress"]
+            for port in rule.get("ports", [])
+        }
+        require(
+            {("UDP", 53), ("TCP", 53), ("TCP", 5432)} <= ports,
+            f"{name}: admitted DNS/database egress is incomplete",
+        )
+    else:
+        require(policy["egress"] == [], f"{name}: static frontend must default-deny egress")
+
+
+def validate_container_hardening(container: dict[str, Any], name: str) -> None:
+    container_security = container.get("securityContext", {})
+    require(
+        container_security.get("allowPrivilegeEscalation") is False,
+        f"{name}: privilege escalation enabled",
+    )
+    require(
+        container_security.get("readOnlyRootFilesystem") is True,
+        f"{name}: writable root filesystem",
+    )
+    require(
+        container_security.get("capabilities", {}).get("drop") == ["ALL"],
+        f"{name}: capabilities not dropped",
+    )
+    for field in ("runAsUser", "runAsNonRoot", "privileged"):
+        require(field not in container_security, f"{name}: container overrides pod identity")
+    require(has_requests_and_limits(container.get("resources", {})), f"{name}: resources incomplete")
+
+
+def validate_pod_hardening(
+    spec: dict[str, Any], name: str, *, init_containers: int = 0
+) -> dict[str, Any]:
+    require(
+        spec.get("automountServiceAccountToken") is False,
+        f"{name}: service account token enabled",
+    )
+    security = spec.get("securityContext", {})
+    require(security.get("runAsNonRoot") is True, f"{name}: runAsNonRoot required")
+    for field in ("runAsUser", "runAsGroup"):
+        identity = security.get(field)
+        require(
+            isinstance(identity, int) and not isinstance(identity, bool) and identity > 0,
+            f"{name}: explicit non-root {field} required",
+        )
+    require(
+        security.get("seccompProfile", {}).get("type") == "RuntimeDefault",
+        f"{name}: RuntimeDefault seccomp required",
+    )
+    containers = spec.get("containers", [])
+    require(
+        isinstance(containers, list) and len(containers) == 1,
+        f"{name}: exactly one container required",
+    )
+    initializers = spec.get("initContainers", [])
+    require(
+        isinstance(initializers, list) and len(initializers) == init_containers,
+        f"{name}: unexpected init containers",
+    )
+    container = cast(dict[str, Any], containers[0])
+    for item in [container, *initializers]:
+        validate_container_hardening(item, name)
+    for volume in spec.get("volumes", []):
+        require(
+            set(volume) == {"name", "emptyDir"}, f"{name}: only bounded emptyDir volumes allowed"
+        )
+        require(bool(volume["emptyDir"].get("sizeLimit")), f"{name}: emptyDir must be bounded")
+    return container
+
+
+def validate_database(
+    document: dict[str, Any], values: dict[str, Any], service_name: str
+) -> None:
+    name = str(document["metadata"]["name"])
+    require(
+        document.get("apiVersion") == "apps/v1",
+        f"{name}: unsupported database workload",
+    )
+    postgres = values["postgres"]
+    statefulset = document.get("spec", {})
+    require(statefulset.get("replicas") == 1, f"{name}: database must run one replica")
+    require(statefulset.get("serviceName") == service_name, f"{name}: database service drift")
+    spec = pod_spec(document)
+    container = validate_pod_hardening(spec, name)
+    security = spec.get("securityContext", {})
+    require(
+        security.get("runAsUser") == POSTGRES_UID
+        and security.get("runAsGroup") == POSTGRES_UID
+        and security.get("fsGroup") == POSTGRES_UID,
+        f"{name}: database must run as the non-root postgres user {POSTGRES_UID}",
+    )
+    grace = spec.get("terminationGracePeriodSeconds")
+    require(
+        isinstance(grace, int) and grace >= 60,
+        f"{name}: database needs at least 60 seconds to shut down cleanly",
+    )
+    image = postgres["image"]
+    digest = str(image.get("digest", ""))
+    require(
+        DIGEST.fullmatch(digest) is not None,
+        f"{name}: database image must be pinned by digest",
+    )
+    require(
+        container.get("image") == f"{image.get('repository')}@{digest}",
+        f"{name}: image identity drift",
+    )
+    require(
+        container.get("envFrom") == [{"secretRef": {"name": postgres["existingSecret"]}}],
+        f"{name}: database must consume one pre-created Secret",
+    )
+    environment = container.get("env", [])
+    require(
+        isinstance(environment, list)
+        and all(isinstance(item, dict) and set(item) == {"name", "value"} for item in environment)
+        and {item["name"] for item in environment}
+        == {"PGDATA", "POSTGRES_DB", "POSTGRES_INITDB_ARGS"},
+        f"{name}: database environment must carry no credential",
+    )
+    settings = {item["name"]: item["value"] for item in environment}
+    require(
+        settings["POSTGRES_INITDB_ARGS"] == "--data-checksums",
+        f"{name}: data checksums required",
+    )
+    require(settings["POSTGRES_DB"] == postgres["database"], f"{name}: database name drift")
+    for probe in ("startupProbe", "readinessProbe", "livenessProbe"):
+        command = container.get(probe, {}).get("exec", {}).get("command", [])
+        require(
+            isinstance(command, list)
+            and bool(command)
+            and "psql" in command[-1]
+            and '"$POSTGRES_USER"' in command[-1]
+            and "SELECT 1" in command[-1],
+            f"{name}: {probe} must run a real query as the configured user",
+        )
+    mounts = {mount.get("mountPath"): mount.get("name") for mount in container["volumeMounts"]}
+    require(
+        mounts.get("/var/lib/postgresql/data") == "data",
+        f"{name}: database data must live on the persistent volume",
+    )
+    require(
+        {"/var/run/postgresql", "/tmp"} <= set(mounts), f"{name}: bounded runtime paths missing"
+    )
+    claims = statefulset.get("volumeClaimTemplates", [])
+    require(
+        isinstance(claims, list) and len(claims) == 1, f"{name}: one persistent volume claim"
+    )
+    claim = claims[0]
+    claim_spec = claim.get("spec", {})
+    require(claim.get("metadata", {}).get("name") == "data", f"{name}: volume claim name drift")
+    require(
+        bool(claim_spec.get("resources", {}).get("requests", {}).get("storage")),
+        f"{name}: persistent volume claim must declare its size",
+    )
+    require(
+        claim_spec.get("storageClassName") == postgres["persistence"]["storageClassName"]
+        and bool(claim_spec.get("storageClassName")),
+        f"{name}: persistent volume claim must name its storage class",
+    )
+    require(
+        claim_spec.get("accessModes") == [postgres["persistence"]["accessMode"]],
+        f"{name}: persistent volume access mode drift",
+    )
+
+
+def validate_migration(
+    document: dict[str, Any],
+    values: dict[str, Any],
+    workloads: dict[str, str],
+    mode: str,
+) -> None:
+    name = str(document["metadata"]["name"])
+    require(document.get("apiVersion") == "batch/v1", f"{name}: unsupported migration workload")
+    validate_migration_hook(document, name, mode)
+    require(
+        name == workloads["migration" if mode == "upgrade" else "migration-init"],
+        f"{name}: migration Job identity drift",
+    )
+    job = document.get("spec", {})
+    require(job.get("backoffLimit") == 0, f"{name}: a failed migration must not be retried")
+    require(
+        job.get("activeDeadlineSeconds") == values["migration"]["activeDeadlineSeconds"],
+        f"{name}: migration deadline drift",
+    )
+    spec = pod_spec(document)
+    require(
+        spec.get("restartPolicy") == "Never",
+        f"{name}: migration Job must not restart (restartPolicy Never)",
+    )
+    container = validate_pod_hardening(spec, name, init_containers=1)
+    backend_image = image_reference(values["backend"]["image"], name)
+    require(
+        container.get("image") == backend_image,
+        f"{name}: migration must run the backend image identity",
+    )
+    require(
+        container.get("command") == MIGRATION_COMMAND and "args" not in container,
+        f"{name}: migration must run alembic upgrade head",
+    )
+    require(
+        container.get("envFrom")
+        == [{"secretRef": {"name": values["migration"]["existingSecret"]}}],
+        f"{name}: migration must consume one pre-created Secret",
+    )
+    require("env" not in container, f"{name}: per-key environment values are forbidden")
+    wait = spec["initContainers"][0]
+    script = "".join(str(item) for item in wait.get("args", []))
+    require(
+        wait.get("image") == backend_image
+        and wait.get("command") == ["python", "-c"]
+        and f'"{workloads["database"]}", {values["postgres"]["port"]}' in script,
+        f"{name}: migration must wait for the in-chart database Service",
+    )
+    require(
+        "env" not in wait and "envFrom" not in wait,
+        f"{name}: the database wait carries no credential",
+    )
+
+
+def validate_documents(
+    documents: list[dict[str, Any]],
+    values: dict[str, Any],
+    chart: dict[str, Any],
+    *,
+    release_name: str,
+    namespace: str,
+    migration_mode: str = "bootstrap",
+) -> None:
+    require(migration_mode in MIGRATION_MODES, f"unknown migration mode: {migration_mode}")
+    expected = expected_resources(values)
     observed: set[tuple[str, str]] = set()
     names: set[tuple[str, str]] = set()
     slug = str(chart["name"])
     product_name = str(chart["annotations"]["scaffold.kt.internal/product-name"])
+    workloads = {
+        component: resource_name(release_name, namespace, slug, component)
+        for component in ("backend", "frontend", "database", "migration", "migration-init")
+    }
     for document in documents:
         kind = str(document.get("kind", ""))
         metadata = document.get("metadata", {})
@@ -357,7 +833,11 @@ def validate_documents(
             labels.get("app.kubernetes.io/instance") == release_name,
             f"{kind}/{name}: wrong release label",
         )
-        require(component in {"backend", "frontend"}, f"{kind}/{name}: forbidden component")
+        require(
+            component in {"backend", "frontend", "database", "migration"}
+            and (kind, component) in expected,
+            f"{kind}/{name}: forbidden component",
+        )
         require(
             annotations.get("scaffold.kt.internal/product-name") == product_name,
             f"{kind}/{name}: product name drift",
@@ -370,6 +850,15 @@ def validate_documents(
             annotations.get("scaffold.kt.internal/release-namespace") == namespace,
             f"{kind}/{name}: namespace identity drift",
         )
+        require(
+            labels.get(WORKLOAD_LABEL) == workloads[component],
+            f"{kind}/{name}: workload identity drift",
+        )
+        if kind != "Job":
+            require(
+                not any(key.startswith("helm.sh/hook") for key in annotations),
+                f"{kind}/{name}: only the migration Job may run as a Helm hook",
+            )
 
         if kind == "Service":
             require(
@@ -411,63 +900,21 @@ def validate_documents(
                 path.get("backend", {}).get("service", {}).get("name") for path in paths
             ]
             require(
-                backend_names
-                == [
-                    next(
-                        item["metadata"]["name"]
-                        for item in documents
-                        if item.get("kind") == "Service"
-                        and item.get("metadata", {})
-                        .get("labels", {})
-                        .get("app.kubernetes.io/component")
-                        == "backend"
-                    ),
-                    next(
-                        item["metadata"]["name"]
-                        for item in documents
-                        if item.get("kind") == "Service"
-                        and item.get("metadata", {})
-                        .get("labels", {})
-                        .get("app.kubernetes.io/component")
-                        == "frontend"
-                    ),
-                ],
+                backend_names == [workloads["backend"], workloads["frontend"]],
                 f"{name}: ingress service routing drift",
             )
             continue
 
         if kind == "NetworkPolicy":
-            require(
-                document.get("apiVersion") == "networking.k8s.io/v1",
-                f"{name}: unsupported NetworkPolicy API",
-            )
-            policy = document.get("spec", {})
-            require(
-                policy.get("policyTypes") == ["Ingress", "Egress"],
-                f"{name}: ingress/egress policy required",
-            )
-            require(
-                "ingress" in policy and "egress" in policy, f"{name}: policy directions incomplete"
-            )
-            expected_policy = values[component]["networkPolicy"]
-            require(
-                policy.get("ingress") == expected_policy["ingress"], f"{name}: ingress peer drift"
-            )
-            require(policy.get("egress") == expected_policy["egress"], f"{name}: egress peer drift")
-            validate_policy_rules(policy["ingress"], "from", name)
-            if component == "backend":
-                validate_policy_rules(policy["egress"], "to", name)
-                ports = {
-                    (port.get("protocol"), port.get("port"))
-                    for rule in policy["egress"]
-                    for port in rule.get("ports", [])
-                }
-                require(
-                    {("UDP", 53), ("TCP", 53), ("TCP", 5432)} <= ports,
-                    f"{name}: admitted DNS/database egress is incomplete",
-                )
-            else:
-                require(policy["egress"] == [], f"{name}: static frontend must default-deny egress")
+            validate_network_policy(document, component, values, workloads)
+            continue
+
+        if kind == "StatefulSet":
+            validate_database(document, values, workloads["database"])
+            continue
+
+        if kind == "Job":
+            validate_migration(document, values, workloads, migration_mode)
             continue
 
         require(
@@ -475,46 +922,10 @@ def validate_documents(
             f"{name}: unsupported workload",
         )
         spec = pod_spec(document)
+        container = validate_pod_hardening(spec, name)
         require(
-            spec.get("automountServiceAccountToken") is False,
-            f"{name}: service account token enabled",
-        )
-        security = spec.get("securityContext", {})
-        require(security.get("runAsNonRoot") is True, f"{name}: runAsNonRoot required")
-        require(
-            security.get("seccompProfile", {}).get("type") == "RuntimeDefault",
-            f"{name}: RuntimeDefault seccomp required",
-        )
-        containers = spec.get("containers", [])
-        require(
-            isinstance(containers, list) and len(containers) == 1,
-            f"{name}: exactly one container required",
-        )
-        container = containers[0]
-        expected_image = values[component]["image"]
-        repository = str(expected_image.get("repository", ""))
-        digest = str(expected_image.get("digest", ""))
-        tag = str(expected_image.get("tag", ""))
-        require(bool(repository), f"{name}: image repository is required")
-        if digest:
-            require(DIGEST.fullmatch(digest) is not None, f"{name}: invalid image digest")
-            expected_reference = f"{repository}@{digest}"
-        else:
-            require(OCI_TAG.fullmatch(tag) is not None, f"{name}: invalid image tag")
-            expected_reference = f"{repository}:{tag}"
-        require(container.get("image") == expected_reference, f"{name}: image identity drift")
-        container_security = container.get("securityContext", {})
-        require(
-            container_security.get("allowPrivilegeEscalation") is False,
-            f"{name}: privilege escalation enabled",
-        )
-        require(
-            container_security.get("readOnlyRootFilesystem") is True,
-            f"{name}: writable root filesystem",
-        )
-        require(
-            container_security.get("capabilities", {}).get("drop") == ["ALL"],
-            f"{name}: capabilities not dropped",
+            container.get("image") == image_reference(values[component]["image"], name),
+            f"{name}: image identity drift",
         )
         require(
             all(
@@ -523,16 +934,6 @@ def validate_documents(
             ),
             f"{name}: probes incomplete",
         )
-        resources = container.get("resources", {})
-        require(
-            bool(resources.get("requests")) and bool(resources.get("limits")),
-            f"{name}: resources incomplete",
-        )
-        for volume in spec.get("volumes", []):
-            if "emptyDir" in volume:
-                require(
-                    bool(volume["emptyDir"].get("sizeLimit")), f"{name}: emptyDir must be bounded"
-                )
         if component == "backend":
             require(
                 container.get("envFrom")
@@ -548,7 +949,7 @@ def validate_documents(
     observed_summary = sorted(observed)
     require(
         observed == expected,
-        f"rendered resources must be backend/frontend only: {observed_summary}",
+        f"rendered resources must match the enabled components: {observed_summary}",
     )
 
 
@@ -556,7 +957,7 @@ def resource_names(documents: Iterable[dict[str, Any]]) -> set[str]:
     return {str(item.get("metadata", {}).get("name", "")) for item in documents}
 
 
-def self_test(values: dict[str, Any], chart: dict[str, Any]) -> int:
+def self_test_values(values: dict[str, Any], chart: dict[str, Any]) -> int:
     rendered = render_chart(values, release_name="generated", namespace="team-a")
     validate_documents(
         rendered,
@@ -578,6 +979,15 @@ def self_test(values: dict[str, Any], chart: dict[str, Any]) -> int:
     return len(rendered)
 
 
+def self_test(values: dict[str, Any], chart: dict[str, Any]) -> tuple[int, int]:
+    """Prove the default render and the render with the optional database and migration."""
+
+    count = self_test_values(values, chart)
+    database_values = database_deployment_values(values, str(chart["name"]))
+    database_count = self_test_values(database_values, chart)
+    return count, database_count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
@@ -589,13 +999,16 @@ def main() -> int:
         chart, canonical = validate_chart_layout()
         if args.values is None:
             values = deployment_values(canonical, str(chart["name"]))
-            count = self_test(values, chart)
-            print(f"chart contract passed: {count} resources, one chart, one values file")
+            count, database_count = self_test(values, chart)
+            print(
+                f"chart contract passed: {count} resources, {database_count} with the optional "
+                "database and migration, one chart, one values file"
+            )
             return 0
         supplied = load_yaml(args.values.resolve(strict=True))
         require(
-            set(supplied) == {"backend", "frontend"},
-            "supplied values must contain backend/frontend only",
+            {"backend", "frontend"} <= set(supplied) <= VALUE_SECTIONS,
+            "supplied values must contain backend/frontend and the optional postgres/migration only",
         )
         documents = render_chart(
             supplied,
@@ -604,7 +1017,7 @@ def main() -> int:
         )
         validate_documents(
             documents,
-            supplied,
+            merge_values(canonical, supplied),
             chart,
             release_name=args.release_name,
             namespace=args.namespace,

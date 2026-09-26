@@ -89,7 +89,7 @@
       "artifact_id": "rule:22-backend-yapilandirmasi",
       "authority": "mandatory",
       "kind": "rule",
-      "sha256": "bd466510d35e129630d5a8a4a97dfe08eb0252a605b8051f4bd290f3ca2f4533",
+      "sha256": "6d288825ea60e97b2bc4c0b05a4dd49e678b793df811976ce2c751f6e73c0c91",
       "version": "0.4.0"
     },
     {
@@ -110,7 +110,7 @@
       "artifact_id": "rule:45-dagitim-hedefi",
       "authority": "mandatory",
       "kind": "rule",
-      "sha256": "804649f998e492f889d8c571f01484965e5881c29731eb42d9877b809a2c2743",
+      "sha256": "bb830541feebecac4cacaae8bccd998a2c5d5c418a081073764c3ee2fc0d1ff4",
       "version": "0.4.0"
     },
     {
@@ -364,7 +364,7 @@
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "2b7783bf610088cb872ff8ef060f31e330530935c1138fe0a3faa0acffaa39f1",
+  "governance_digest": "f824e2d368e34753601898f0e2455ff77e0110e5e4b08bb4a89ea5f08f9d26af",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

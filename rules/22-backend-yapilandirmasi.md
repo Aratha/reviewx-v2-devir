@@ -35,11 +35,10 @@ anahtarları sabit yığın tipli ayarlarından türetir; ön eksiz veya yabanc�
 anahtarlarını ve onaylı ayar yükleyicisi/başlatma sınırları dışındaki doğrudan süreç ortamı
 okumalarını reddeder.
 
-Kök Helm chart'ının tam olarak bir `values.yaml` dosyası vardır; yalnız `backend` ve `frontend`
-bölümlerini taşır. İmaj yolu, etiket varsayılanı, sunucu adı ve `Secret` gibi dağıtım girdilerinin
-sahibi `45-dagitim-hedefi` kuralıdır; bu kural onları yeniden tanımlamaz. Yapısal işleme testi gizli
-olmayan sentetik değerleri komut satırından sağlar; ikinci bir değer dosyası veya ortam katmanı
-üretmez.
+Kök Helm chart'ının tam olarak bir `values.yaml` dosyası vardır. Bu dosyanın bölümleri ile imaj yolu,
+etiket varsayılanı, sunucu adı ve `Secret` gibi dağıtım girdilerinin sahibi `45-dagitim-hedefi`
+kuralıdır; bu kural onları yeniden tanımlamaz. Yapısal işleme testi gizli olmayan sentetik değerleri
+komut satırından sağlar; ikinci bir değer dosyası veya ortam katmanı üretmez.
 
 Helm chart'ı, arka uçta `envFrom` üzerinden önceden oluşturulmuş `Secret`'a adıyla referans verir;
 anahtar başına sır eşlemesi listelemez. Gizli malzeme; kaynak, örnek dosya, çizelge değeri, günlük,

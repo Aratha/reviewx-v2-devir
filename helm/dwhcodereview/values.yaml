@@ -44,3 +44,38 @@ frontend:
   resources:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {cpu: 500m, memory: 256Mi}
+
+# Optional in-chart PostgreSQL 17. It stays off until the project's accepted PRD declares it.
+postgres:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "17.10"
+    digest: "sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317"
+  existingSecret: ""
+  port: 5432
+  database: "dwhcodereview_db"
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 1000m, memory: 1Gi}
+
+# Optional Alembic schema migration Job; it runs the backend image and needs postgres.enabled.
+migration:
+  enabled: false
+  existingSecret: ""
+  activeDeadlineSeconds: 600
+  networkPolicy:
+    dns:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}

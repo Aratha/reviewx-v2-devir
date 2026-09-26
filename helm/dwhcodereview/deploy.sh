@@ -214,6 +214,7 @@ fi
 
 settle_pending_release || exit 1
 
+# --wait-for-jobs makes a failed schema migration fail the release, so --atomic restores the last one.
 exec helm upgrade --install "$release" "$chart" \
-  --create-namespace --reset-values --atomic --wait \
+  --create-namespace --reset-values --atomic --wait --wait-for-jobs \
   --timeout "${HELM_TIMEOUT:-30m}" "${common[@]}"

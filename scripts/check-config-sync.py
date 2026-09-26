@@ -261,7 +261,11 @@ def _check_kubernetes(root: Path, errors: list[str]) -> None:
     deployment = root / "helm/dwhcodereview/templates/backend-deployment.yaml"
     values = root / "helm/dwhcodereview/values.yaml"
     source = _read(deployment)
-    value_matches = re.findall(r"(?m)^  existingSecret:\s*([^#]+?)\s*(?:#.*)?$", _read(values))
+    # Only the backend section feeds the application; the database and migration own their Secrets.
+    backend = re.search(r"(?ms)^backend:\s*$(.*?)(?=^\S|\Z)", _read(values))
+    value_matches = re.findall(
+        r"(?m)^  existingSecret:\s*([^#]+?)\s*(?:#.*)?$", backend.group(1) if backend else ""
+    )
     if value_matches != ['""']:
         errors.append(
             f"{values}: backend existingSecret must be one empty environment-supplied fact"

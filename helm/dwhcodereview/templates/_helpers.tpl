@@ -39,3 +39,34 @@ scaffold.kt.internal/release-namespace: {{ .Release.Namespace | quote }}
 {{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
 {{- end }}
+
+{{- define "generated.postgresImage" -}}
+{{- $image := .Values.postgres.image -}}
+{{- $repository := required "postgres.image.repository is required" $image.repository -}}
+{{- $digest := required "postgres.image.digest must pin the PostgreSQL image when postgres.enabled" $image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail "postgres.image.digest must be a lowercase sha256 digest" -}}
+{{- end -}}
+{{- printf "%s@%s" $repository $digest -}}
+{{- end }}
+
+{{- define "generated.validateMigration" -}}
+{{- if not .Values.postgres.enabled -}}
+{{- fail "migration.enabled requires postgres.enabled; the migration Job reaches only the in-chart PostgreSQL" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Migration mode. "upgrade" when an earlier release already created the migration NetworkPolicy, so
+the database exists and the Job runs as a pre-upgrade hook before any new backend pod. Otherwise
+"bootstrap": the Job is an ordinary release resource created together with the database (fresh
+install, or the first upgrade that adds the database), so nothing waits on backend readiness first.
+helm template sees no cluster and always renders "bootstrap".
+*/}}
+{{- define "generated.migrationMode" -}}
+{{- if lookup "networking.k8s.io/v1" "NetworkPolicy" .Release.Namespace (include "generated.resourceName" (list . "migration")) -}}
+upgrade
+{{- else -}}
+bootstrap
+{{- end -}}
+{{- end }}

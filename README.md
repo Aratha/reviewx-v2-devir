@@ -15,9 +15,12 @@ Kalıcılık otoritesi: `sqlalchemy-alembic`.
 iskelet güncellemesi bu kapsamın üzerine yazmaz veya bu kapsamı silmez. `helm/**` ise temel iskelet
 ve DevOps tarafından yönetilen kapsamdır. DevOps standardı gereği uygulama chart'ı
 `helm/dwhcodereview/` dizinindedir: kendi `Chart.yaml`, `templates/**`, `deploy.sh` ve tam olarak
-bir `values.yaml` dosyasından oluşan tek Helm paketi içinde yalnız arka uç ve ön yüz iş yüklerini taşır.
-PostgreSQL, Redis, işleyici, geçiş ve gözlemlenebilirlik iş yükleri ihtiyaç doğduğunda kabul edilmiş
-proje çalışmasıyla eklenir.
+bir `values.yaml` dosyasından oluşan tek Helm paketi içinde arka uç ve ön yüz iş yüklerini taşır.
+Aynı pakette PostgreSQL 17 veritabanı ve Alembic şema geçişi (veritabanı tablolarını güncelleyen tek
+seferlik iş) de vardır, ama `values.yaml` içindeki `postgres` ve `migration` bölümlerinde varsayılan
+olarak kapalıdır; yalnız projenin kabul edilmiş PRD'si isterse açılır. Kuralları
+`rules/45-dagitim-hedefi.md` dosyasındadır. Redis, işleyici ve gözlemlenebilirlik iş yükleri ihtiyaç
+doğduğunda kabul edilmiş proje çalışmasıyla eklenir.
 
 ## İmaj yayını ve Helm dağıtımı
 
@@ -55,7 +58,8 @@ varsayılan olarak `kt-verim/ailab-tls` kaynağından kopyalar. `TLS_COPY_ENABLE
 kapatır; `TLS_SOURCE_NAMESPACE`, `TLS_SOURCE_SECRET` ve `TLS_TARGET_SECRET` adları değiştirebilir.
 Sertifika ve anahtar yalnız owner-only geçici dizinden geçirilir, Git'e veya Helm argümanına yazılmaz.
 Script önce `helm lint` çalıştırır; beklemedeki release'i kurtarır ve ardından
-`helm upgrade --install --reset-values --atomic --wait` çalıştırır. Render kipi cluster'a erişmez veya Secret kopyalamaz.
+`helm upgrade --install --reset-values --atomic --wait --wait-for-jobs` çalıştırır; şema geçişi
+başarısız olursa önceki sürüm korunur. Render kipi cluster'a erişmez veya Secret kopyalamaz.
 
 Güvenilen yerel MCP kurulu üreteçle sabit çalışma alanına doğrudan yazabilir. Uzak HTTP MCP ise aynı
 kanonik dosya baytlarını, modları ve SHA-256 özetlerini sayfalar halinde teslim eder; Claude, Codex

@@ -14,8 +14,16 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   (`app/backend/tests/integration/test_object_review_api.py`); iptal edilen koşumda metnin
   saklanmaması; metnin ve etiketin günlükte olmaması ve yalnız koşum nesnesinde saklanması.
   Kanıt: `app/backend/tests/integration/test_script_review_api.py`.
-- [ ] Task 3 — Requirement 2, 11 / Acceptance 3: "SQL betiği incelemesi" sayfası, sayaç, sınır
-  iletisi, sabit not ve Vitest testleri. Ön yüz sonraki teslimdedir; açık. `OpenAPI` ve üretilmiş
-  tipler bu teslimde güncel (`scripts/generate-types.sh --check`).
-- [ ] Task 4 — Acceptance 4, Acceptance 5: onaylı LLM ucuyla tarayıcıda L2 (gerçek ortamda
-  doğrulama). Task 3 ve kurum ağı gerekli; açık.
+- [x] Task 3 — Requirement 2, 11 / Acceptance 3: "SQL betiği incelemesi" sayfası, sayaç, sınır
+  iletisi, sabit not ve Vitest testleri. Kanıt: `app/frontend/src/pages/ScriptReviewPage.test.tsx`
+  (düğme durumları, sayaç, 120.000/120.001 sınırı ve iletisi, sabit not, 200 karakter etiket, koşum
+  sürerken kilit, tarayıcı deposuna yazılmaması), `app/frontend/src/contexts/ReviewSessionContext.test.tsx`
+  (durdurma, "Yapıştırılan SQL" varsayılanı); `scripts/generate-types.sh --check`.
+- [x] Task 4 — Requirement 2, 8 / Acceptance 5: 120.001 karakterlik metin tarayıcıda gönderilemez ve
+  API'de `422 sql_text_too_long` alır; "Analizi durdur" sonrası koşum "iptal edildi" olur ve 5 saniyeden
+  sonra başlamış LLM çağrı özeti yoktur. `e2e/sql-review/02-script-review-history.mjs` 2026-09-26'da
+  Chromium'da, arka uç kabının içinde yalnız bu doğrulama için çalıştırılan yerel, OpenAI uyumlu yedek
+  LLM ucuyla (`http://127.0.0.1:8765/v1`) geçti; bu uç onaylı kurum LLM'i değildir.
+- [ ] Task 5 — Acceptance 4: onaylı LLM ucuyla tarayıcıda L2. Aynı akış (etiketli metin, canlı
+  ilerleme, satır referanslı bulgu, sabit not, koşum kaydında sürüm ve etiket) Task 4'teki yedek uçla
+  gözlendi; onaylı kurum LLM'i yerelden erişilebilir olmadığı için açık.

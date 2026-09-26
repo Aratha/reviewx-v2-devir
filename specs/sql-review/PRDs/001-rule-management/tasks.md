@@ -1,9 +1,9 @@
 # Görevler — rule-management
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti (göç, arka uç, OpenAPI, üretilmiş tip, yönetişim sapması ve chart adımları
-dahil). Bu, arka uç kapsamı için L1 (otomatik testlerden geçti) kanıtıdır; ön yüz sayfaları
-(Task 6) yapılmadığı için Acceptance 3 ve Acceptance 4 açıktır.
+Compose yığınında geçti (göç, arka uç, ön yüz, OpenAPI, üretilmiş tip, yönetişim sapması ve chart
+adımları dahil). Bu, L1 (otomatik testlerden geçti) kanıtıdır; Acceptance 4'ün yerel tarayıcı kanıtı
+Task 7'dedir, Acceptance 5 açıktır.
 
 - [x] Task V1 — Requirement 2, 3, 4, 5, 8 / Acceptance 1: taslak, taslak kuralı, sürüm ve sürüm
   kuralı tabloları; göç `202609260001`. Kanıt: `app/backend/tests/integration/test_data_model.py`.
@@ -23,9 +23,16 @@ dahil). Bu, arka uç kapsamı için L1 (otomatik testlerden geçti) kanıtıdır
   `test_rule_set_api.py::test_imported_file_is_version_one_for_both_roles`, `scripts/db.sh validate`.
 - [x] Task 5 — API sözleşmesi / Acceptance 1: `specs/openapi/dwhcodereview-api.yaml` ve üretilmiş ön
   yüz tipleri. Kanıt: `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`.
-- [ ] Task 6 — Requirement 4 (409 iletisi), 10, 11 / Acceptance 3: Kurallar ve "Yayımlanmış
-  kurallar" sayfaları ile Vitest testleri. Bu teslimde ön yüz işi kapsam dışı tutuldu; açık.
-- [ ] Task 7 — Requirement 1, 4, 5, 8, 9, 10, 11 / Acceptance 4: yerel PostgreSQL ve tarayıcıyla
-  L2 doğrulaması (gerçek istemci ve ortamda gözlem). Task 6'ya bağlı; açık.
+- [x] Task 6 — Requirement 4 (409 iletisi), 10, 11 / Acceptance 3: Kurallar ve "Yayımlanmış
+  kurallar" sayfaları ile Vitest testleri. Kanıt: `app/frontend/src/pages/RulesPage.test.tsx`
+  (arama, taşıma, silme, ekleme kimliği, "Kaydedilmedi", yayımlamadan önce kaydetme, 409 iletisi ve
+  yenileme, 8.000 karakter), `app/frontend/src/pages/PublishedRulesPage.test.tsx` (iki rolde salt
+  okunur, eski sürüm, sürüm yokken ileti), `app/frontend/src/components/layout/AppShell.test.tsx`
+  (Kurallar menüsü ve sayfası inceleyiciye kapalı).
+- [x] Task 7 — Requirement 1, 4, 5, 8, 9, 10, 11 / Acceptance 4: yerel PostgreSQL ve tarayıcıyla
+  L2 doğrulaması. `e2e/sql-review/01-rules-and-roles.mjs` 2026-09-26'da Chromium'da geçti: kural
+  yöneticisi içe aktarılmış sürüm 1'i görür (ilk koşumda 1 → 2), kural ekler, kaydeder, yayımlar ve
+  yeni sürümü görür; inceleyici Kurallar sayfasını göremez, taslak ucundan 403 alır, yeni sürümü
+  "Yayımlanmış kurallar"da salt okunur görür. Senaryo eklediği kuralı kaldırıp yeniden yayımlar.
 - [ ] Task 8 — Requirement 7 / Acceptance 5: koşumun sürümü başta sabitlediğinin gerçek koşumla
   gözlenmesi. [Nesne incelemesi](../003-object-review/PRD.md) uygulanınca yapılır; açık.

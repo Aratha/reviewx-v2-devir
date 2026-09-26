@@ -19,6 +19,7 @@ ayarıdır (Requirement 2).
 | Koşum | `app/backend/app/services/review_run_service.py` (`start_script_review`, `_review_script`) | Requirement 1–5, 7–10 |
 | Ortak inceleme | `app/backend/app/services/review_engine.py`, `review_prompts.py`, `review_response_parser.py` | Requirement 6, 12 |
 | API | `app/backend/app/api/reviews/router.py` (`POST /script-reviews`, `get_script_review_service`), `app/backend/app/schemas/reviews/contracts.py` | API sözleşmesi |
+| Ön yüz | `app/frontend/src/pages/ScriptReviewPage.tsx`; canlı ve sonuç pencereleri nesne incelemesiyle ortak | Requirement 2, 11 |
 
 ## Uygulama kararları
 
@@ -58,4 +59,5 @@ bu teslimde `helm/` değişmedi.
 | Requirement 3–7, 12 | Acceptance 1 | Task 1 |
 | Requirement 1–3, 8–10 | Acceptance 2 | Task 2 |
 | Requirement 2, 11 | Acceptance 3 | Task 3 |
-| Acceptance 4, Acceptance 5 | Acceptance 4, Acceptance 5 | Task 4 |
+| Requirement 2, 8 | Acceptance 5 | Task 4 |
+| Acceptance 4 | Acceptance 4 | Task 5 |

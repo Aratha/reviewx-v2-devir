@@ -25,7 +25,7 @@ sütun yoktur; saklama işi için `started_at` dizini vardır (Requirement 14). 
 | Yaşam döngüsü | `app/backend/app/main.py` (başlangıç denetimi, saklama işi) | Requirement 1, 14 |
 | İmaj | `app/backend/certs/corporate-inference-root.crt`, `app/infra/install-backend-system-packages.sh`, iki Dockerfile | Requirement 5 |
 | Bağımlılık | `app/backend/requirements.in` (`httpx==0.28.1`, `httpcore==1.0.9`), kilitli `requirements*.txt`, `dependency-admission.json` | Decision 5 |
-| Ön yüz | LLM bağlantısı sayfası | Requirement 13 |
+| Ön yüz | `app/frontend/src/pages/LlmConnectionPage.tsx`, `app/frontend/src/pages/LlmCallsPage.tsx` | Requirement 11, 13 |
 
 ## Uygulama kararları
 
@@ -90,7 +90,7 @@ bu teslimde `helm/` değişmedi.
 | Requirement 3, 5, 6, 8, 9 | Acceptance 1 | Task 2 |
 | Requirement 4 | Acceptance 1 | Task 2, Task 5 |
 | Requirement 7 | Acceptance 2 | Task 3 |
-| Requirement 10, 11, 12, 14 | Acceptance 2 | Task V1, Task 4 |
+| Requirement 10, 11, 12, 14 | Acceptance 2, Acceptance 3 | Task V1, Task 4, Task 7 |
 | Requirement 13 | Acceptance 3, Acceptance 5 | Task 5, Task 7 |
 | Gözlemlenebilirlik (ölçüm ve iz) | — | Task 6 |
 | Acceptance 4 | Acceptance 4 | Task 8 |

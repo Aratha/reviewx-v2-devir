@@ -35,9 +35,13 @@ bir SQL Server'a karşı tümleşik test çalıştırılmadı: yerelde erişileb
   `dwhcodereview_sql_server_call_duration_seconds` ve `dwhcodereview_sql_server_inflight`
   ölçümleri. Arka uçta ölçüm kitaplığı veya dışa aktarıcı yok; yeni bağımlılık (OpenTelemetry SDK
   veya Prometheus istemcisi) için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli.
-- [ ] Task 8 — Requirement 9 / Acceptance 3: SQL bağlantısı sayfası ve Vitest testleri. Bu
-  teslimde ön yüz işi kapsam dışı tutuldu; açık.
+- [x] Task 8 — Requirement 5, 9 / Acceptance 3: SQL bağlantısı sayfası ve Vitest testleri. Kanıt:
+  `app/frontend/src/pages/ConnectionPages.test.tsx` (`editable: false` iken yalnız dağıtım notu,
+  süreç içi uygulama metni, kaydetmeden test ve ilk 8 veritabanı, parola koruma/kaldırma, sabit
+  hata iletisi, port aralığı), `app/frontend/src/components/layout/AppShell.test.tsx` (`editable:
+  false` iken menü öğesi yok). Yerel tarayıcıda `e2e/sql-review/03-settings-objects-users.mjs`
+  sayfayı, kaydetmeden testin sabit hata iletisini ve inceleyiciye kapalı menüyü gözledi.
 - [ ] Task 9 — Requirement 3, 4, 7, 9 / Acceptance 4 ve Requirement 5, 7 / Acceptance 5: geliştirici
   SQL Server'ı ve `nonprod` ayarlarıyla L2 doğrulaması; gerçek SQL Server'a karşı tümleşik testler
-  (yanlış parola `sql_login_failed`, erişilemeyen port `sql_server_unreachable`). Erişilebilir SQL
-  Server ve Task 8 gerekli; açık.
+  (yanlış parola `sql_login_failed`, erişilemeyen port `sql_server_unreachable`). Yerel Compose ağı
+  dışarı çıkamadığı için erişilebilir SQL Server yok; açık.

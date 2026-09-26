@@ -39,6 +39,7 @@ kiracı mekanizması eklenmez:
 | Betik | `scripts/create-local-user.sh`, `app/backend/app/scripts/create_local_user.py` | Requirement 11, Decision 9 |
 | Bağımlılık | `app/backend/requirements.in` (`ldap3==2.9.1`), kilitli `requirements*.txt`, `dependency-admission.json` | Requirement 2 |
 | Sözleşme | `specs/openapi/dwhcodereview-api.yaml`, üretilmiş `app/frontend/src/types/api.d.ts` | API sözleşmesi |
+| Ön yüz | `app/frontend/src/lib/authStorage.ts` (bellekte oturum), `app/frontend/src/lib/apiClient.ts` (çerezle yenileme ve yeniden deneme), `app/frontend/src/contexts/AuthContext.tsx`, `app/frontend/src/pages/LoginPage.tsx`, `app/frontend/src/components/layout/AppShell.tsx`, `app/frontend/src/components/auth/RoleRoute.tsx`, `app/frontend/src/pages/UserAdministrationPage.tsx` | Requirement 5, 6, 8, 13 |
 
 ## Uygulama kararları
 

@@ -36,8 +36,13 @@ kurum ağındaki gerçek LLM ucuna çağrı yapılmadı.
 - [ ] Task 6 — Gözlemlenebilirlik: `dwhcodereview_llm_*` ölçümleri ve içerik taşımayan çağrı izi
   (trace). Arka uçta ölçüm/iz kitaplığı veya dışa aktarıcı yok; yeni bağımlılık için sahip kararı
   ve kabul kaydı gerekiyor. Açık, engelli.
-- [ ] Task 7 — Requirement 13 / Acceptance 3: LLM bağlantısı sayfası ve Vitest testleri. Bu
-  teslimde ön yüz işi kapsam dışı tutuldu; açık.
+- [x] Task 7 — Requirement 11, 13 / Acceptance 3: LLM bağlantısı sayfası, LLM çağrı özetleri
+  listesi ve Vitest testleri. Kanıt: `app/frontend/src/pages/ConnectionPages.test.tsx`
+  (`editable: false` iken yalnız biçim ve model, kaydetme, boş anahtar alanının kayıtlı anahtarı
+  koruması, `network_policy_denied` iletisi, vekil kutusu olmaması),
+  `app/frontend/src/pages/LlmCallsPage.test.tsx`, `app/frontend/src/components/layout/AppShell.test.tsx`.
+  Yerel tarayıcıda `e2e/sql-review/02-script-review-history.mjs` sayfadan adres ve model kaydını,
+  `e2e/sql-review/03-settings-objects-users.mjs` çağrı listesini gözledi.
 - [ ] Task 8 — Acceptance 4 ve Acceptance 5: kurum ağından Decision 3 ucuna gerçek inceleme ve
   `nonprod` ayarlarıyla yerel L2 doğrulaması. [Nesne incelemesi](../003-object-review/PRD.md) ve
   Task 7 gerekli; açık.

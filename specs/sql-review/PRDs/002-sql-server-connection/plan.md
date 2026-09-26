@@ -17,7 +17,7 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 | API | `app/backend/app/api/sql_connection/router.py`, `app/backend/app/api/route_classes.py`, `app/backend/app/api/router.py` (`local_environment_router`), `app/backend/app/api/integrations.py`, `app/backend/app/schemas/sql_connection/contracts.py` | API sözleşmesi, Requirement 5 |
 | İmaj | `app/infra/locks/backend-alpine-packages.lock`, `app/infra/locks/msodbcsql18-alpine-packages.lock`, `app/infra/install-backend-system-packages.sh`, `app/backend/Dockerfile.dev`, `app/infra/Dockerfile.backend.release` | Dağıtım etkisi, Decision 4, 6 |
 | Bağımlılık | `app/backend/requirements.in` (`pyodbc==5.3.0`), kilitli `requirements*.txt`, `dependency-admission.json` | Decision 4 |
-| Ön yüz | SQL bağlantısı sayfası | Requirement 5, 9 |
+| Ön yüz | `app/frontend/src/pages/SqlConnectionPage.tsx`, `app/frontend/src/hooks/useConnectionMenu.ts`, `app/frontend/src/services/connections.ts` | Requirement 5, 9 |
 
 ## Uygulama kararları
 
@@ -77,6 +77,6 @@ bu teslimde `helm/` değişmedi.
 | Requirement 3, 4, 5 | Acceptance 1, Acceptance 3 | Task 4, Task 5 |
 | Requirement 6 | Acceptance 2 | Task 3 |
 | Requirement 7 | Acceptance 1 | Task 3 |
-| Requirement 9 | Acceptance 3, Acceptance 4 | Task 8 |
+| Requirement 5, 9 | Acceptance 3, Acceptance 4 | Task 8, Task 9 |
 | Gözlemlenebilirlik (ölçümler) | — | Task 7 |
 | Dağıtım etkisi (imaj, bağımlılık) | Acceptance 1 | Task 6 |

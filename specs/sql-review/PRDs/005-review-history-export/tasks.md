@@ -19,10 +19,24 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   gerçek satırı göstermesi (nesne ve metin koşumu, CRLF ve baştaki boş satırlar), yanlış pozitifin
   yorumdan çıkması. Kanıt: `app/backend/tests/unit/test_review_export.py`,
   `app/backend/tests/integration/test_review_history_api.py`.
-- [ ] Task 3 — Requirement 3, 4, 5, 10, 11 / Acceptance 3: geçmiş sayfası, onaylar, indirme
-  düğmeleri, pasif SQL düğmesi ve Vitest testleri. Ön yüz sonraki teslimdedir; açık.
+- [x] Task 3 — Requirement 3, 4, 5, 10, 11 / Acceptance 3: geçmiş sayfası, onaylar, indirme
+  düğmeleri, pasif SQL düğmesi ve Vitest testleri. Kanıt:
+  `app/frontend/src/pages/ReviewHistoryPage.test.tsx` (liste, kapsam seçimi yalnız kural
+  yöneticisinde, ayrıntı, yanlış pozitif işareti, CSV indirme, SQL metni yokken pasif SQL düğmesi,
+  tek ve toplu silme onayı, süren koşumda 409 iletisi, `localStorage` kullanılmaması),
+  `app/frontend/src/components/review/ReviewResultsView.test.tsx`,
+  `app/frontend/src/services/reviews.test.ts` (oturum başlığıyla indirme, sunucunun dosya adı).
 - [ ] Task 4 — Gözlemlenebilirlik: biçime göre dışa aktarım sayısı, saklama işinin sildiği koşum
   sayısı ve son başarılı çalışma zamanı ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
   için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli. Günlük olayları teslim edildi.
-- [ ] Task 5 — Acceptance 4, Acceptance 5: iki tarayıcı ve iki kullanıcıyla L2 (gerçek ortamda
-  doğrulama). Task 3 gerekli; açık.
+- [x] Task 5 — Acceptance 4 ve Acceptance 5'in görme/yetki bölümü: `e2e/sql-review/02-script-review-history.mjs`
+  2026-09-26'da Chromium'da geçti (metin koşumu yerel yedek LLM ucuyla,
+  [script-review](../004-script-review/tasks.md) Task 4): canlı sonuçta işaretlenen bulgu ikinci
+  tarayıcıda işaretli görünür; CSV UTF-8 BOM, CRLF ve sütun sırasıyla iner, işaretli bulgu
+  `false_positive=true` taşır; SQL dosyasındaki "Satır N" indirilen dosyadaki `NOLOCK` satırını
+  gösterir ve işaretli bulgu yorumdan çıkar; ikinci inceleyici koşumu ve SQL dışa aktarımını 404 ile
+  göremez; kural yöneticisi "Tüm incelemeler"de salt okunur görür, SQL indirir, işaret değiştiremez
+  (403) ve silemez (403); sahip onaylı silme yapar.
+- [ ] Task 6 — Acceptance 4 ve 5'in kalan bölümü: CSV'nin Excel'de Türkçe karakterlerle açıldığının
+  kişi tarafından görülmesi ve saklama süresi 1 güne ayarlanıp bitiş zamanı geçmişe çekilen koşumun
+  saklama işiyle silinmesinin gözlenmesi; açık.

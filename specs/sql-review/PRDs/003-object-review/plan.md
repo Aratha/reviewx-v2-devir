@@ -1,8 +1,8 @@
 # Plan — object-review
 
 [PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
-sabit yığın `python-fastapi` arka uçtur. Bu teslim arka ucu kapsar; ön yüz sayfaları ve tarayıcı
-doğrulaması açık görevlerdir.
+sabit yığın `python-fastapi` arka uç ve `React`/`Vite` ön yüzdür. Gerçek SQL Server ve onaylı LLM
+ile tarayıcı doğrulaması açık görevdir.
 
 ## Veri modeli ve ayarlar
 
@@ -41,6 +41,7 @@ Ayarlar mevcuttur: `DWHCODEREVIEW_REVIEW_MAX_SQL_CHARS` (120.000; tablo sınır�
 | API | `app/backend/app/api/reviews/router.py`, `app/backend/app/schemas/reviews/contracts.py`, `app/backend/app/schemas/reviews/events.py`, `app/backend/app/api/integrations.py`, `app/backend/app/api/router.py` | API sözleşmesi, Requirement 14 |
 | Yaşam döngüsü | `app/backend/app/main.py` (açılışta yarıda kalan koşumlar, kapanışta süren koşumlar) | Requirement 16 |
 | Sözleşme | `specs/openapi/dwhcodereview-api.yaml`, `app/frontend/src/types/api.d.ts` (üretilmiş) | Acceptance 4 |
+| Ön yüz | `app/frontend/src/pages/ObjectReviewPage.tsx`, `app/frontend/src/components/review/` (nesne tablosu, canlı ve sonuç pencereleri), `app/frontend/src/contexts/ReviewSessionContext.tsx`, `app/frontend/src/lib/eventStream.ts` (`fetch` ile akış), `app/frontend/src/lib/reviewProgress.ts`, `app/frontend/src/services/catalog.ts`, `app/frontend/src/services/reviews.ts` | Requirement 1–3, 14, 15, 19 |
 
 ## Uygulama kararları
 

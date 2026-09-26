@@ -30,7 +30,7 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 | API | `app/backend/app/api/rule_set/router.py`, `app/backend/app/schemas/rule_set/contracts.py`, `app/backend/app/api/auth/dependencies.py` (`require_any_role`), `app/backend/app/api/validation.py` | API sözleşmesi, Requirement 8 |
 | İçe aktarım | `schema/alembic/versions/202609260002_import_previous_review_rules.py`, `schema/alembic/data/review_rules.json` | Requirement 9, Decision 3 |
 | Sözleşme | `specs/openapi/dwhcodereview-api.yaml`, üretilmiş `app/frontend/src/types/api.d.ts` | API sözleşmesi |
-| Ön yüz | Kurallar ve "Yayımlanmış kurallar" sayfaları | Requirement 10, 11 |
+| Ön yüz | `app/frontend/src/pages/RulesPage.tsx`, `app/frontend/src/components/rules/RuleEditorColumn.tsx`, `app/frontend/src/pages/PublishedRulesPage.tsx`, `app/frontend/src/services/ruleSet.ts` | Requirement 4, 10, 11 |
 
 ## Uygulama kararları
 

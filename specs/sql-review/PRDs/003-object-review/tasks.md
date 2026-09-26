@@ -40,9 +40,20 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
 - [x] Task 6 — Requirement 20, API sözleşmesi / Acceptance 4 (arka uç): katmanlara bölme,
   `OpenAPI` ve üretilmiş ön yüz tipleri. Kanıt: `scripts/quality-gate.sh all` (`ruff`, `mypy`,
   `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`).
-- [ ] Task 7 — Requirement 1–3, 14, 15, 19 / Acceptance 4: inceleme sayfası, canlı pencere,
-  "Analizi durdur", sonuç penceresi ve Vitest testleri. Ön yüz sonraki teslimdedir; açık.
+- [x] Task 7 — Requirement 1–3, 14, 15, 19 / Acceptance 4: inceleme sayfası, canlı pencere,
+  "Analizi durdur", sonuç penceresi ve Vitest testleri. Kanıt:
+  `app/frontend/src/pages/ObjectReviewPage.test.tsx` (sunucuda süzgeç, çoklu veritabanı seçimi,
+  50 sınırı, SQL Server hatasında Türkçe ileti ve "Listeyi yenile"),
+  `app/frontend/src/lib/eventStream.test.ts` (akış çözümleyici, parça sınırları, erken durma,
+  kopma), `app/frontend/src/lib/reviewProgress.test.ts` (olay birleştirme),
+  `app/frontend/src/contexts/ReviewSessionContext.test.tsx` (`fetch` akışı ve oturum başlığı,
+  durdurma, kapanamayan canlı pencere, son olaysız kopma, akış öncesi 409/422/429/503),
+  `app/frontend/src/components/review/ReviewResultsView.test.tsx` (sonuç, satır referansı, yanlış
+  pozitif işareti). Yerel tarayıcıda SQL Server yokken sayfanın iletisi gözlendi
+  (`e2e/sql-review/03-settings-objects-users.mjs`).
 - [ ] Task 8 — Gözlemlenebilirlik: koşum ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
   için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli.
 - [ ] Task 9 — Acceptance 5, Acceptance 6: test SQL Server'ı ve onaylı LLM ucuyla tarayıcıda L2
-  (gerçek ortamda doğrulama). Task 7 ve kurum ağı gerekli; açık.
+  (gerçek ortamda doğrulama). Kurum ağı ve erişilebilir SQL Server gerekli; açık. Aynı canlı pencere,
+  durdurma ve sonuç penceresi metin incelemesinde yerel yedek LLM ucuyla gözlendi
+  ([script-review](../004-script-review/tasks.md) Task 4).

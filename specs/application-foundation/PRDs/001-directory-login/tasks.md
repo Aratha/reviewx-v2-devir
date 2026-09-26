@@ -1,9 +1,9 @@
 # Görevler — directory-login
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti (arka uç 236/236, ön yüz 35/35 test; göç, OpenAPI, üretilmiş tip,
-yönetişim sapması ve chart adımları dahil). Bu, arka uç kapsamı için L1 (otomatik testlerden
-geçti) kanıtıdır; Acceptance 1'in ön yüz bölümü Task 10 tamamlanmadan karşılanmaz.
+Compose yığınında geçti (arka uç 559/559, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+yönetişim sapması ve chart adımları dahil). Bu, arka uç ve ön yüz için L1 (otomatik testlerden
+geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) Task 11'dedir.
 
 - [x] Task 1 — Requirement 3, 6, 7, 9, 10, 11 / Acceptance 1: tipli ayarlar (ortam eşlemesi,
   dizin, oturum süreleri, güvenilen giriş denetleyicisi, uygulama adresi), `.env.example` ve yerel
@@ -36,11 +36,24 @@ geçti) kanıtıdır; Acceptance 1'in ön yüz bölümü Task 10 tamamlanmadan k
   `dependency-admission.json` karar kaydı.
 - [x] Task 9 — API sözleşmesi / Acceptance 1: `specs/openapi/dwhcodereview-api.yaml` ve üretilmiş ön
   yüz tipleri. Kanıt: `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`.
-- [ ] Task 10 — Requirement 6 (belleğe alınan belirteç), 13 / Acceptance 1, Acceptance 2: giriş
+- [x] Task 10 — Requirement 6 (belleğe alınan belirteç), 13 / Acceptance 1, Acceptance 2: giriş
   ekranı, sessiz yenileme, çıkış, oturum bitince girişe dönüş, süper yönetici kullanıcı yönetimi
-  ekranı, Vitest testleri ve tarayıcı senaryosu.
-- [ ] Task 11 — Requirement 3, 5–8, 11, 13 / Acceptance 2: yerel Compose'da tarayıcıyla L2
-  doğrulaması (gerçek istemci ve ortamda gözlem).
+  ekranı, Vitest testleri ve tarayıcı senaryosu. Kanıt: `app/frontend/src/lib/authStorage.test.ts`,
+  `app/frontend/src/lib/apiClient.test.ts` (reddedilen belirteçte tek ortak yenileme ve yeniden
+  deneme, yenileme bitince oturumun kapanması, ilgisiz hatalarda korunması),
+  `app/frontend/src/contexts/AuthContext.test.tsx`, `app/frontend/src/pages/LoginPage.test.tsx`,
+  `app/frontend/src/components/layout/AppShell.test.tsx`,
+  `app/frontend/src/pages/UserAdministrationPage.test.tsx`, `e2e/auth/01-super-admin-login.mjs`.
+- [x] Task 11 — Requirement 3, 5–8, 11, 13 / Acceptance 2: yerel Compose'da tarayıcıyla L2
+  doğrulaması. 2026-09-26'da `scripts/create-local-user.sh` ile açılan yerel hesaplarla (dizin
+  kapalı) Chromium'da gözlendi: `e2e/auth/01-super-admin-login.mjs` (belirteç tarayıcı deposunda
+  yok, `HttpOnly` çerez, başka kökenden yenileme 403, yeniden yüklemede çerezle oturum, çıkıştan sonra
+  yenileme 401), `e2e/sql-review/01-rules-and-roles.mjs` (inceleyici kural ekranını açamaz, taslak
+  ucundan 403), `e2e/sql-review/03-settings-objects-users.mjs` (süper yönetici rol ve durum değiştirir,
+  rol değişince kullanıcının yenilemesi 401, pasif hesap girişte reddedilir). Ayrıca inceleyici
+  oturumu 16 dakika boşta bekletilip geçmiş sayfası açıldı: süresi dolan belirteç 401 aldı, sayfa bir
+  kez `POST /auth/refresh` (200) yapıp isteği yineledi (200) ve giriş ekranına dönmedi (tek seferlik
+  yerel tarayıcı betiği; kalıcı senaryoda değil).
 - [ ] Task 12 — Requirement 1–4, 9, 10 / Acceptance 3: `nonprod` kümede gerçek Active Directory ile
   L2 doğrulaması; CA bundle'ının imaja, dizin ayarlarının runtime Secret'a girmesi ve LDAPS çıkış
   kuralı [kubernetes-delivery](../002-kubernetes-delivery/PRD.md) görevleriyle birlikte.

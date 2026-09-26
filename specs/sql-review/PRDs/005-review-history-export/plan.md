@@ -1,7 +1,7 @@
 # Plan — review-history-export
 
 [PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
-sabit yığın `python-fastapi` arka uçtur. Bu teslim arka ucu kapsar; geçmiş sayfası açık görevdir.
+sabit yığın `python-fastapi` arka uç ve `React`/`Vite` ön yüzdür.
 
 ## Veri modeli ve ayarlar
 
@@ -21,6 +21,7 @@ Saklama işi için `review_run.finished_at` üzerinde dizin vardır (Requirement
 | Dışa aktarım biçimleri | `app/backend/app/services/review_export.py` (kaynaktaki `ExportMenu.tsx` taşıması) | Requirement 7–9 |
 | Kalıcılık | `app/backend/app/infrastructure/repositories/review_repository.py` | Requirement 1–6 |
 | API | `app/backend/app/api/review_runs/router.py`, `app/backend/app/schemas/review_runs/contracts.py` | API sözleşmesi |
+| Ön yüz | `app/frontend/src/pages/ReviewHistoryPage.tsx`, `app/frontend/src/components/review/ReviewResultsView.tsx`, `app/frontend/src/components/review/ExportButtons.tsx` | Requirement 1–5, 10, 11 |
 | Yaşam döngüsü | `app/backend/app/main.py` (saklama işi) | Requirement 6 |
 
 ## Uygulama kararları
@@ -88,4 +89,4 @@ bu teslimde `helm/` değişmedi.
 | Requirement 7–9 | Acceptance 2 | Task 2 |
 | Requirement 3, 4, 5, 10, 11 | Acceptance 3 | Task 3 |
 | Gözlemlenebilirlik (ölçüm) | — | Task 4 |
-| Acceptance 4, Acceptance 5 | Acceptance 4, Acceptance 5 | Task 5 |
+| Acceptance 4, Acceptance 5 | Acceptance 4, Acceptance 5 | Task 5, Task 6 |

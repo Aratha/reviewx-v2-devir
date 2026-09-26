@@ -444,6 +444,165 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/databases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Databases
+         * @description Online databases inside the allow-list, ordered by name (Requirement 1).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    page_size?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DatabasePage"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok veya veritabanı izinli değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz değer */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description SQL Server bağlantısı yok veya sunucu hatası */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description SQL Server zaman aşımı */
+                504: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/databases/{database}/objects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Objects
+         * @description User procedures, views and functions; every filter applies on the server.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string | null;
+                    type?: ("P" | "V" | "FN" | "IF" | "TF" | "SF") | null;
+                    from_date?: string | null;
+                    page?: number;
+                    page_size?: number;
+                };
+                header?: never;
+                path: {
+                    database: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CatalogObjectPage"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok veya veritabanı izinli değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz değer */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description SQL Server bağlantısı yok veya sunucu hatası */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description SQL Server zaman aşımı */
+                504: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/liveness": {
         parameters: {
             query?: never;
@@ -721,6 +880,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/object-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Object Review
+         * @description Review up to 50 selected objects with live progress (object-review).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ObjectReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description Canlı ilerleme: her olay tek `data:` satırında bir JSON nesnesidir. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["ReviewStreamEvent"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok veya veritabanı izinli değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Yayımlanmış kural yok */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz istek */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Çok fazla inceleme başlatıldı */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description LLM bağlantısı yapılandırılmamış */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/readiness": {
         parameters: {
             query?: never;
@@ -753,6 +997,559 @@ export interface paths {
             };
         };
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Review Runs
+         * @description Runs newest first; ``scope=all`` is for the rule manager (Requirement 1-2).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    scope?: "mine" | "all";
+                    page?: number;
+                    page_size?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewRunPage"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete Own Review Runs
+         * @description Delete every finished run of the caller; other people's runs are untouched.
+         */
+        delete: {
+            parameters: {
+                query: {
+                    scope: "mine";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeletedRuns"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Review Run
+         * @description The stored results with false-positive marks; never the SQL text (Requirement 3).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewRunDetail"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete Review Run
+         * @description Physically delete one run of the caller with everything stored for it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşumun sahibi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum sürüyor */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs/{run_id}/exports/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Csv
+         * @description The results as a CSV file (Requirement 7 and 9).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/csv": string;
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs/{run_id}/exports/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Sql
+         * @description The reviewed SQL under a fix-comment block (Requirement 8-10).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/sql": string;
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Saklanmış SQL metni yok */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs/{run_id}/findings/{finding_id}/false-positive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Finding
+         * @description Set or clear the false-positive mark of a finding; repeating a value changes nothing.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                    finding_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FalsePositiveUpdate"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FalsePositiveState"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşumun sahibi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/review-runs/{run_id}/rule-results/{rule_result_id}/false-positive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Rule Result
+         * @description Mark a failed rule result that has no findings.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                    rule_result_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FalsePositiveUpdate"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FalsePositiveState"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşumun sahibi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural sonucu işaretlenemez */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
         post?: never;
         delete?: never;
         options?: never;
@@ -1146,6 +1943,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/script-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Script Review
+         * @description Review pasted SQL text with live progress; SQL Server is never contacted.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ScriptReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description Canlı ilerleme: her olay tek `data:` satırında bir JSON nesnesidir. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["ReviewStreamEvent"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok veya veritabanı izinli değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Yayımlanmış kural yok */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz istek */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Çok fazla inceleme başlatıldı */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description LLM bağlantısı yapılandırılmamış */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/sql-connection": {
         parameters: {
             query?: never;
@@ -1333,8 +2215,100 @@ export interface components {
             tenant_id: string;
             username: string;
         };
+        CatalogObjectItem: {
+            created_at: string | null;
+            last_modified: string | null;
+            name: string;
+            schema: string;
+            type: string;
+            type_code: string;
+        };
+        CatalogObjectPage: {
+            items: components["schemas"]["CatalogObjectItem"][];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        CompleteEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "complete";
+            results: components["schemas"]["LiveObjectResultItem"][];
+            run_id: string;
+        };
+        DatabasePage: {
+            items: string[];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        DefinitionFetchEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "definition_fetch";
+            schema: string;
+            type_code: string;
+        };
+        DeletedRuns: {
+            deleted_count: number;
+        };
+        ErrorEvent: {
+            code: string;
+            message: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "error";
+        };
+        FalsePositiveState: {
+            changed_at: string | null;
+            false_positive: boolean;
+            id: string;
+        };
+        FalsePositiveUpdate: {
+            false_positive: boolean;
+        };
+        FindingItem: {
+            code_snippet: string;
+            description: string;
+            false_positive: boolean;
+            /** @description public_id of the finding. */
+            id: string;
+            line_reference: string;
+            rule_id: string;
+            /** @enum {string} */
+            severity: "HIGH" | "MEDIUM" | "LOW";
+        };
         HTTPValidationError: {
             detail?: components["schemas"]["ValidationError"][];
+        };
+        LiveObjectResultItem: {
+            /** @description Empty for a script run. */
+            database: string;
+            error_code: string | null;
+            error_message: string | null;
+            findings: components["schemas"]["FindingItem"][];
+            name: string;
+            object_type: string;
+            parse_warning: string | null;
+            rule_results: components["schemas"]["RuleResultItem"][];
+            schema: string;
+            /** @description The reviewed text for display in this session; empty on an object error. */
+            source_sql: string | null;
+            type_code: string;
         };
         LlmCallSummaryItem: {
             attempt: number;
@@ -1385,6 +2359,26 @@ export interface components {
             model: string;
             resolved_chat_url?: string | null;
         };
+        LlmStreamEvent: {
+            completion_tokens: number | null;
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "llm_stream";
+            rule_id: string;
+            schema: string;
+            total_chars: number;
+            type_code: string;
+        };
         LoginRequest: {
             /** Format: password */
             password: string;
@@ -1401,9 +2395,195 @@ export interface components {
             token_type: "bearer";
             user: components["schemas"]["AuthenticatedUser"];
         };
+        MetadataFetchEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "metadata_fetch";
+            schema: string;
+            type_code: string;
+        };
+        MetadataReadyEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "metadata_ready";
+            schema: string;
+            type_code: string;
+        };
+        ObjectDoneEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "object_done";
+            schema: string;
+            type_code: string;
+        };
+        ObjectErrorEvent: {
+            code: string;
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            message: string;
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "object_error";
+            schema: string;
+            type_code: string;
+        };
+        ObjectResultItem: {
+            /** @description Empty for a script run. */
+            database: string;
+            error_code: string | null;
+            error_message: string | null;
+            findings: components["schemas"]["FindingItem"][];
+            name: string;
+            object_type: string;
+            parse_warning: string | null;
+            rule_results: components["schemas"]["RuleResultItem"][];
+            schema: string;
+            type_code: string;
+        };
+        ObjectReviewRequest: {
+            selections: components["schemas"]["ObjectSelectionItem"][];
+        };
+        ObjectSelectionItem: {
+            database: string;
+            name: string;
+            schema: string;
+            type_code: string;
+        };
+        ObjectStartEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "object_start";
+            schema: string;
+            type_code: string;
+        };
+        ReviewRunDetail: {
+            error_code: string | null;
+            error_message: string | null;
+            finding_count: number;
+            finished_at: string | null;
+            /** @description public_id of the run. */
+            id: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            label: string | null;
+            object_count: number;
+            /** @description True when the caller started the run. */
+            owned: boolean;
+            owner_display_name: string;
+            /** @description Stored results; empty unless the run completed. Never carries SQL text. */
+            results: components["schemas"]["ObjectResultItem"][];
+            rule_version: number;
+            /** Format: date-time */
+            started_at: string;
+            /** @enum {string} */
+            status: "running" | "completed" | "failed" | "cancelled" | "interrupted";
+            subtitle: string | null;
+        };
+        ReviewRunPage: {
+            items: components["schemas"]["ReviewRunSummary"][];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        ReviewRunSummary: {
+            error_code: string | null;
+            error_message: string | null;
+            finding_count: number;
+            finished_at: string | null;
+            /** @description public_id of the run. */
+            id: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            object_count: number;
+            /** @description True when the caller started the run. */
+            owned: boolean;
+            owner_display_name: string;
+            rule_version: number;
+            /** Format: date-time */
+            started_at: string;
+            /** @enum {string} */
+            status: "running" | "completed" | "failed" | "cancelled" | "interrupted";
+            subtitle: string | null;
+        };
+        /** @description One event of the stream: the JSON on a single ``data:`` line, named by ``phase``. */
+        ReviewStreamEvent: components["schemas"]["RunStartedEvent"] | components["schemas"]["ObjectStartEvent"] | components["schemas"]["DefinitionFetchEvent"] | components["schemas"]["SqlReadyEvent"] | components["schemas"]["MetadataFetchEvent"] | components["schemas"]["MetadataReadyEvent"] | components["schemas"]["ObjectErrorEvent"] | components["schemas"]["ObjectDoneEvent"] | components["schemas"]["RulesBatchStartEvent"] | components["schemas"]["RuleStartEvent"] | components["schemas"]["LlmStreamEvent"] | components["schemas"]["RuleDoneEvent"] | components["schemas"]["CompleteEvent"] | components["schemas"]["ErrorEvent"];
         RoleChange: {
             /** @enum {string} */
             role: "inceleyici" | "kural-yoneticisi";
+        };
+        RuleDoneEvent: {
+            completion_tokens: number | null;
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            ok: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "rule_done";
+            rule_id: string;
+            rule_index: number;
+            rules_total: number;
+            schema: string;
+            sql_two_part: boolean;
+            /** @enum {string} */
+            tier: "critical" | "normal";
+            total_chars: number | null;
+            type_code: string;
         };
         RuleItem: {
             /** @description KuralNN code. */
@@ -1411,6 +2591,22 @@ export interface components {
             /** @default false */
             requires_metadata: boolean;
             text: string;
+        };
+        RuleResultItem: {
+            code_snippet: string;
+            decision_basis: string | null;
+            description: string;
+            false_positive: boolean;
+            /** @description public_id of the rule result. */
+            id: string;
+            line_reference: string;
+            rule_id: string;
+            /** @description Set only for a FAIL verdict. */
+            severity: ("HIGH" | "MEDIUM" | "LOW") | null;
+            /** @enum {string} */
+            status: "PASS" | "FAIL" | "NOT_APPLICABLE" | "UNKNOWN";
+            /** @enum {string} */
+            tier: "critical" | "normal";
         };
         RuleSetDraftUpdate: {
             base_revision: number;
@@ -1462,6 +2658,63 @@ export interface components {
             /** @description Draft change counter; save and publish must send it. */
             revision: number;
         };
+        RuleStartEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "rule_start";
+            rule_id: string;
+            rule_index: number;
+            rules_total: number;
+            schema: string;
+            sql_two_part: boolean;
+            /** @enum {string} */
+            tier: "critical" | "normal";
+            type_code: string;
+        };
+        RulesBatchStartEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "rules_batch_start";
+            rules_total: number;
+            schema: string;
+            type_code: string;
+        };
+        RunStartedEvent: {
+            /** @enum {string} */
+            kind: "object" | "script";
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "run_started";
+            rule_version: number;
+            run_id: string;
+        };
+        ScriptReviewRequest: {
+            label?: string | null;
+            sql: string;
+        };
         /** @description Partial values; a missing password keeps the stored one and an empty one removes it. */
         SqlConnectionChange: {
             encrypt?: boolean | null;
@@ -1491,6 +2744,24 @@ export interface components {
             server?: string | null;
             trust_server_certificate?: boolean | null;
             user?: string | null;
+        };
+        SqlReadyEvent: {
+            /** @description Empty for a script run. */
+            database: string;
+            /** @enum {string} */
+            kind: "object" | "script";
+            name: string;
+            object_index: number;
+            object_label: string;
+            objects_total: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            phase: "sql_ready";
+            schema: string;
+            sql_length: number;
+            type_code: string;
         };
         UserPage: {
             items: components["schemas"]["UserSummary"][];

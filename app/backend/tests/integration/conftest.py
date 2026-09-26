@@ -1,5 +1,7 @@
 """Shared PostgreSQL integration fixtures: one Alembic upgrade per run, engine per test loop."""
 
+import asyncio
+import json
 import logging
 import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -15,16 +17,28 @@ from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
 from app.api.auth.endpoints import get_directory_login, get_login_rate_limiter
+from app.api.integrations import (
+    get_llm_chat,
+    get_llm_connection_store,
+    get_review_rate_limiter,
+    get_review_registry,
+    get_sql_catalog,
+)
 from app.core.config import Settings, get_settings
 from app.core.login_throttle import LoginRateLimiter
+from app.core.review_throttle import ReviewRateLimiter
 from app.db.session import async_session_factory, engine
 from app.domain.directory import (
     DirectoryAccount,
     DirectoryCredentialsRejected,
 )
+from app.domain.models.llm_call import LlmChatApi
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.main import app
 from app.scripts.create_super_admin import ensure_super_admin
+from app.services.llm_connection_service import LlmConnectionConfig, LlmConnectionStore
+from app.services.review_run_service import ReviewRunRegistry
+from tests.fakes.review_ports import FakeCatalog, ScriptedLlm
 
 
 @pytest.fixture(scope="session")
@@ -259,3 +273,129 @@ class RoleSessions:
 @pytest.fixture
 def role_sessions(auth: AuthHarness) -> RoleSessions:
     return RoleSessions(auth)
+
+
+# --- Review runs (sql-review 003, 004, 005) ----------------------------------------------------
+
+
+def sse_events(body: str) -> list[dict[str, Any]]:
+    """The JSON of every ``data:`` line; comment lines are keep-alive ticks."""
+
+    events: list[dict[str, Any]] = []
+    for line in body.split("\n"):
+        if line.startswith("data: "):
+            events.append(json.loads(line[len("data: ") :]))
+        else:
+            assert line == "" or line.startswith(":"), line
+    return events
+
+
+@dataclass
+class ReviewEnv:
+    auth: AuthHarness
+    sessions: RoleSessions
+    llm: ScriptedLlm
+    catalog: FakeCatalog
+    limiter: ReviewRateLimiter
+    registry: ReviewRunRegistry
+    llm_store: LlmConnectionStore
+
+    @property
+    def prefix(self) -> str:
+        return self.auth.prefix
+
+    async def publish(
+        self,
+        manager: RoleSession,
+        critical: list[tuple[str, bool]],
+        normal: list[tuple[str, bool]] | None = None,
+    ) -> tuple[int, list[str]]:
+        """Publish a fresh rule set with new codes; returns the version number and codes."""
+
+        client = self.auth.client
+        workspace = (await client.get(f"{self.prefix}/rule-set", headers=manager.headers)).json()
+        number = int(workspace["next_rule_id"].removeprefix("Kural"))
+        codes: list[str] = []
+
+        def items(rules: list[tuple[str, bool]]) -> list[dict[str, Any]]:
+            built = []
+            for text_value, flag in rules:
+                code = f"Kural{number + len(codes):02d}"
+                codes.append(code)
+                built.append({"id": code, "text": text_value, "requires_metadata": flag})
+            return built
+
+        body = {
+            "base_revision": workspace["revision"],
+            "critical": items(critical),
+            "normal": items(normal or []),
+        }
+        saved = await client.put(
+            f"{self.prefix}/rule-set/draft", json=body, headers=manager.headers
+        )
+        assert saved.status_code == 200, saved.text
+        published = await client.post(
+            f"{self.prefix}/rule-set/versions",
+            json={"base_revision": saved.json()["revision"]},
+            headers=manager.headers,
+        )
+        assert published.status_code in (200, 201), published.text
+        return int(published.json()["number"]), codes
+
+    async def object_review(self, session: RoleSession, selections: list[dict[str, str]]) -> Any:
+        return await self.auth.client.post(
+            f"{self.prefix}/object-reviews",
+            json={"selections": selections},
+            headers=session.headers,
+        )
+
+    async def script_review(self, session: RoleSession, sql: str, label: str | None = None) -> Any:
+        return await self.auth.client.post(
+            f"{self.prefix}/script-reviews",
+            json={"sql": sql, "label": label},
+            headers=session.headers,
+        )
+
+    async def settle(self) -> None:
+        """Wait until no review task of this test is running any more."""
+
+        for _ in range(200):
+            if not self.registry._tasks:
+                return
+            await asyncio.sleep(0.025)
+        raise AssertionError("a review task did not finish")
+
+
+@pytest.fixture
+async def review_env(auth: AuthHarness, role_sessions: RoleSessions) -> AsyncIterator[ReviewEnv]:
+    env = ReviewEnv(
+        auth=auth,
+        sessions=role_sessions,
+        llm=ScriptedLlm(),
+        catalog=FakeCatalog(),
+        limiter=ReviewRateLimiter(),
+        registry=ReviewRunRegistry(),
+        llm_store=LlmConnectionStore(
+            LlmConnectionConfig(
+                chat_api=LlmChatApi.OPENAI,
+                base_url="https://llm.corp.example.test/v1",
+                model="test-model",
+            )
+        ),
+    )
+    overrides: dict[Any, Any] = {
+        get_llm_chat: lambda: env.llm,
+        get_sql_catalog: lambda: env.catalog,
+        get_review_rate_limiter: lambda: env.limiter,
+        get_review_registry: lambda: env.registry,
+        get_llm_connection_store: lambda: env.llm_store,
+    }
+    app.dependency_overrides.update(overrides)
+    try:
+        yield env
+    finally:
+        if env.llm.gate is not None:
+            env.llm.gate.set()
+        await env.registry.shutdown()
+        for dependency in overrides:
+            app.dependency_overrides.pop(dependency, None)

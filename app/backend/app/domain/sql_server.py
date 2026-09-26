@@ -53,6 +53,12 @@ class SqlServerError(Exception):
         return SQL_SERVER_ERROR_MESSAGES[self.error_class]
 
 
+NOT_CONFIGURED_CODE = "sql_connection_not_configured"
+NOT_CONFIGURED_MESSAGE = "SQL Server bağlantısı yapılandırılmamış."
+DATABASE_NOT_ALLOWED_CODE = "database_not_allowed"
+DATABASE_NOT_ALLOWED_MESSAGE = "Bu veritabanı inceleme için izinli değil."
+
+
 class SqlServerNotConfigured(Exception):
     """No server, user or password is configured; catalog endpoints answer 503."""
 
@@ -88,7 +94,11 @@ class CatalogObject:
 
 
 class SqlCatalogPort(Protocol):
-    """The four read-only SQL Server operations of Decision 2."""
+    """The four read-only SQL Server operations of Decision 2 and the allow-list check."""
+
+    def is_allowed(self, database: str) -> bool:
+        """Requirement 7 allow-list (case-insensitive); checked before any SQL Server call."""
+        ...
 
     async def list_databases(self) -> list[str]:
         """Online databases inside the allow-list, ordered by name."""

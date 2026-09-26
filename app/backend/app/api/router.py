@@ -7,6 +7,9 @@ from app.api.auth.router import router as auth_router
 from app.api.health import router as health_router
 from app.api.llm.router import local_router as llm_local_router
 from app.api.llm.router import router as llm_router
+from app.api.review_runs.router import router as review_runs_router
+from app.api.reviews.router import catalog_router as review_catalog_router
+from app.api.reviews.router import router as reviews_router
 from app.api.rule_set.router import router as rule_set_router
 from app.api.sql_connection.router import local_router as sql_connection_local_router
 from app.api.sql_connection.router import router as sql_connection_router
@@ -21,6 +24,9 @@ router.include_router(admin_router)
 router.include_router(rule_set_router)
 router.include_router(sql_connection_router)
 router.include_router(llm_router)
+router.include_router(review_catalog_router)
+router.include_router(reviews_router)
+router.include_router(review_runs_router)
 # kt-scaffold:router-registration
 
 

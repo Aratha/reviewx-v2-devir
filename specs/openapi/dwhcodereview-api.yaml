@@ -75,6 +75,287 @@
         ],
         "type": "object"
       },
+      "CatalogObjectItem": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "name",
+          "type",
+          "type_code",
+          "created_at",
+          "last_modified"
+        ],
+        "type": "object"
+      },
+      "CatalogObjectPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogObjectItem"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "type": "object"
+      },
+      "CompleteEvent": {
+        "properties": {
+          "phase": {
+            "const": "complete",
+            "default": "complete",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/LiveObjectResultItem"
+            },
+            "type": "array"
+          },
+          "run_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "results"
+        ],
+        "type": "object"
+      },
+      "DatabasePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "type": "object"
+      },
+      "DefinitionFetchEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "definition_fetch",
+            "default": "definition_fetch",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "DeletedRuns": {
+        "properties": {
+          "deleted_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted_count"
+        ],
+        "type": "object"
+      },
+      "ErrorEvent": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "phase": {
+            "const": "error",
+            "default": "error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "FalsePositiveState": {
+        "properties": {
+          "changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "false_positive": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "false_positive",
+          "changed_at"
+        ],
+        "type": "object"
+      },
+      "FalsePositiveUpdate": {
+        "properties": {
+          "false_positive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "false_positive"
+        ],
+        "type": "object"
+      },
+      "FindingItem": {
+        "properties": {
+          "code_snippet": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "false_positive": {
+            "type": "boolean"
+          },
+          "id": {
+            "description": "public_id of the finding.",
+            "type": "string"
+          },
+          "line_reference": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rule_id",
+          "severity",
+          "description",
+          "line_reference",
+          "code_snippet",
+          "false_positive"
+        ],
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -84,6 +365,93 @@
             "type": "array"
           }
         },
+        "type": "object"
+      },
+      "LiveObjectResultItem": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingItem"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "parse_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_results": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResultItem"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "source_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reviewed text for display in this session; empty on an object error."
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "database",
+          "schema",
+          "name",
+          "object_type",
+          "type_code",
+          "error_code",
+          "error_message",
+          "parse_warning",
+          "rule_results",
+          "findings",
+          "source_sql"
+        ],
         "type": "object"
       },
       "LlmCallSummaryItem": {
@@ -379,6 +747,74 @@
         ],
         "type": "object"
       },
+      "LlmStreamEvent": {
+        "properties": {
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "llm_stream",
+            "default": "llm_stream",
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "total_chars": {
+            "type": "integer"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "rule_id",
+          "completion_tokens",
+          "total_chars"
+        ],
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "password": {
@@ -424,6 +860,697 @@
         ],
         "type": "object"
       },
+      "MetadataFetchEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "metadata_fetch",
+            "default": "metadata_fetch",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "MetadataReadyEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "metadata_ready",
+            "default": "metadata_ready",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "ObjectDoneEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "object_done",
+            "default": "object_done",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "ObjectErrorEvent": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "object_error",
+            "default": "object_error",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "ObjectResultItem": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingItem"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "parse_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_results": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResultItem"
+            },
+            "type": "array"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "database",
+          "schema",
+          "name",
+          "object_type",
+          "type_code",
+          "error_code",
+          "error_message",
+          "parse_warning",
+          "rule_results",
+          "findings"
+        ],
+        "type": "object"
+      },
+      "ObjectReviewRequest": {
+        "properties": {
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectSelectionItem"
+            },
+            "maxItems": 1000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "selections"
+        ],
+        "type": "object"
+      },
+      "ObjectSelectionItem": {
+        "properties": {
+          "database": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schema": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type_code": {
+            "maxLength": 8,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "database",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "ObjectStartEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "object_start",
+            "default": "object_start",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code"
+        ],
+        "type": "object"
+      },
+      "ReviewRunDetail": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding_count": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "description": "public_id of the run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "object_count": {
+            "type": "integer"
+          },
+          "owned": {
+            "description": "True when the caller started the run.",
+            "type": "boolean"
+          },
+          "owner_display_name": {
+            "type": "string"
+          },
+          "results": {
+            "description": "Stored results; empty unless the run completed. Never carries SQL text.",
+            "items": {
+              "$ref": "#/components/schemas/ObjectResultItem"
+            },
+            "type": "array"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "started_at",
+          "finished_at",
+          "title",
+          "subtitle",
+          "error_code",
+          "error_message",
+          "rule_version",
+          "object_count",
+          "finding_count",
+          "owner_display_name",
+          "owned",
+          "label",
+          "results"
+        ],
+        "type": "object"
+      },
+      "ReviewRunPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewRunSummary"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "page_size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "type": "object"
+      },
+      "ReviewRunSummary": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finding_count": {
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "description": "public_id of the run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "object_count": {
+            "type": "integer"
+          },
+          "owned": {
+            "description": "True when the caller started the run.",
+            "type": "boolean"
+          },
+          "owner_display_name": {
+            "type": "string"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "started_at",
+          "finished_at",
+          "title",
+          "subtitle",
+          "error_code",
+          "error_message",
+          "rule_version",
+          "object_count",
+          "finding_count",
+          "owner_display_name",
+          "owned"
+        ],
+        "type": "object"
+      },
+      "ReviewStreamEvent": {
+        "description": "One event of the stream: the JSON on a single ``data:`` line, named by ``phase``.",
+        "discriminator": {
+          "mapping": {
+            "complete": "#/components/schemas/CompleteEvent",
+            "definition_fetch": "#/components/schemas/DefinitionFetchEvent",
+            "error": "#/components/schemas/ErrorEvent",
+            "llm_stream": "#/components/schemas/LlmStreamEvent",
+            "metadata_fetch": "#/components/schemas/MetadataFetchEvent",
+            "metadata_ready": "#/components/schemas/MetadataReadyEvent",
+            "object_done": "#/components/schemas/ObjectDoneEvent",
+            "object_error": "#/components/schemas/ObjectErrorEvent",
+            "object_start": "#/components/schemas/ObjectStartEvent",
+            "rule_done": "#/components/schemas/RuleDoneEvent",
+            "rule_start": "#/components/schemas/RuleStartEvent",
+            "rules_batch_start": "#/components/schemas/RulesBatchStartEvent",
+            "run_started": "#/components/schemas/RunStartedEvent",
+            "sql_ready": "#/components/schemas/SqlReadyEvent"
+          },
+          "propertyName": "phase"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/RunStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ObjectStartEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DefinitionFetchEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SqlReadyEvent"
+          },
+          {
+            "$ref": "#/components/schemas/MetadataFetchEvent"
+          },
+          {
+            "$ref": "#/components/schemas/MetadataReadyEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ObjectErrorEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ObjectDoneEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RulesBatchStartEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuleStartEvent"
+          },
+          {
+            "$ref": "#/components/schemas/LlmStreamEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RuleDoneEvent"
+          },
+          {
+            "$ref": "#/components/schemas/CompleteEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorEvent"
+          }
+        ]
+      },
       "RoleChange": {
         "properties": {
           "role": {
@@ -436,6 +1563,105 @@
         },
         "required": [
           "role"
+        ],
+        "type": "object"
+      },
+      "RuleDoneEvent": {
+        "properties": {
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "phase": {
+            "const": "rule_done",
+            "default": "rule_done",
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "rule_index": {
+            "type": "integer"
+          },
+          "rules_total": {
+            "type": "integer"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "sql_two_part": {
+            "type": "boolean"
+          },
+          "tier": {
+            "enum": [
+              "critical",
+              "normal"
+            ],
+            "type": "string"
+          },
+          "total_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "rule_id",
+          "tier",
+          "rule_index",
+          "rules_total",
+          "ok",
+          "sql_two_part",
+          "completion_tokens",
+          "total_chars"
         ],
         "type": "object"
       },
@@ -458,6 +1684,84 @@
         "required": [
           "id",
           "text"
+        ],
+        "type": "object"
+      },
+      "RuleResultItem": {
+        "properties": {
+          "code_snippet": {
+            "type": "string"
+          },
+          "decision_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "false_positive": {
+            "type": "boolean"
+          },
+          "id": {
+            "description": "public_id of the rule result.",
+            "type": "string"
+          },
+          "line_reference": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set only for a FAIL verdict."
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOT_APPLICABLE",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "critical",
+              "normal"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rule_id",
+          "tier",
+          "status",
+          "severity",
+          "decision_basis",
+          "description",
+          "line_reference",
+          "code_snippet",
+          "false_positive"
         ],
         "type": "object"
       },
@@ -675,6 +1979,187 @@
         ],
         "type": "object"
       },
+      "RuleStartEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "rule_start",
+            "default": "rule_start",
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "rule_index": {
+            "type": "integer"
+          },
+          "rules_total": {
+            "type": "integer"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "sql_two_part": {
+            "type": "boolean"
+          },
+          "tier": {
+            "enum": [
+              "critical",
+              "normal"
+            ],
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "rule_id",
+          "tier",
+          "rule_index",
+          "rules_total",
+          "sql_two_part"
+        ],
+        "type": "object"
+      },
+      "RulesBatchStartEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "rules_batch_start",
+            "default": "rules_batch_start",
+            "type": "string"
+          },
+          "rules_total": {
+            "type": "integer"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "rules_total"
+        ],
+        "type": "object"
+      },
+      "RunStartedEvent": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "run_started",
+            "default": "run_started",
+            "type": "string"
+          },
+          "rule_version": {
+            "type": "integer"
+          },
+          "run_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "kind",
+          "rule_version",
+          "objects_total"
+        ],
+        "type": "object"
+      },
+      "ScriptReviewRequest": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 1000000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sql": {
+            "maxLength": 1000000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "type": "object"
+      },
       "SqlConnectionChange": {
         "additionalProperties": false,
         "description": "Partial values; a missing password keeps the stored one and an empty one removes it.",
@@ -875,6 +2360,59 @@
           "environment",
           "editable",
           "configured"
+        ],
+        "type": "object"
+      },
+      "SqlReadyEvent": {
+        "properties": {
+          "database": {
+            "description": "Empty for a script run.",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "object",
+              "script"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_index": {
+            "type": "integer"
+          },
+          "object_label": {
+            "type": "string"
+          },
+          "objects_total": {
+            "type": "integer"
+          },
+          "phase": {
+            "const": "sql_ready",
+            "default": "sql_ready",
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "sql_length": {
+            "type": "integer"
+          },
+          "type_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "database",
+          "object_index",
+          "objects_total",
+          "object_label",
+          "schema",
+          "name",
+          "type_code",
+          "sql_length"
         ],
         "type": "object"
       },
@@ -1412,6 +2950,201 @@
         ]
       }
     },
+    "/api/dwhcodereview/v1/databases": {
+      "get": {
+        "description": "Online databases inside the allow-list, ordered by name (Requirement 1).",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabasePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok veya veritaban\u0131 izinli de\u011fil"
+          },
+          "422": {
+            "description": "Ge\u00e7ersiz de\u011fer"
+          },
+          "503": {
+            "description": "SQL Server ba\u011flant\u0131s\u0131 yok veya sunucu hatas\u0131"
+          },
+          "504": {
+            "description": "SQL Server zaman a\u015f\u0131m\u0131"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "List Databases",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/databases/{database}/objects": {
+      "get": {
+        "description": "User procedures, views and functions; every filter applies on the server.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "database",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "P",
+                    "V",
+                    "FN",
+                    "IF",
+                    "TF",
+                    "SF"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogObjectPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok veya veritaban\u0131 izinli de\u011fil"
+          },
+          "422": {
+            "description": "Ge\u00e7ersiz de\u011fer"
+          },
+          "503": {
+            "description": "SQL Server ba\u011flant\u0131s\u0131 yok veya sunucu hatas\u0131"
+          },
+          "504": {
+            "description": "SQL Server zaman a\u015f\u0131m\u0131"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "List Objects",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/liveness": {
       "get": {
         "description": "The process can serve requests.",
@@ -1626,6 +3359,61 @@
         ]
       }
     },
+    "/api/dwhcodereview/v1/object-reviews": {
+      "post": {
+        "description": "Review up to 50 selected objects with live progress (object-review).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewStreamEvent"
+                }
+              }
+            },
+            "description": "Canl\u0131 ilerleme: her olay tek `data:` sat\u0131r\u0131nda bir JSON nesnesidir."
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok veya veritaban\u0131 izinli de\u011fil"
+          },
+          "409": {
+            "description": "Yay\u0131mlanm\u0131\u015f kural yok"
+          },
+          "422": {
+            "description": "Ge\u00e7ersiz istek"
+          },
+          "429": {
+            "description": "\u00c7ok fazla inceleme ba\u015flat\u0131ld\u0131"
+          },
+          "503": {
+            "description": "LLM ba\u011flant\u0131s\u0131 yap\u0131land\u0131r\u0131lmam\u0131\u015f"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Start Object Review",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/readiness": {
       "get": {
         "description": "Return 503 until PostgreSQL accepts a trivial query.",
@@ -1642,6 +3430,525 @@
         "summary": "Readiness",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs": {
+      "delete": {
+        "description": "Delete every finished run of the caller; other people's runs are untouched.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "const": "mine",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedRuns"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Delete Own Review Runs",
+        "tags": [
+          "review-runs"
+        ]
+      },
+      "get": {
+        "description": "Runs newest first; ``scope=all`` is for the rule manager (Requirement 1-2).",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewRunPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "List Review Runs",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs/{run_id}": {
+      "delete": {
+        "description": "Physically delete one run of the caller with everything stored for it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Ko\u015fumun sahibi de\u011fil"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "409": {
+            "description": "Ko\u015fum s\u00fcr\u00fcyor"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Delete Review Run",
+        "tags": [
+          "review-runs"
+        ]
+      },
+      "get": {
+        "description": "The stored results with false-positive marks; never the SQL text (Requirement 3).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewRunDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Read Review Run",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs/{run_id}/exports/csv": {
+      "get": {
+        "description": "The results as a CSV file (Requirement 7 and 9).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Export Csv",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs/{run_id}/exports/sql": {
+      "get": {
+        "description": "The reviewed SQL under a fix-comment block (Requirement 8-10).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/sql": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "409": {
+            "description": "Saklanm\u0131\u015f SQL metni yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Export Sql",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs/{run_id}/findings/{finding_id}/false-positive": {
+      "put": {
+        "description": "Set or clear the false-positive mark of a finding; repeating a value changes nothing.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FalsePositiveUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FalsePositiveState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Ko\u015fumun sahibi de\u011fil"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Mark Finding",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/review-runs/{run_id}/rule-results/{rule_result_id}/false-positive": {
+      "put": {
+        "description": "Mark a failed rule result that has no findings.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "rule_result_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FalsePositiveUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FalsePositiveState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Ko\u015fumun sahibi de\u011fil"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "409": {
+            "description": "Kural sonucu i\u015faretlenemez"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Mark Rule Result",
+        "tags": [
+          "review-runs"
         ]
       }
     },
@@ -1947,6 +4254,61 @@
         "summary": "Read Version",
         "tags": [
           "rule-set"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/script-reviews": {
+      "post": {
+        "description": "Review pasted SQL text with live progress; SQL Server is never contacted.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewStreamEvent"
+                }
+              }
+            },
+            "description": "Canl\u0131 ilerleme: her olay tek `data:` sat\u0131r\u0131nda bir JSON nesnesidir."
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok veya veritaban\u0131 izinli de\u011fil"
+          },
+          "409": {
+            "description": "Yay\u0131mlanm\u0131\u015f kural yok"
+          },
+          "422": {
+            "description": "Ge\u00e7ersiz istek"
+          },
+          "429": {
+            "description": "\u00c7ok fazla inceleme ba\u015flat\u0131ld\u0131"
+          },
+          "503": {
+            "description": "LLM ba\u011flant\u0131s\u0131 yap\u0131land\u0131r\u0131lmam\u0131\u015f"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Start Script Review",
+        "tags": [
+          "reviews"
         ]
       }
     },

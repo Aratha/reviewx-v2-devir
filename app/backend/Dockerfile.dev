@@ -1,0 +1,49 @@
+# Build from the scaffold root: docker build -f app/backend/Dockerfile.dev .
+ARG PYTHON_BASE_IMAGE=python:3.13-alpine3.23@sha256:7ea3f82de8ea6d4fb7e5d2bbe3fe3c9d931700b7a529f1fe5769e42abe514ca1
+
+FROM ${PYTHON_BASE_IMAGE}
+
+ARG APP_GID=10001
+ARG APP_UID=10001
+ARG DEPENDENCY_MODE=connected
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONUTF8=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/workspace/app/backend
+
+RUN addgroup -g "${APP_GID}" app \
+    && adduser -D -H -u "${APP_UID}" -G app app
+
+WORKDIR /workspace/app/backend
+
+COPY app/backend/requirements.txt app/backend/requirements-dev.txt /tmp/dependencies/
+RUN --mount=type=bind,from=python_wheelhouse,source=/,target=/opt/wheelhouse \
+    --mount=type=secret,id=pip_conf,target=/etc/pip.conf,required=false \
+    set -eu; \
+    case "${DEPENDENCY_MODE}" in \
+        connected) \
+            python -m pip install --no-cache-dir \
+                -r /tmp/dependencies/requirements.txt \
+                -r /tmp/dependencies/requirements-dev.txt \
+            ;; \
+        offline) \
+            PIP_CONFIG_FILE=/dev/null PIP_NO_INDEX=1 \
+                python -m pip install --no-cache-dir --no-index \
+                --find-links=/opt/wheelhouse \
+                -r /tmp/dependencies/requirements.txt \
+                -r /tmp/dependencies/requirements-dev.txt \
+            ;; \
+        *) \
+            echo "DEPENDENCY_MODE must be connected or offline" >&2; \
+            exit 64 \
+            ;; \
+    esac; \
+    rm -rf /tmp/dependencies
+
+COPY --chmod=0755 app/backend/entrypoint.dev.sh /usr/local/bin/backend-entrypoint
+
+USER ${APP_UID}:${APP_GID}
+EXPOSE 8000
+ENTRYPOINT ["backend-entrypoint"]

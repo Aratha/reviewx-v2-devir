@@ -1,0 +1,82 @@
+# Generated application image publication. Azure owns the separate Helm deployment.
+name: Build & Push
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "dwhcodereview-image-publication"
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: ${{ matrix.image }} (GHCR)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            dockerfile: app/infra/Dockerfile.backend.release
+          - image: frontend
+            dockerfile: app/infra/Dockerfile.frontend.release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute publication coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE_REPOSITORY=$REGISTRY/$owner/dwhcodereview-${{ matrix.image }}" >> "$GITHUB_ENV"
+          echo "IMAGE_DATE_TAG=$(date -u +'%Y%m%d-%H%M%S')" >> "$GITHUB_ENV"
+          echo "IMAGE_SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            DEPENDENCY_MODE=connected
+            PYTHON_BASE_IMAGE=python:3.13-alpine3.23@sha256:7ea3f82de8ea6d4fb7e5d2bbe3fe3c9d931700b7a529f1fe5769e42abe514ca1
+            FRONTEND_NODE_BASE_IMAGE=node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6
+            NGINX_BASE_IMAGE=nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+          tags: |
+            ${{ env.IMAGE_REPOSITORY }}:latest
+            ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_DATE_TAG }}
+            ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_SHORT_SHA }}
+            ${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io

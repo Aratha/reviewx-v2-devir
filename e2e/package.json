@@ -1,0 +1,15 @@
+{
+  "name": "app-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "auth": "node auth/run-all.mjs"
+  },
+  "dependencies": {
+    "@playwright/test": "1.62.1"
+  },
+  "engines": {
+    "node": ">=22.13.0 <23"
+  }
+}

@@ -1,0 +1,46 @@
+backend:
+  replicaCount: 1
+  image:
+    repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-backend
+    tag: latest
+    digest: ""
+  existingSecret: ""
+  networkPolicy:
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - {protocol: TCP, port: 8000}
+    egress: []
+  service:
+    port: 8000
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 1000m, memory: 512Mi}
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-frontend
+    tag: latest
+    digest: ""
+  ingress:
+    className: ""
+    host: ""
+    tlsSecretName: ""
+  networkPolicy:
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - {protocol: TCP, port: 8080}
+    egress: []
+  service:
+    port: 8080
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}

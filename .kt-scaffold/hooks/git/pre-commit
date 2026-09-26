@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+# İstemciden ve oturum kökünden bağımsız commit öncesi yönetişim tutarlılığı kapısı.
+# scripts/git-gate.sh bu dizini core.hooksPath olarak etkinleştirir. Git kancaları proje kökünde
+# çalışır; kodlama istemcisinin oturumu hangi dizinde açılmış olursa olsun bu kapı uygulanır.
+set -u
+
+root="$(git rev-parse --show-toplevel)" || exit 1
+cd "$root" || exit 1
+
+if ! python3 scripts/check-governance-drift.py >/dev/null; then
+  echo "kt-scaffold: yönetişim yüzeyi kanonik özetten saptı; commit reddedildi." >&2
+  echo "Değişikliği git ile geri alın veya kanonik güncellemeyi kt-iskelet guncelle ile uygulayın." >&2
+  echo "Kontrolü silerek bulgu kapatılmaz; kapıyı --no-verify ile atlamayın." >&2
+  exit 1
+fi
+
+# core.hooksPath Git'in kendi hooks dizinini devre dışı bırakır; önceden kurulmuş kancayı koru.
+common="$(git rev-parse --git-common-dir)" || exit 1
+if [ -x "$common/hooks/pre-commit" ]; then
+  exec "$common/hooks/pre-commit" "$@"
+fi
+exit 0

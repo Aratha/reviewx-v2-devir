@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "minimum_release_age_days": 30
+  },
+  "authorities": [
+    {
+      "kind": "npm",
+      "path": "app/frontend/package.json"
+    },
+    {
+      "kind": "npm",
+      "path": "e2e/package.json"
+    },
+    {
+      "kind": "requirements",
+      "path": "app/backend/requirements.in"
+    },
+    {
+      "kind": "requirements",
+      "path": "app/backend/requirements-dev.in"
+    },
+    {
+      "kind": "requirements",
+      "path": "app/backend/requirements-llm.in"
+    },
+    {
+      "kind": "oci",
+      "patterns": [
+        "app/frontend/Dockerfile.dev",
+        "app/infra/.env.example",
+        "app/infra/Dockerfile*.release",
+        "app/infra/docker-compose*.yml",
+        "helm/dwhcodereview/values.yaml"
+      ]
+    },
+    {
+      "kind": "github-actions",
+      "patterns": [
+        ".github/workflows/*.yml"
+      ]
+    }
+  ],
+  "decision": {
+    "id": "KT-DEPENDENCY-BASELINE-2026-09-25",
+    "reviewed_on": "2026-09-25",
+    "inventory_sha256_by_variant": {
+      "observability-enabled": "1ef4b1f6dac061f20cb43b7a295e25a6f1c192f57efeb1e9ddce1dd190f5f0b4",
+      "observability-disabled": "1ef4b1f6dac061f20cb43b7a295e25a6f1c192f57efeb1e9ddce1dd190f5f0b4"
+    },
+    "compatibility_evidence": [
+      "Backend ruff 0.16.4 and langchain 1.3.17, frontend @types/node 26.3.0, @types/react-dom 19.2.5, eslint 10.9.1, eslint-plugin-react-refresh 0.5.5, typescript-eslint 8.68.0 and vite 8.2.2: release maturity, advisories and generated-project checks in docs/evidence/2026-09-25-dependabot-admission.md in factory source. The js-yaml 4.3.2 security patch (CVE-2026-84375, released 2026-08-26) reached the 30-day threshold and left the exception list.",
+      "Backend uvicorn 0.52.4 and python-dotenv 1.2.3, frontend eslint 10.9.0, happy-dom 20.11.6 and @vitejs/plugin-react 6.1.0: release maturity, advisories and generated-project checks in docs/evidence/2026-09-24-dependabot-admission.md in factory source.",
+      "Optional LangChain set in app/backend/requirements-llm.in (inactive until an accepted PRD adds it to requirements.in): release maturity, advisories and activation compatibility in docs/evidence/2026-09-24-langchain-admission.md in factory source.",
+      "Scaffold delivery workflow coordinates in this inventory (pinned checkout, Buildx, login and build/push actions): focused generation/Helm tests and a clean generated-project Helm render passed.",
+      "Release dates, verified artifact identities and compatibility checks for the package coordinates in this inventory: docs/evidence/2026-09-15-dependabot-admission.md, docs/evidence/2026-09-09-appsec-dependency-patches.md and docs/evidence/2026-09-08-dependabot-admission.md in factory source."
+    ]
+  },
+  "exceptions": []
+}

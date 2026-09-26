@@ -1,0 +1,4 @@
+**
+!app/backend/requirements.txt
+!app/backend/requirements-dev.txt
+!app/backend/entrypoint.dev.sh

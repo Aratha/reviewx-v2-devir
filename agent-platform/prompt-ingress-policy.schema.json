@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "prompt-ingress-policy.schema.json",
+  "title": "PromptIngressPolicy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "metadata",
+    "scope",
+    "limits",
+    "persistence",
+    "detectors"
+  ],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "2.0"},
+    "kind": {"const": "PromptIngressPolicy"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "owner", "lifecycle"],
+      "properties": {
+        "id": {"const": "policy:prompt-ingress"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "owner": {"type": "string", "pattern": "^team:[a-z][a-z0-9-]+$"},
+        "lifecycle": {"const": "phase-1-partial"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["included_channel", "excluded_channels", "gr_f01_coverage"],
+      "properties": {
+        "included_channel": {"const": "user-prompt-text"},
+        "excluded_channels": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "gr_f01_coverage": {"const": "partial-phase-1"}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_event_bytes", "max_prompt_bytes"],
+      "properties": {
+        "max_event_bytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "max_prompt_bytes": {"type": "integer", "minimum": 1, "maximum": 524288}
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_scope",
+        "clean_prompt",
+        "sensitive_prompt",
+        "invalid_prompt",
+        "redaction_strategy",
+        "redaction_token_template",
+        "whole_prompt_redaction_classes",
+        "whole_prompt_redaction_strategy",
+        "whole_prompt_redaction_token",
+        "digest_scope",
+        "raw_sensitive_digest_allowed",
+        "excluded_content_persistence"
+      ],
+      "properties": {
+        "capture_scope": {"const": "user-prompt-text-only"},
+        "clean_prompt": {"const": "exact"},
+        "sensitive_prompt": {"const": "risk-class-aware-redacted"},
+        "invalid_prompt": {"const": "unavailable"},
+        "redaction_strategy": {"const": "validated-detector-spans-v1"},
+        "redaction_token_template": {"const": "[REDACTED:{class}]"},
+        "whole_prompt_redaction_classes": {
+          "const": ["labelled-secret", "private-key"]
+        },
+        "whole_prompt_redaction_strategy": {"const": "whole-prompt-redacted-v1"},
+        "whole_prompt_redaction_token": {"const": "[REDACTED:high-risk-prompt]"},
+        "digest_scope": {"const": "persisted-prompt-capture-only"},
+        "raw_sensitive_digest_allowed": {"const": false},
+        "excluded_content_persistence": {"const": false}
+      }
+    },
+    "detectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "class", "source_ref", "implementation"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^detector:[a-z0-9-]+/[a-z0-9-]+$"},
+          "class": {
+            "enum": ["labelled-secret", "cloud-access-key", "private-key", "email", "tckn", "iban", "payment-card", "phone-number"]
+          },
+          "source_ref": {"type": "string", "minLength": 8},
+          "implementation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "engine", "pattern", "flags", "validator"],
+            "properties": {
+              "kind": {"const": "regex"},
+              "engine": {"const": "python-re"},
+              "pattern": {"type": "string", "minLength": 1, "maxLength": 1000},
+              "flags": {
+                "type": "array",
+                "items": {"enum": ["IGNORECASE", "MULTILINE"]},
+                "uniqueItems": true
+              },
+              "validator": {
+                "enum": [
+                  null,
+                  "private-key-pem-block",
+                  "tckn-checksum",
+                  "iban-mod97",
+                  "luhn-checksum"
+                ]
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"class": {"const": "tckn"}}, "required": ["class"]},
+            "then": {"properties": {"implementation": {"properties": {"validator": {"const": "tckn-checksum"}}}}}
+          },
+          {
+            "if": {"properties": {"class": {"const": "iban"}}, "required": ["class"]},
+            "then": {"properties": {"implementation": {"properties": {"validator": {"const": "iban-mod97"}}}}}
+          },
+          {
+            "if": {"properties": {"class": {"const": "payment-card"}}, "required": ["class"]},
+            "then": {"properties": {"implementation": {"properties": {"validator": {"const": "luhn-checksum"}}}}}
+          },
+          {
+            "if": {"properties": {"class": {"const": "private-key"}}, "required": ["class"]},
+            "then": {
+              "properties": {
+                "implementation": {
+                  "properties": {
+                    "pattern": {
+                      "const": "-----BEGIN (?:[A-Z0-9]{1,24}(?: [A-Z0-9]{1,24}){0,3} )?PRIVATE KEY-----"
+                    },
+                    "flags": {"const": []},
+                    "validator": {"const": "private-key-pem-block"}
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "class": {"enum": ["labelled-secret", "cloud-access-key", "email"]}
+              },
+              "required": ["class"]
+            },
+            "then": {"properties": {"implementation": {"properties": {"validator": {"type": "null"}}}}}
+          }
+        ]
+      }
+    }
+  }
+}

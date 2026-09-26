@@ -1,0 +1,72 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #12231c;
+  background: #f2f6f3;
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+.center { min-height: 100vh; display: grid; place-items: center; }
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(18, 124, 80, .16), transparent 32rem),
+    linear-gradient(145deg, #eff8f2, #e9efeb);
+}
+.login-card {
+  width: min(100%, 30rem);
+  padding: clamp(2rem, 5vw, 3.5rem);
+  border: 1px solid rgba(15, 71, 48, .12);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 2rem 5rem rgba(20, 52, 39, .12);
+}
+.eyebrow { color: #087246; font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+h1 { font-size: clamp(2rem, 6vw, 3.5rem); letter-spacing: -.04em; margin: .5rem 0; }
+form { display: grid; gap: .6rem; margin-top: 2rem; }
+label { font-size: .85rem; font-weight: 700; }
+input {
+  border: 1px solid #b9c9c0;
+  border-radius: .75rem;
+  padding: .85rem 1rem;
+  margin-bottom: .5rem;
+  background: white;
+}
+input:focus { outline: 3px solid rgba(8, 114, 70, .18); border-color: #087246; }
+button {
+  border: 0;
+  border-radius: .75rem;
+  padding: .85rem 1.1rem;
+  color: white;
+  background: #087246;
+  font-weight: 800;
+}
+button:disabled { opacity: .55; cursor: progress; }
+.language { margin-top: 1.5rem; display: flex; align-items: center; gap: .75rem; }
+.language select {
+  border: 1px solid #b9c9c0;
+  border-radius: .75rem;
+  padding: .5rem .75rem;
+  background: white;
+  font: inherit;
+}
+.home { min-height: 100vh; padding: clamp(1.5rem, 5vw, 5rem); max-width: 80rem; margin: auto; }
+.home header { display: flex; justify-content: space-between; align-items: start; gap: 2rem; }
+.hero, .empty-state {
+  margin-top: 2rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: 1.5rem;
+  background: white;
+  border: 1px solid #dbe6df;
+}
+.hero > p { font-size: clamp(1.1rem, 2.5vw, 1.7rem); max-width: 52rem; line-height: 1.55; }
+dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin-top: 2rem; }
+dl div { padding: 1rem; border-radius: 1rem; background: #f2f6f3; }
+dt { color: #65756d; font-size: .75rem; text-transform: uppercase; }
+dd { margin: .35rem 0 0; font-weight: 800; overflow-wrap: anywhere; }
+

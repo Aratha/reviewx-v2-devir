@@ -1,0 +1,194 @@
+schema_version: "1.1"
+kind: DeterministicDetectorPack
+metadata:
+  id: detector-pack:gizlilik-kvkk
+  version: 1.2.0
+  owner: team:data-protection
+  lifecycle: draft
+agent_ref: agent:gizlilik-kvkk
+policy_ref: policy:gizlilik-kvkk
+source_lineage:
+  source_role: governance-source:desktop-agents/privacy-kvkk
+  source_authority: governance-authoritative
+  implementation_status: partially-implemented
+  projection_status: not-projectable
+  runtime_admission: not-admitted
+  crosswalk_ref: governance-crosswalk:desktop-agents-v1
+execution_boundary:
+  mode: specification-only
+  executor_ref: null
+  implementation_status: partially-implemented
+  projection_status: not-projectable
+  runtime_admission: not-admitted
+  calibration_status: uncalibrated
+detectors:
+  - id: detector:gizlilik-kvkk/priv-001
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-001
+    control_refs:
+      - control:PRIVACY-102
+    severity: critical
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "(?<!\\d)[1-9]\\d{10}(?!\\d)"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-002
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-002
+    control_refs:
+      - control:PRIVACY-102
+    severity: critical
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "\\bTR\\d{2}\\s?\\d{4}\\s?\\d{4}\\s?\\d{4}\\s?\\d{4}\\s?\\d{4}\\s?\\d{2}\\b"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-003
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-003
+    control_refs:
+      - control:PRIVACY-102
+    severity: critical
+    evidence_kind: deterministic-check
+    standard_refs:
+      - standard_id: PCI-DSS
+        control_id: source-stated
+        version: null
+        mapping_status: source-stated-unverified
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "\\b(?:\\d[ -]?){13,16}\\b"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-004
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-004
+    control_refs:
+      - control:PRIVACY-102
+    severity: medium
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "\\b0?5\\d{2}[\\s.-]?\\d{3}[\\s.-]?\\d{2}[\\s.-]?\\d{2}\\b"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-005
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-005
+    control_refs:
+      - control:PRIVACY-102
+    severity: medium
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-006
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-006
+    control_refs:
+      - control:PRIVACY-102
+    severity: high
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "\\b(diagnosis|hasta_no|tani_kodu|din|dini_inanc|biyometrik|ceza_mahkumiyeti|sabika|sendika_uyeligi)\\b\\s*[:=]\\s*['\"]"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-007
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-007
+    control_refs:
+      - control:PRIVACY-102
+    severity: critical
+    evidence_kind: deterministic-check
+    standard_refs:
+      - standard_id: PCI-DSS
+        control_id: source-stated
+        version: null
+        mapping_status: source-stated-unverified
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "(?i)\\b(cvv|cvc|pin)\\b\\s*[:=]\\s*['\"]?\\d{3,6}['\"]?"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+  - id: detector:gizlilik-kvkk/priv-008
+    source_refs:
+      - governance-source:desktop-agents/privacy-kvkk/policy.yaml#rule/PRIV-008
+    control_refs:
+      - control:PRIVACY-102
+    severity: critical
+    evidence_kind: deterministic-check
+    standard_refs: []
+    implementation:
+      kind: regex
+      engine: python-re
+      pattern: "log(ger)?\\.\\w+\\([^)]*\\b(tckn|iban|cardnumber|card_number|cvv)\\b"
+      flags: []
+    limitations: Kaynak tarafından sağlanan tespit mantığı korunur; ancak kalibrasyon tamamlanmamıştır ve tek başına çalışma zamanı etkisini veya politika uyumluluğunu kanıtlayamaz.
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    lifecycle: draft
+decision_metadata:
+  authoritative_hard_fail_detectors:
+    - detector:gizlilik-kvkk/priv-001
+    - detector:gizlilik-kvkk/priv-002
+    - detector:gizlilik-kvkk/priv-003
+    - detector:gizlilik-kvkk/priv-007
+    - detector:gizlilik-kvkk/priv-008
+  authoritative_non_hard_fail_detectors:
+    - detector:gizlilik-kvkk/priv-004
+    - detector:gizlilik-kvkk/priv-005
+  hard_fail_not_declared_detectors: []
+  unresolved_hard_fail_detectors:
+    - detector:gizlilik-kvkk/priv-006
+  unresolved_decision_conflicts:
+    - detector_id: detector:gizlilik-kvkk/priv-006
+      source_conflict_refs:
+        - source-conflict:privacy-priv006-hard-fail
+runtime_profile: null

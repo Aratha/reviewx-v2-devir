@@ -1,0 +1,6 @@
+# LLM orchestration dependency authority (technology-profile.yml#llm_orchestration).
+# Inactive by default: an accepted PRD activates it by adding "-r requirements-llm.in" to
+# requirements.in. Recompile requirements-llm.txt after changing this file.
+langchain==1.3.17
+langchain-core==1.6.0
+langgraph==1.2.11

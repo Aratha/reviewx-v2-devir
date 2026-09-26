@@ -31,6 +31,7 @@ MAX_OBJECTS_PER_RUN = 50
 REVIEWED_SQL_MAX_LENGTH = 120_000
 RULE_RESULT_TEXT_MAX_LENGTH = 500
 FINDING_TEXT_MAX_LENGTH = 4000
+LINE_REFERENCE_MAX_LENGTH = 500
 LABEL_MAX_LENGTH = 200
 
 
@@ -314,6 +315,9 @@ class ReviewRuleResult(AuditSoftDeleteMixin, Base):
             "status IN ('PASS', 'FAIL', 'NOT_APPLICABLE', 'UNKNOWN')", name="status_allowed"
         ),
         CheckConstraint(_SEVERITY_CHECK, name="severity_allowed"),
+        CheckConstraint(
+            "(status = 'FAIL') = (severity IS NOT NULL)", name="severity_only_for_fail"
+        ),
         CheckConstraint("position >= 0", name="position_not_negative"),
         CheckConstraint(
             "(false_positive_changed_at IS NULL) = (false_positive_changed_by IS NULL)",
@@ -360,7 +364,14 @@ class ReviewRuleResult(AuditSoftDeleteMixin, Base):
             "değerlendirilemedi."
         ),
     )
-    severity: Mapped[str] = mapped_column(String(8), nullable=False, comment=_SEVERITY_COMMENT)
+    severity: Mapped[str | None] = mapped_column(
+        String(8),
+        nullable=True,
+        comment=(
+            "Severity of a FAIL verdict; code reflection app.domain.models.review.Severity: "
+            "'HIGH', 'MEDIUM', 'LOW'. Empty for every other status."
+        ),
+    )
     decision_basis: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="The model's stated basis for the verdict (karar dayanağı)."
     )
@@ -370,7 +381,7 @@ class ReviewRuleResult(AuditSoftDeleteMixin, Base):
         comment="Explanation, at most 500 characters.",
     )
     line_reference: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, comment=_LINE_REFERENCE_COMMENT
+        String(LINE_REFERENCE_MAX_LENGTH), nullable=True, comment=_LINE_REFERENCE_COMMENT
     )
     code_snippet: Mapped[str | None] = mapped_column(
         String(RULE_RESULT_TEXT_MAX_LENGTH),
@@ -448,7 +459,7 @@ class ReviewFinding(AuditSoftDeleteMixin, Base):
         comment="'object name: reason' text, at most 4000 characters; never logged.",
     )
     line_reference: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, comment=_LINE_REFERENCE_COMMENT
+        String(LINE_REFERENCE_MAX_LENGTH), nullable=True, comment=_LINE_REFERENCE_COMMENT
     )
     code_snippet: Mapped[str | None] = mapped_column(
         String(FINDING_TEXT_MAX_LENGTH),

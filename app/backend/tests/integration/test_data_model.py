@@ -400,3 +400,65 @@ async def test_a_run_cannot_point_at_a_missing_rule_version(migrated_database: N
                 {"public_id": str(uuid4()), "tenant": tenant_id, "owner": owner},
             )
         await connection.rollback()
+
+
+@pytest.mark.parametrize(
+    ("status", "severity", "accepted"),
+    [
+        ("FAIL", "HIGH", True),
+        ("PASS", None, True),
+        ("UNKNOWN", None, True),
+        ("PASS", "LOW", False),
+        ("FAIL", None, False),
+    ],
+)
+async def test_only_a_fail_verdict_has_a_severity(
+    migrated_database: None, status: str, severity: str | None, accepted: bool
+) -> None:
+    """sql-review 003 Requirement 13: severity is set exactly for FAIL (revision 202609260003)."""
+
+    async with engine.connect() as connection:
+        tenant_id = await _tenant_id(connection)
+        owner = await _insert_directory_user(connection, tenant_id)
+        version = await _insert_version(
+            connection, tenant_id, 5_000_000 + int(uuid4().int % 1_000_000)
+        )
+        run = int(
+            await _scalar(
+                connection,
+                "INSERT INTO review_run (public_id, tenant_id, owner_user_id, kind, "
+                "rule_set_version_id, object_count, status, started_at) VALUES (:p, :t, :o, "
+                "'object', :v, 1, 'running', now()) RETURNING review_run_id",
+                p=str(uuid4()),
+                t=tenant_id,
+                o=owner,
+                v=version,
+            )
+        )
+        run_object = int(
+            await _scalar(
+                connection,
+                "INSERT INTO review_run_object (review_run_id, position, schema_name, "
+                "object_name, type_code, object_type) VALUES (:run, 0, 'dbo', 'p', 'P', "
+                "'PROCEDURE') RETURNING review_run_object_id",
+                run=run,
+            )
+        )
+        insert = text(
+            "INSERT INTO review_rule_result (public_id, review_run_object_id, position, "
+            "rule_code, priority_group, status, severity, line_reference) VALUES (:p, :o, 0, "
+            "'Kural01', 'critical', :status, :severity, :line)"
+        )
+        values = {
+            "p": str(uuid4()),
+            "o": run_object,
+            "status": status,
+            "severity": severity,
+            "line": "Satır " + ", ".join(str(n) for n in range(1, 120)),
+        }
+        if accepted:
+            await connection.execute(insert, values)
+        else:
+            with pytest.raises(IntegrityError):
+                await connection.execute(insert, values)
+        await connection.rollback()

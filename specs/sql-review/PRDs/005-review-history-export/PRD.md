@@ -182,8 +182,13 @@ istekten dosya olarak kaydedilir.
   `public_id`), `review_history.exported` (koşum `public_id`, biçim, satır veya nesne sayısı),
   `review_history.retention_run` (silinen koşum sayısı, süre, sonuç). SQL metni, açıklama ve kod
   parçası yer almaz.
-- Ölçümler (metrik): biçime göre dışa aktarım sayısı, saklama işinin sildiği koşum sayısı ve
-  saklama işinin son başarılı çalışma zamanı; bu zaman 48 saatten eskiyse iş durmuş demektir.
+- Ölçümler (metrik): biçime göre dışa aktarım sayısı `dwhcodereview_review_exports_total{format}`
+  (`format` `csv` veya `sql`), saklama işinin sildiği koşum sayısı
+  `dwhcodereview_review_history_retention_deleted_runs_total` ve saklama işinin son başarılı çalışma
+  zamanı `dwhcodereview_review_history_retention_last_success_timestamp_seconds` (Unix saniyesi);
+  bu zaman 48 saatten eskiyse iş durmuş demektir. Koşum ve kullanıcı ölçüme girmez. Ortak kurallar
+  ve saklama süresi [application-foundation alanında](../../../application-foundation/DOMAIN.md)
+  tanımlıdır. Tüketen test: `app/backend/tests/integration/test_telemetry_signals.py`.
 
 ## Dağıtım etkisi
 

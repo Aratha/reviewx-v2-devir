@@ -21,8 +21,11 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   `app/backend/tests/integration/test_review_history_api.py`.
 - [ ] Task 3 — Requirement 3, 4, 5, 10, 11 / Acceptance 3: geçmiş sayfası, onaylar, indirme
   düğmeleri, pasif SQL düğmesi ve Vitest testleri. Ön yüz sonraki teslimdedir; açık.
-- [ ] Task 4 — Gözlemlenebilirlik: biçime göre dışa aktarım sayısı, saklama işinin sildiği koşum
-  sayısı ve son başarılı çalışma zamanı ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
-  için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli. Günlük olayları teslim edildi.
+- [x] Task 4 — Gözlemlenebilirlik: `dwhcodereview_review_exports_total{format}`,
+  `dwhcodereview_review_history_retention_deleted_runs_total` ve
+  `dwhcodereview_review_history_retention_last_success_timestamp_seconds` ölçümleri ile günlük
+  olayları. Kanıt: `app/backend/tests/integration/test_telemetry_signals.py`
+  (`test_exports_and_retention_record_their_metrics`), `scripts/quality-gate.sh all`; saklama işinin iki ölçümü
+  yerel gözlemlenebilirlik yığınında Prometheus'ta gözlendi.
 - [ ] Task 5 — Acceptance 4, Acceptance 5: iki tarayıcı ve iki kullanıcıyla L2 (gerçek ortamda
   doğrulama). Task 3 gerekli; açık.

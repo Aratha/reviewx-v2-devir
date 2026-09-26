@@ -33,9 +33,14 @@ kurum ağındaki gerçek LLM ucuna çağrı yapılmadı.
   `app/backend/tests/unit/test_llm_connection_service.py`,
   `app/backend/tests/integration/test_connection_settings_api.py`,
   `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`.
-- [ ] Task 6 — Gözlemlenebilirlik: `dwhcodereview_llm_*` ölçümleri ve içerik taşımayan çağrı izi
-  (trace). Arka uçta ölçüm/iz kitaplığı veya dışa aktarıcı yok; yeni bağımlılık için sahip kararı
-  ve kabul kaydı gerekiyor. Açık, engelli.
+- [x] Task 6 — Gözlemlenebilirlik: `dwhcodereview_llm_*` ölçümleri (özet yazma hatası dahil) ve
+  deneme başına içerik taşımayan `llm chat` izi; uç adresi, anahtar, istem ve yanıt yok.
+  OpenTelemetry altyapısı [directory-login](../../../application-foundation/PRDs/001-directory-login/tasks.md)
+  Task 13'tedir. Kanıt: `app/backend/tests/unit/test_llm_adapter.py`
+  (`test_attempts_emit_the_prd_metrics_and_content_free_spans`,
+  `test_a_cancelled_attempt_is_counted_as_cancelled`),
+  `app/backend/tests/integration/test_telemetry_signals.py`, `scripts/quality-gate.sh all`. Kurum LLM ucu
+  olmadığından bu ölçümler yerel yığında canlı gözlenmedi.
 - [ ] Task 7 — Requirement 13 / Acceptance 3: LLM bağlantısı sayfası ve Vitest testleri. Bu
   teslimde ön yüz işi kapsam dışı tutuldu; açık.
 - [ ] Task 8 — Acceptance 4 ve Acceptance 5: kurum ağından Decision 3 ucuna gerçek inceleme ve

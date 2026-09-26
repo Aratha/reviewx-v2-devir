@@ -42,7 +42,11 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
   `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`).
 - [ ] Task 7 — Requirement 1–3, 14, 15, 19 / Acceptance 4: inceleme sayfası, canlı pencere,
   "Analizi durdur", sonuç penceresi ve Vitest testleri. Ön yüz sonraki teslimdedir; açık.
-- [ ] Task 8 — Gözlemlenebilirlik: koşum ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
-  için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli.
+- [x] Task 8 — Gözlemlenebilirlik: koşum başladı/bitti ve süre, kural çağrısı ve kural sonucu
+  ölçümleri; isteğe, LLM çağrılarına ve PostgreSQL komutlarına bağlanan `review_run` izi; SQL
+  metni, kod parçası, model yanıtı, nesne ve veritabanı adı yok. OpenTelemetry altyapısı
+  [directory-login](../../../application-foundation/PRDs/001-directory-login/tasks.md) Task 13'tedir.
+  Kanıt: `app/backend/tests/integration/test_telemetry_signals.py`,
+  `app/backend/tests/unit/test_telemetry.py`, `scripts/quality-gate.sh all`.
 - [ ] Task 9 — Acceptance 5, Acceptance 6: test SQL Server'ı ve onaylı LLM ucuyla tarayıcıda L2
   (gerçek ortamda doğrulama). Task 7 ve kurum ağı gerekli; açık.

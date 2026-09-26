@@ -114,8 +114,8 @@ Kaynaktaki `DELETE /api/llm-logs` karşılığı yoktur (Decision 6). İnceleme 
 ## Gözlemlenebilirlik
 
 - Log: Requirement 12 `llm.call` olayı; özet yazma hatasında `llm_call_summary.write_failed` (yalnız `request_id` ve hata sınıfı); saklama işi için `llm_call_summary.retention_run` (silinen satır sayısı, süre, sonuç).
-- Ölçümler: `dwhcodereview_llm_calls_total{outcome,chat_api}`, `dwhcodereview_llm_call_duration_seconds{outcome}`, `dwhcodereview_llm_inflight_calls`, `dwhcodereview_llm_completion_tokens_total`, `dwhcodereview_llm_retries_total`.
-- İz (trace): her çağrı için içerik taşımayan bir aralık; öznitelikleri model, sonuç, HTTP kodu ve deneme sırasıdır.
+- Ölçümler: `dwhcodereview_llm_calls_total{outcome,chat_api}`, `dwhcodereview_llm_call_duration_seconds{outcome}`, `dwhcodereview_llm_inflight_calls`, `dwhcodereview_llm_completion_tokens_total`, `dwhcodereview_llm_retries_total` ve Requirement 10'daki özet yazma hatası için `dwhcodereview_llm_call_summary_write_failures_total`. `outcome` `ok` veya Requirement 9 sınıfı, `chat_api` iki istek biçiminden biridir; model, kural ve koşum ölçüme girmez.
+- İz (trace): her çağrı için içerik taşımayan bir `llm chat` aralığı; öznitelikleri model, sonuç, HTTP kodu ve deneme sırasıdır. Uç adresi, istem ve yanıt aralığa girmez. Ortak kurallar ve saklama süresi [application-foundation alanında](../../../application-foundation/DOMAIN.md) tanımlıdır. Tüketen test: `app/backend/tests/unit/test_llm_adapter.py`.
 
 ## Dağıtım etkisi
 

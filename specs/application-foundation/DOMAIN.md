@@ -29,6 +29,10 @@ Rancher kümesinde tek chart ile çalışır.
 - Parola uygulamada saklanmaz; yalnız dizine doğrulama için iletilir.
 - Sırlar Git'e, Helm değer dosyasına, komut argümanına ve loga girmez.
 - Dağıtım, yayımlanmamış imajla kümeye dokunmaz ve hizmet vermiş release'i silmez.
+- Ölçümler ve izler (OpenTelemetry) yalnız PRD'lerin Gözlemlenebilirlik bölümünde adı geçen
+  sinyallerdir. Etiket değerleri sabit kümelerdir; kümede olmayan değer `other` olarak yazılır. SQL
+  metni, kod parçası, etiket, model yanıtı, adres, parola, belirteç, kullanıcı adı, nesne ve
+  veritabanı adı hiçbir iz aralığına, özniteliğe veya ölçüme girmez; hata metni ize yazılmaz.
 
 ## Sahip olunan veri
 
@@ -39,6 +43,12 @@ PostgreSQL'de kullanıcı kaydı (dizin kimliği, görünen ad, rol, son giriş)
 - **Active Directory:** LDAPS, kurum CA bundle'ı ve onaylı çıkış hedefleri.
 - **KT Rancher nonprod kümesi ve Azure dağıtım işi:** `helm/dwhcodereview/deploy.sh` ile.
 - **Kurum imaj deposu:** `cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/`.
+- **OpenTelemetry toplayıcısı:** Ölçüm ve izler OTLP/gRPC ile yalnız
+  `DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT` adresine gider; ayar boşsa hiçbir sinyal dışarı
+  çıkmaz ve `OTEL_` ile başlayan süreç değişkeni başlangıcı durdurur. Yerelde gözlemlenebilirlik
+  Compose katmanı adresi kendi toplayıcısına yöneltir; orada Prometheus ölçümleri 15 gün, Tempo
+  izleri 14 gün saklar. `nonprod`'da adres yalnız `https` olabilir; kümede toplayıcı yoktur ve
+  kurulması ayrı PRD ister (`rules/25`).
 
 ## İş yetkinliği yol haritası
 

@@ -31,10 +31,14 @@ bir SQL Server'a karşı tümleşik test çalıştırılmadı: yerelde erişileb
   kurum kök CA'sı; geliştirme ve yayın imajları. Kanıt: `python3 scripts/check-dependency-admission.py`,
   `dependency-admission.json` karar kaydı, `app/backend/tests/unit/test_corporate_ca.py`, geliştirme
   imajında ve amd64/arm64 yayın imajında sürücünün `pyodbc.drivers()` ile görülmesi.
-- [ ] Task 7 — Gözlemlenebilirlik: `dwhcodereview_sql_server_calls_total`,
-  `dwhcodereview_sql_server_call_duration_seconds` ve `dwhcodereview_sql_server_inflight`
-  ölçümleri. Arka uçta ölçüm kitaplığı veya dışa aktarıcı yok; yeni bağımlılık (OpenTelemetry SDK
-  veya Prometheus istemcisi) için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli.
+- [x] Task 7 — Gözlemlenebilirlik: `dwhcodereview_sql_server_calls_total`,
+  `dwhcodereview_sql_server_call_duration_seconds`, `dwhcodereview_sql_server_inflight` ölçümleri
+  ve çağrı başına `sql_server <operation>` izi; veritabanı adı, sunucu, kullanıcı, parola ve sürücü
+  metni yok. OpenTelemetry altyapısı [directory-login](../../../application-foundation/PRDs/001-directory-login/tasks.md)
+  Task 13'tedir. Kanıt: `app/backend/tests/unit/test_sql_server_adapter.py`
+  (`test_calls_emit_the_prd_metrics_and_spans_without_names_or_secrets`,
+  `test_the_in_flight_gauge_counts_calls_waiting_for_the_pool`), `scripts/quality-gate.sh all`. Gerçek SQL Server
+  olmadığından bu ölçümler yerel yığında canlı gözlenmedi.
 - [ ] Task 8 — Requirement 9 / Acceptance 3: SQL bağlantısı sayfası ve Vitest testleri. Bu
   teslimde ön yüz işi kapsam dışı tutuldu; açık.
 - [ ] Task 9 — Requirement 3, 4, 7, 9 / Acceptance 4 ve Requirement 5, 7 / Acceptance 5: geliştirici

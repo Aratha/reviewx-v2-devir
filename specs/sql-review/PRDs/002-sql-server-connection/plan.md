@@ -17,6 +17,7 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 | API | `app/backend/app/api/sql_connection/router.py`, `app/backend/app/api/route_classes.py`, `app/backend/app/api/router.py` (`local_environment_router`), `app/backend/app/api/integrations.py`, `app/backend/app/schemas/sql_connection/contracts.py` | API sözleşmesi, Requirement 5 |
 | İmaj | `app/infra/locks/backend-alpine-packages.lock`, `app/infra/locks/msodbcsql18-alpine-packages.lock`, `app/infra/install-backend-system-packages.sh`, `app/backend/Dockerfile.dev`, `app/infra/Dockerfile.backend.release` | Dağıtım etkisi, Decision 4, 6 |
 | Bağımlılık | `app/backend/requirements.in` (`pyodbc==5.3.0`), kilitli `requirements*.txt`, `dependency-admission.json` | Decision 4 |
+| Gözlemlenebilirlik | `app/backend/app/infrastructure/sql_server/catalog_adapter.py` (`sql_server_call`), `app/backend/app/core/telemetry.py` | Gözlemlenebilirlik |
 | Ön yüz | SQL bağlantısı sayfası | Requirement 5, 9 |
 
 ## Uygulama kararları

@@ -48,6 +48,7 @@ services:
         DEPENDENCY_MODE: ${DEPENDENCY_MODE:-connected}
       additional_contexts:
         python_wheelhouse: ${PYTHON_WHEELHOUSE_CONTEXT:-../frontend}
+        system_packages: ${SYSTEM_PACKAGES_CONTEXT:-../frontend}
     environment:
       DWHCODEREVIEW_ENVIRONMENT: development
       DWHCODEREVIEW_DEBUG: "true"

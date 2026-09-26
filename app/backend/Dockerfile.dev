@@ -6,6 +6,7 @@ FROM ${PYTHON_BASE_IMAGE}
 ARG APP_GID=10001
 ARG APP_UID=10001
 ARG DEPENDENCY_MODE=connected
+ARG TARGETARCH
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -17,6 +18,16 @@ RUN addgroup -g "${APP_GID}" app \
     && adduser -D -H -u "${APP_UID}" -G app app
 
 WORKDIR /workspace/app/backend
+
+# unixODBC, the Microsoft ODBC driver and the organization root CA; every package is digest-locked
+# in app/infra/locks and apk installs without network access.
+COPY app/infra/locks/backend-alpine-packages.lock app/infra/locks/msodbcsql18-alpine-packages.lock /tmp/system-locks/
+COPY app/infra/install-backend-system-packages.sh /tmp/system-locks/install.sh
+COPY app/backend/certs/corporate-inference-root.crt /tmp/system-locks/corporate-inference-root.crt
+RUN --mount=type=bind,from=system_packages,source=/,target=/opt/system-packages \
+    sh /tmp/system-locks/install.sh "${DEPENDENCY_MODE}" "${TARGETARCH}" /tmp/system-locks \
+        /opt/system-packages /tmp/system-locks/corporate-inference-root.crt \
+    && rm -rf /tmp/system-locks
 
 COPY app/backend/requirements.txt app/backend/requirements-dev.txt /tmp/dependencies/
 RUN --mount=type=bind,from=python_wheelhouse,source=/,target=/opt/wheelhouse \

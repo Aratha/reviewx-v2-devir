@@ -13,6 +13,14 @@
       "path": "e2e/package.json"
     },
     {
+      "kind": "alpine-lock",
+      "path": "app/infra/locks/backend-alpine-packages.lock"
+    },
+    {
+      "kind": "alpine-lock",
+      "path": "app/infra/locks/msodbcsql18-alpine-packages.lock"
+    },
+    {
       "kind": "requirements",
       "path": "app/backend/requirements.in"
     },
@@ -42,13 +50,18 @@
     }
   ],
   "decision": {
-    "id": "DWHCODEREVIEW-DEPENDENCY-2026-09-26-LDAP3",
+    "id": "DWHCODEREVIEW-DEPENDENCY-2026-09-26-SQL-SERVER-LLM",
     "reviewed_on": "2026-09-26",
     "inventory_sha256_by_variant": {
-      "observability-enabled": "5869752980f68eca864254fc8982c9ac9552544c84119269fdc2d7994b585fac",
-      "observability-disabled": "5869752980f68eca864254fc8982c9ac9552544c84119269fdc2d7994b585fac"
+      "observability-enabled": "1e78742c26d62b85d9045ca3237cadfe2521bbd21ad4a700c8f204e62cb648dd",
+      "observability-disabled": "1e78742c26d62b85d9045ca3237cadfe2521bbd21ad4a700c8f204e62cb648dd"
     },
     "compatibility_evidence": [
+      "Backend pyodbc 5.3.0 (direct runtime dependency of sql-review/PRDs/002-sql-server-connection Decision 4, read-only SQL Server catalog adapter): PyPI release 2025-10-17, MIT; cp313 musllinux_1_2 wheels for x86_64 and aarch64 are hash-pinned in requirements.txt (the wheels bundle only libgcc_s and libstdc++, libodbc comes from the admitted unixodbc package); OSV query for PyPI pyodbc 5.3.0 on 2026-09-26 returned no advisory.",
+      "Backend httpx 0.28.1 and httpcore 1.0.9 (direct runtime dependencies of sql-review/PRDs/006-llm-connection Decision 5; httpx moved from requirements-dev.in to requirements.in, httpcore is imported directly for the private-network connection backend): PyPI releases 2024-12-06 and 2025-04-24, both BSD-3-Clause; their locked transitives h11 0.16.0, anyio 4.14.2, idna 3.18 were already admitted and certifi 2026.7.22 (MPL-2.0, released 2026-07-22) enters the runtime lock through httpx; OSV queries for PyPI httpx 0.28.1, httpcore 1.0.9, h11 0.16.0 and certifi 2026.7.22 on 2026-09-26 returned no advisory.",
+      "Backend image system packages in app/infra/locks/backend-alpine-packages.lock (Alpine v3.23 main, amd64 and aarch64, .apk SHA-256 bytes observed from dl-cdn.alpinelinux.org on 2026-09-26, APKINDEX build dates): unixodbc 2.3.14-r0 (LGPL-2.0-or-later, 2025-10-07) and the Microsoft driver's runtime dependencies krb5-libs 1.22.1-r0 (MIT, 2025-09-24), krb5-conf 1.0-r2 (MIT, 2020-03-02), libcom_err 1.47.3-r0 (e2fsprogs licences, 2025-10-07), keyutils-libs 1.6.3-r4 (GPL-2.0-or-later AND LGPL-2.0-or-later, 2025-01-03), libverto 0.3.2-r2 (MIT, 2023-04-11), libgcc and libstdc++ 15.2.0-r2 (GPL-2.0-or-later AND LGPL-2.1-or-later with the GCC runtime exception, 2025-10-30), openssl, libssl3 and libcrypto3 3.5.8-r0 (Apache-2.0, 2026-08-25; required by the driver package and upgrading the base image's 3.5.7-r0); OSV queries for ecosystem Alpine:v3.23 on 2026-09-26 returned no advisory for unixodbc, krb5, krb5-conf, e2fsprogs, keyutils, libverto, gcc or openssl at these versions. The images install them with apk --no-network after the lock digest check; the libraries are used unmodified as shared libraries.",
+      "Microsoft ODBC Driver 18 for SQL Server msodbcsql18 18.6.2.1-1 for Alpine (app/infra/locks/msodbcsql18-alpine-packages.lock, sql-review/PRDs/002-sql-server-connection Decision 4): licence Microsoft EULA (https://aka.ms/odbc18eula), accepted by the project owner on 2026-09-26; release 2026-04-01 (download.microsoft.com Last-Modified, Microsoft release notes 18.6.2 March 2026); the newer 18.7.1.1 (published 2026-09-03) is below the 30-day maturity window and is not admitted. The amd64 and arm64 .apk files were admitted only after their detached signatures (.sig SHA-256 ef085fba9b732129003dd09e1d3eca9bddf86bda8628179797a6c315ad254203 and ddbab3974113f95e215a1e97be705559d76b04450a535b178ce67f05488bad6e) verified as good signatures from the Microsoft (Release signing) key BC528686B50D79E339D3721CEB3E94ADBE1229CF published at https://packages.microsoft.com/keys/microsoft.asc; the lock pins each file's SHA-256. OSV has no record for this proprietary package. Compatibility on Alpine 3.23: the development image built from both locks registers 'ODBC Driver 18 for SQL Server' in unixODBC and pyodbc 5.3.0 loads it; a live SQL Server connection was not available on 2026-09-26.",
+      "Compatibility of this inventory: backend lint, strict type checks, unit and PostgreSQL integration tests passed in the development image rebuilt from the regenerated hash-locked requirements (requirements.txt, requirements-dev.txt, requirements-llm.txt) and both Alpine locks; the locks were regenerated with the pip-compile commands of scripts/compile-dependency-locks.sh in a one-off container of the same image with network access.",
       "Backend ldap3 2.9.1 (direct runtime dependency of application-foundation/PRDs/001-directory-login, login-only LDAPS adapter): PyPI release 2021-07-18, wheel sha256:5869596fc4948797020d3f03b7939da938778a0f9e2009f7a072ccf92b8e8d70 and sdist sha256:f3e7fc4718e3f09dda568b57100095e0ce58633bcabbed8667ce3f8fbaa4229f pinned in requirements.txt; OSV query for PyPI ldap3 2.9.1 on 2026-09-26 returned no advisory; license LGPL-3.0 (used unmodified as a library). Its locked transitive pyasn1 0.6.4 (BSD-2-Clause) was released 2026-07-09 and had no OSV advisory on 2026-09-26. Compatibility: backend unit, PostgreSQL integration, lint and strict type checks passed in the development image built from the regenerated hash-locked requirements (requirements.txt, requirements-dev.txt, requirements-llm.txt).",
       "Backend ruff 0.16.4 and langchain 1.3.17, frontend @types/node 26.3.0, @types/react-dom 19.2.5, eslint 10.9.1, eslint-plugin-react-refresh 0.5.5, typescript-eslint 8.68.0 and vite 8.2.2: release maturity, advisories and generated-project checks in docs/evidence/2026-09-25-dependabot-admission.md in factory source. The js-yaml 4.3.2 security patch (CVE-2026-84375, released 2026-08-26) reached the 30-day threshold and left the exception list.",
       "Backend uvicorn 0.52.4 and python-dotenv 1.2.3, frontend eslint 10.9.0, happy-dom 20.11.6 and @vitejs/plugin-react 6.1.0: release maturity, advisories and generated-project checks in docs/evidence/2026-09-24-dependabot-admission.md in factory source.",

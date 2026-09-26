@@ -1,25 +1,28 @@
+import { useEffect } from "react";
+import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIntl } from "@/contexts/IntlContext";
+import { roleLabel } from "@/lib/access";
 import { config } from "@/lib/config";
 
 export default function HomePage() {
-  const { user, logout } = useAuth();
+  const { user, access } = useAuth();
   const { t } = useIntl();
+  useEffect(() => {
+    document.title = config.productName;
+  }, []);
   return (
-    <main className="home">
-      <header>
-        <div>
-          <div className="eyebrow">{config.primaryDomain}</div>
-          <h1>{config.productName}</h1>
-        </div>
-        <button onClick={logout}>{t("auth.session.signOut")}</button>
-      </header>
+    <div className="home">
+      <div>
+        <div className="eyebrow">{config.primaryDomain}</div>
+        <h1>{config.productName}</h1>
+      </div>
       <section className="hero">
         <p>{config.projectIntent}</p>
-        <dl>
+        <dl className="facts">
           <div>
             <dt>{t("home.overview.actor")}</dt>
-            <dd>{user?.username}</dd>
+            <dd>{user?.display_name || user?.username}</dd>
           </div>
           <div>
             <dt>{t("home.overview.tenant")}</dt>
@@ -30,7 +33,7 @@ export default function HomePage() {
             <dd>
               {user?.is_super_admin
                 ? t("home.overview.superAdmin")
-                : user?.roles?.join(", ")}
+                : roleLabel(user?.role)}
             </dd>
           </div>
         </dl>
@@ -38,7 +41,20 @@ export default function HomePage() {
       <section className="empty-state">
         <h2>{t("home.empty.title")}</h2>
         <p>{t("home.empty.body")}</p>
+        {access.review && (
+          <p className="row">
+            <Link className="btn btn-primary" to="/inceleme">
+              Nesne incelemesi
+            </Link>
+            <Link className="btn btn-secondary" to="/sql-inceleme">
+              SQL betiği incelemesi
+            </Link>
+            <Link className="btn btn-secondary" to="/gecmis">
+              İnceleme geçmişi
+            </Link>
+          </p>
+        )}
       </section>
-    </main>
+    </div>
   );
 }

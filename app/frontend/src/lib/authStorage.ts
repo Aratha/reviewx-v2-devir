@@ -1,38 +1,52 @@
 import type {AuthenticatedUser} from '@/types/auth';
 
-/** The only module that reads or writes the persisted session. */
-export const STORAGE_KEYS = {
-  accessToken: 'dwhcodereview.access_token',
-  user: 'dwhcodereview.user',
-} as const;
+/**
+ * The only module that holds the session. The access token lives in memory only
+ * (application-foundation directory-login Requirement 6); nothing is written to localStorage,
+ * sessionStorage or a readable cookie. A page reload restores the session through the HttpOnly
+ * refresh cookie, which this code never sees.
+ */
+interface Session {
+  accessToken: string;
+  user: AuthenticatedUser;
+}
+
+let session: Session | null = null;
+const listeners = new Set<() => void>();
+
+function notify(): void {
+  for (const listener of [...listeners]) listener();
+}
 
 export function readAccessToken(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.accessToken);
-  } catch {
-    return null;
-  }
+  return session?.accessToken ?? null;
 }
 
 export function readUser(): AuthenticatedUser | null {
-  try {
-    const value = localStorage.getItem(STORAGE_KEYS.user);
-    return value ? (JSON.parse(value) as AuthenticatedUser) : null;
-  } catch {
-    return null;
-  }
+  return session?.user ?? null;
 }
 
 export function writeSession(accessToken: string, user: AuthenticatedUser): void {
-  localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+  session = {accessToken, user};
+  notify();
 }
 
 export function writeUser(user: AuthenticatedUser): void {
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+  if (session === null) return;
+  session = {...session, user};
+  notify();
 }
 
 export function clearAuth(): void {
-  localStorage.removeItem(STORAGE_KEYS.accessToken);
-  localStorage.removeItem(STORAGE_KEYS.user);
+  if (session === null) return;
+  session = null;
+  notify();
+}
+
+/** Subscribe to session changes; returns the unsubscribe function. */
+export function subscribeAuth(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

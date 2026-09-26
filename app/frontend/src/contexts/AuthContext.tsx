@@ -5,58 +5,54 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ApiError } from "@/lib/apiClient";
-import { clearAuth, readUser, writeSession, writeUser } from "@/lib/authStorage";
+import { clearAuth, readUser, subscribeAuth, writeSession } from "@/lib/authStorage";
+import { accessOf, type Access } from "@/lib/access";
 import { AuthService } from "@/services/auth";
 import type { AuthenticatedUser } from "@/types/auth";
 
 interface AuthValue {
   user: AuthenticatedUser | null;
   loading: boolean;
+  /** Menu and route visibility only; the backend authorizes every request. */
+  access: Access;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
 const Context = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthenticatedUser | null>(readUser);
-  const [loading, setLoading] = useState(Boolean(readUser()));
+  const user = useSyncExternalStore(subscribeAuth, readUser, readUser);
+  // The token lives in memory only, so every page load restores the session from the HttpOnly
+  // refresh cookie before protected routes render.
+  const [restoring, setRestoring] = useState(() => readUser() === null);
 
   useEffect(() => {
-    if (!loading) return;
+    if (!restoring) return;
     let active = true;
-    AuthService.me()
-      .then((current) => {
-        if (!active) return;
-        writeUser(current);
-        setUser(current);
-      })
-      .catch((error: unknown) => {
-        // The shared client already cleared storage when the bearer credential was rejected;
-        // network, proxy, upstream and unrelated authorization failures keep the session.
-        if (active && error instanceof ApiError && error.sessionExpired) setUser(null);
-      })
+    AuthService.refresh()
+      .catch(() => undefined)
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setRestoring(false);
       });
     return () => {
       active = false;
     };
-  }, [loading]);
+  }, [restoring]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await AuthService.login(username, password);
     writeSession(response.access_token, response.user);
-    setUser(response.user);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Close the refresh session on the server first; a failed call still ends the local session.
+    await AuthService.logout().catch(() => undefined);
     clearAuth();
-    setUser(null);
   }, []);
 
   const hasPermission = useCallback(
@@ -69,9 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const access = useMemo(() => accessOf(user), [user]);
+
   const value = useMemo(
-    () => ({ user, loading, login, logout, hasPermission }),
-    [user, loading, login, logout, hasPermission],
+    () => ({ user, loading: restoring, access, login, logout, hasPermission }),
+    [user, restoring, access, login, logout, hasPermission],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

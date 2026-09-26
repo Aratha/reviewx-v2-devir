@@ -97,9 +97,11 @@ oluşur. Göçler uygulama rolüne yeni tablolarda DML yetkisi verir. Backend ya
 bağlanır; sahip rolünün bağlantısı yalnız göç Job'unda bulunur.
 
 Requirement 4: Şema göçü `alembic upgrade head` komutudur ve backend imajıyla çalışır (ayrı göç imajı
-yoktur). İlk kurulumda Job PostgreSQL'i en fazla 300 saniye bekler; güncellemede yeni backend
-podlarından önce çalışan kanca olarak koşar. Job yeniden denenmez (`backoffLimit: 0`); başarısız göç
-güncellemeyi durdurur ve `--atomic` önceki sürümü korur. Backend hazır olma yoklaması şema imajın
+yoktur). Veritabanını ilk kez getiren kurulumda veya yükseltmede Job, PostgreSQL ile aynı adımda
+oluşur ve veritabanı bağlantı kabul edene kadar bekler; sonraki güncellemelerde yeni backend
+podlarından önce çalışan kanca olarak koşar. Job'un toplam süresi `activeDeadlineSeconds` (varsayılan
+600 saniye) ile sınırlıdır ve yeniden denenmez (`backoffLimit: 0`); `deploy.sh` Job'un bitmesini de
+bekler, başarısız göç güncellemeyi durdurur ve `--atomic` önceki sürümü korur. Backend hazır olma yoklaması şema imajın
 beklediği sürüme gelene kadar 503 döner. Göçler yalnız genişletici yazılır (eski sürüm yeni şemayla
 çalışabilir), çünkü geri almada şema geri indirilmez.
 

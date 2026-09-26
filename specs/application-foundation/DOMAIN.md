@@ -1,0 +1,45 @@
+# application-foundation alanı
+
+## Amaç ve sonuçlar
+
+DWH Code Review'un kimlik, yetki, çalışma ortamı ve dağıtım temeli. Kullanıcılar kurum Active
+Directory hesabıyla girer, rolüne göre yetkilendirilir; uygulama yerelde Compose ile, nonprod'da KT
+Rancher kümesinde tek chart ile çalışır.
+
+## Aktörler
+
+- **Kullanıcı:** Active Directory hesabıyla giriş yapan inceleyici veya kural yöneticisi.
+- **Uygulama yöneticisi:** Rol atamalarını yapan süper yönetici.
+- **İşletim ekibi:** Azure dağıtım işini, gizli değişkenleri ve küme kaynaklarını yönetir.
+
+## Ortak dil
+
+- **Dizin girişi:** Kullanıcı adı ve parolanın LDAPS üzerinden Active Directory'de doğrulanması.
+  Kullanıcı eşitleme ve dizinde arama yoktur.
+- **Rol:** `inceleyici` veya `kural-yoneticisi`.
+- **Runtime Secret:** Nonprod'da uygulama sırlarını taşıyan Kubernetes Secret'ı
+  (`dwhcodereview-runtime`); değerleri Azure gizli değişkenlerinden `deploy.sh` yazar.
+- **Ortam:** `local` (geliştirici makinesi, `DWHCODEREVIEW_ENVIRONMENT=development`) veya `nonprod`
+  (KT Rancher kümesi, `DWHCODEREVIEW_ENVIRONMENT=staging`). Başka ya da okunamayan değer `nonprod`
+  gibi davranır.
+
+## Değişmezler
+
+- Her API isteği, sağlık uçları dışında, geçerli oturum ve uygun rol ister; SSE akışları dahil.
+- Parola uygulamada saklanmaz; yalnız dizine doğrulama için iletilir.
+- Sırlar Git'e, Helm değer dosyasına, komut argümanına ve loga girmez.
+- Dağıtım, yayımlanmamış imajla kümeye dokunmaz ve hizmet vermiş release'i silmez.
+
+## Sahip olunan veri
+
+PostgreSQL'de kullanıcı kaydı (dizin kimliği, görünen ad, rol, son giriş) ve oturum yenileme durumu.
+
+## Harici sınırlar
+
+- **Active Directory:** LDAPS, kurum CA bundle'ı ve onaylı çıkış hedefleri.
+- **KT Rancher nonprod kümesi ve Azure dağıtım işi:** `helm/dwhcodereview/deploy.sh` ile.
+- **Kurum imaj deposu:** `cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/`.
+
+## İş yetkinliği yol haritası
+
+[Yol haritası](roadmap.md).

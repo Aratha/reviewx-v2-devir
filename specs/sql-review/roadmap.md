@@ -4,3 +4,9 @@ Her satır bağımsız teslim edilebilir bir yeteneği kabul edilmiş PRD'sine b
 
 | Sıra | Yetenek | PRD | Durum |
 |---:|---|---|---|
+| 001 | rule-management | [PRD](PRDs/001-rule-management/PRD.md) | Accepted |
+| 002 | sql-server-connection | [PRD](PRDs/002-sql-server-connection/PRD.md) | Accepted |
+| 003 | object-review | [PRD](PRDs/003-object-review/PRD.md) | Accepted |
+| 004 | script-review | [PRD](PRDs/004-script-review/PRD.md) | Accepted |
+| 005 | review-history-export | [PRD](PRDs/005-review-history-export/PRD.md) | Accepted |
+| 006 | llm-connection | [PRD](PRDs/006-llm-connection/PRD.md) | Accepted |

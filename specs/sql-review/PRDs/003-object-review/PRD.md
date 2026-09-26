@@ -270,6 +270,18 @@ erişimi yapmaz.
   sürümü, nesne ve kural sayısı, süre, `UNKNOWN` sonuç sayısı.
 - Nesne düzeyinde yalnız kimlik bilgisi (veritabanı, şema, ad) ve hata kodu yazılır. SQL metni, kod
   parçası, meta veri metni ve LLM yanıtı yazılmaz.
+- Ölçümler: `dwhcodereview_review_runs_started_total{kind}`,
+  `dwhcodereview_review_runs_finished_total{kind,status}`,
+  `dwhcodereview_review_run_duration_seconds{kind,status}`, kural başına LLM yanıtı alınıp
+  alınmadığını sayan `dwhcodereview_review_rule_calls_total{kind,outcome}` ve tamamlanan koşumların
+  kural sonuçlarını sayan `dwhcodereview_review_rule_results_total{kind,status}`. `kind` `object`
+  veya `script`; bitişte `status` `completed`, `failed`, `cancelled` veya `interrupted`; `outcome`
+  `ok` veya `failed`; kural sonucunda `status` `PASS`, `FAIL`, `NOT_APPLICABLE` veya `UNKNOWN`.
+  Kullanıcı, koşum, nesne ve veritabanı ölçüme girmez.
+- İz (trace): koşum başına `review_run` aralığı (tür, nesne ve kural sayısı, son durum); isteğin
+  sunucu aralığına, altındaki LLM çağrılarına ve PostgreSQL komutlarına bağlanır. Ortak kurallar ve
+  saklama süresi [application-foundation alanında](../../../application-foundation/DOMAIN.md)
+  tanımlıdır. Tüketen test: `app/backend/tests/integration/test_telemetry_signals.py`.
 
 ## Dağıtım etkisi
 

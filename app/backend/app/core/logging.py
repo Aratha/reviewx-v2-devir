@@ -7,6 +7,8 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, TextIO
 
+from opentelemetry import trace
+
 # The x-request-id of the request being served; request logging middleware sets it so every
 # application event of that request carries the same correlation identifier.
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
@@ -27,6 +29,11 @@ class JsonFormatter(logging.Formatter):
         request_id = request_id_var.get()
         if request_id is not None:
             payload["request_id"] = request_id
+        span_context = trace.get_current_span().get_span_context()
+        if span_context.is_valid:
+            # Links the line to its trace in the local observability stack; ids carry no content.
+            payload["trace_id"] = format(span_context.trace_id, "032x")
+            payload["span_id"] = format(span_context.span_id, "016x")
         fields = getattr(record, "structured_fields", None)
         if isinstance(fields, dict):
             payload.update(fields)

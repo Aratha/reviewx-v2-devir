@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.errors import ApplicationError
 from app.core.logging import log_event
 from app.core.request_context import RequestContext
+from app.core.telemetry import record_review_export, record_review_history_retention
 from app.domain.models.review import (
     ReviewFinding,
     ReviewRuleResult,
@@ -417,6 +418,7 @@ class ReviewHistoryService:
             format="csv",
             rows=content.count("\r\n"),
         )
+        record_review_export("csv")
         return ExportFile(f"sql-review-{_timestamp_ms(now)}.csv", "text/csv", content)
 
     async def export_sql(self, context: RequestContext, run_id: str) -> ExportFile:
@@ -442,6 +444,7 @@ class ReviewHistoryService:
             format="sql",
             objects=sum(1 for item in results.objects if item.source_sql),
         )
+        record_review_export("sql")
         now = datetime.now(UTC)
         return ExportFile(f"sql-review-source-{_timestamp_ms(now)}.sql", "application/sql", content)
 
@@ -487,6 +490,7 @@ async def purge_expired_review_runs(
         deleted=run.deleted,
         duration_ms=int((time.monotonic() - started) * 1000),
     )
+    record_review_history_retention(outcome=run.outcome, deleted=run.deleted)
     return run
 
 

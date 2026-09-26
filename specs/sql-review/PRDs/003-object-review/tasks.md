@@ -51,8 +51,12 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
   `app/frontend/src/components/review/ReviewResultsView.test.tsx` (sonuç, satır referansı, yanlış
   pozitif işareti). Yerel tarayıcıda SQL Server yokken sayfanın iletisi gözlendi
   (`e2e/sql-review/03-settings-objects-users.mjs`).
-- [ ] Task 8 — Gözlemlenebilirlik: koşum ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
-  için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli.
+- [x] Task 8 — Gözlemlenebilirlik: koşum başladı/bitti ve süre, kural çağrısı ve kural sonucu
+  ölçümleri; isteğe, LLM çağrılarına ve PostgreSQL komutlarına bağlanan `review_run` izi; SQL
+  metni, kod parçası, model yanıtı, nesne ve veritabanı adı yok. OpenTelemetry altyapısı
+  [directory-login](../../../application-foundation/PRDs/001-directory-login/tasks.md) Task 13'tedir.
+  Kanıt: `app/backend/tests/integration/test_telemetry_signals.py`,
+  `app/backend/tests/unit/test_telemetry.py`, `scripts/quality-gate.sh all`.
 - [ ] Task 9 — Acceptance 5, Acceptance 6: test SQL Server'ı ve onaylı LLM ucuyla tarayıcıda L2
   (gerçek ortamda doğrulama). Kurum ağı ve erişilebilir SQL Server gerekli; açık. Aynı canlı pencere,
   durdurma ve sonuç penceresi metin incelemesinde yerel yedek LLM ucuyla gözlendi

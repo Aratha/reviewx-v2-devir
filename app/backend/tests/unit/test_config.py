@@ -236,3 +236,60 @@ def test_public_origin_must_be_an_exact_origin() -> None:
     for value in ("https://app.example.test/", "https://app.example.test/path", "app.example"):
         with pytest.raises(ValidationError, match="public_origin"):
             _settings(public_origin=value)
+
+
+def test_telemetry_is_off_by_default_and_bounded() -> None:
+    settings = _settings()
+    assert settings.otel_exporter_otlp_endpoint == ""
+    assert settings.otel_service_name == "dwhcodereview-backend"
+    assert settings.otel_traces_sample_ratio == 1.0
+    assert settings.otel_metric_export_interval_seconds == 60
+    for field, value in (
+        ("otel_traces_sample_ratio", 1.5),
+        ("otel_traces_sample_ratio", -0.1),
+        ("otel_metric_export_interval_seconds", 4),
+        ("otel_metric_export_interval_seconds", 301),
+    ):
+        with pytest.raises(ValidationError):
+            _settings(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    (
+        "otel-collector:4317",
+        "grpc://otel-collector:4317",
+        "http://user:secret@otel-collector:4317",
+        "http://otel-collector:4317/v1/traces",
+        "http://otel-collector:4317?token=x",
+        "https://",
+    ),
+)
+def test_collector_endpoint_must_be_a_bare_address(endpoint: str) -> None:
+    with pytest.raises(ValidationError) as raised:
+        _settings(otel_exporter_otlp_endpoint=endpoint)
+    assert "secret" not in str(raised.value)
+
+
+def test_collector_endpoint_accepts_an_address_and_trims_it() -> None:
+    settings = _settings(otel_exporter_otlp_endpoint=" http://otel-collector:4317 ")
+    assert settings.otel_exporter_otlp_endpoint == "http://otel-collector:4317"
+
+
+@pytest.mark.parametrize("name", ("Backend", "dwh review", "-backend", ""))
+def test_service_name_is_a_plain_lowercase_name(name: str) -> None:
+    with pytest.raises(ValidationError):
+        _settings(otel_service_name=name)
+
+
+@pytest.mark.parametrize(
+    "variable", ("OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES", "otel_sdk_disabled")
+)
+def test_otel_process_variables_stop_start_up(
+    monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    monkeypatch.setenv(variable, "authorization=Bearer do-not-echo")
+    with pytest.raises(ValidationError) as raised:
+        _settings()
+    assert variable in str(raised.value)
+    assert "do-not-echo" not in str(raised.value)

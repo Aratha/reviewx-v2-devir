@@ -1,4 +1,12 @@
 services:
+  # The backend exports its traces and metrics to the collector over the internal network.
+  backend:
+    environment:
+      DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      otel-collector:
+        condition: service_started
+
   otel-collector:
     image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.158.0@sha256:c5918f78992ee73b0d6f0e599423ac5ec52dd5d9726733114d6eca53d5a32ed5}
     command: ["--config=/etc/otelcol/config.yaml"]

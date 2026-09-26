@@ -96,7 +96,8 @@ Bu PRD PostgreSQL'e tablo, şema veya göç eklemez. Port Nesne tanımını yaln
 ## Gözlemlenebilirlik
 
 - Her SQL Server çağrısı için yapılandırılmış JSON log olayı `sql_server.call`: `request_id`, `operation` (`list_databases`, `list_objects`, `fetch_definition`, `dependency_metadata`, `connection_test`), `database`, `outcome` (`ok` veya Requirement 8 sınıfı), varsa `sqlstate`, `duration_ms`, dönen satır sayısı. Sunucu adı, kullanıcı, parola, SQL tanımı ve sürücü metni yazılmaz.
-- Ölçümler: `dwhcodereview_sql_server_calls_total{operation,outcome}`, `dwhcodereview_sql_server_call_duration_seconds{operation}` ve bekleyen iş parçacığı sayısı `dwhcodereview_sql_server_inflight`.
+- Ölçümler: `dwhcodereview_sql_server_calls_total{operation,outcome}`, `dwhcodereview_sql_server_call_duration_seconds{operation}` ve bekleyen iş parçacığı sayısı `dwhcodereview_sql_server_inflight`. `operation` yukarıdaki beş işlemden, `outcome` `ok` ile Requirement 8 sınıflarından biridir; veritabanı adı ölçüme girmez.
+- İz (trace): her çağrı için içerik taşımayan `sql_server <operation>` aralığı; öznitelikleri işlem ve sonuç sınıfıdır. Ortak kurallar ve saklama süresi [application-foundation alanında](../../../application-foundation/DOMAIN.md) tanımlıdır. Tüketen test: `app/backend/tests/unit/test_sql_server_adapter.py`.
 - `local` Ortamda ayar değişikliği `sql_connection.updated` olayıyla değişen alan adlarını (değerleri değil) ve kullanıcıyı yazar.
 
 ## Dağıtım etkisi

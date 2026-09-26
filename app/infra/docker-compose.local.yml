@@ -106,6 +106,11 @@ services:
       DWHCODEREVIEW_REVIEW_RATE_LIMIT_WINDOW_SECONDS: "60"
       DWHCODEREVIEW_REVIEW_RATE_LIMIT_MAX_REQUESTS: "30"
       DWHCODEREVIEW_REVIEW_HISTORY_RETENTION_DAYS: "90"
+      # OpenTelemetry export stays off here; the observability overlay sets its collector address.
+      DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT: "${DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      DWHCODEREVIEW_OTEL_SERVICE_NAME: "dwhcodereview-backend"
+      DWHCODEREVIEW_OTEL_TRACES_SAMPLE_RATIO: "1.0"
+      DWHCODEREVIEW_OTEL_METRIC_EXPORT_INTERVAL_SECONDS: "15"
     volumes:
       - ../backend:/workspace/app/backend
       - ../../schema:/workspace/schema

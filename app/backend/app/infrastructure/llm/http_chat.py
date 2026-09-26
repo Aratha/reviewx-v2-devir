@@ -6,7 +6,8 @@ Transport behaviour ported from the previous application: ``openai`` streams SSE
 text fails, and only connect/read timeouts are retried with a ``1.5 * 2^n`` second (at most 12 s)
 wait. On top of it: verified TLS without proxies or redirects, the private-network policy, a
 4 MiB response limit, run-wide and process-wide concurrency limits and one content-free summary
-per attempt. No prompt, SQL, response text or server error body is logged or stored.
+per attempt, with one content-free span and the Gözlemlenebilirlik metrics. No prompt, SQL,
+response text, URL or server error body is logged, stored or traced.
 """
 
 import asyncio
@@ -23,6 +24,7 @@ from urllib.parse import urlsplit
 import httpcore
 import httpx
 
+from app.core.telemetry import llm_attempt
 from app.domain.llm import (
     MAX_RESPONSE_BYTES,
     PROGRESS_MIN_INTERVAL_SECONDS,
@@ -360,36 +362,44 @@ class HttpLlmChat:
         parts = urlsplit(endpoint.chat_url)
         host = parts.hostname or ""
         text: str | None = None
-        try:
-            await resolve_private(
-                self._resolver,
-                host,
-                parts.port or (443 if parts.scheme == "https" else 80),
-                timeout=self._connect_timeout,
-            )
-            if endpoint.chat_api is LlmChatApi.OPENAI:
-                text = await _openai_call(client, endpoint, request, progress, observed)
-            else:
-                text = await _api_v1_chat_call(client, endpoint, request, progress, observed)
-            outcome = LlmCallOutcome.OK
-            observed.response_chars = len(text)
-        except asyncio.CancelledError:
-            await asyncio.shield(
-                self._record(
-                    request,
-                    endpoint,
+        with llm_attempt(
+            model=endpoint.model, chat_api=endpoint.chat_api.value, attempt=attempt
+        ) as call:
+            try:
+                await resolve_private(
+                    self._resolver,
                     host,
-                    attempt,
-                    started_at,
-                    started,
-                    LlmCallOutcome.CANCELLED,
-                    observed,
+                    parts.port or (443 if parts.scheme == "https" else 80),
+                    timeout=self._connect_timeout,
                 )
-            )
-            raise
-        except Exception as error:  # noqa: BLE001 - unknown errors propagate from classify
-            outcome = classify_transport_error(error)
-            text = None
+                if endpoint.chat_api is LlmChatApi.OPENAI:
+                    text = await _openai_call(client, endpoint, request, progress, observed)
+                else:
+                    text = await _api_v1_chat_call(client, endpoint, request, progress, observed)
+                outcome = LlmCallOutcome.OK
+                observed.response_chars = len(text)
+            except asyncio.CancelledError:
+                call.outcome = LlmCallOutcome.CANCELLED.value
+                call.http_status = observed.http_status
+                await asyncio.shield(
+                    self._record(
+                        request,
+                        endpoint,
+                        host,
+                        attempt,
+                        started_at,
+                        started,
+                        LlmCallOutcome.CANCELLED,
+                        observed,
+                    )
+                )
+                raise
+            except Exception as error:  # noqa: BLE001 - unknown errors propagate from classify
+                outcome = classify_transport_error(error)
+                text = None
+            call.outcome = outcome.value
+            call.http_status = observed.http_status
+            call.completion_tokens = observed.completion_tokens
         await self._record(request, endpoint, host, attempt, started_at, started, outcome, observed)
         usage = LlmUsage(
             completion_tokens=observed.completion_tokens,

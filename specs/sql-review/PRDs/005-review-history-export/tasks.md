@@ -26,9 +26,12 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   tek ve toplu silme onayı, süren koşumda 409 iletisi, `localStorage` kullanılmaması),
   `app/frontend/src/components/review/ReviewResultsView.test.tsx`,
   `app/frontend/src/services/reviews.test.ts` (oturum başlığıyla indirme, sunucunun dosya adı).
-- [ ] Task 4 — Gözlemlenebilirlik: biçime göre dışa aktarım sayısı, saklama işinin sildiği koşum
-  sayısı ve son başarılı çalışma zamanı ölçümleri. Arka uçta ölçüm kitaplığı yok; yeni bağımlılık
-  için sahip kararı ve kabul kaydı gerekiyor. Açık, engelli. Günlük olayları teslim edildi.
+- [x] Task 4 — Gözlemlenebilirlik: `dwhcodereview_review_exports_total{format}`,
+  `dwhcodereview_review_history_retention_deleted_runs_total` ve
+  `dwhcodereview_review_history_retention_last_success_timestamp_seconds` ölçümleri ile günlük
+  olayları. Kanıt: `app/backend/tests/integration/test_telemetry_signals.py`
+  (`test_exports_and_retention_record_their_metrics`), `scripts/quality-gate.sh all`; saklama işinin iki ölçümü
+  yerel gözlemlenebilirlik yığınında Prometheus'ta gözlendi.
 - [x] Task 5 — Acceptance 4 ve Acceptance 5'in görme/yetki bölümü: `e2e/sql-review/02-script-review-history.mjs`
   2026-09-26'da Chromium'da geçti (metin koşumu yerel yedek LLM ucuyla,
   [script-review](../004-script-review/tasks.md) Task 4): canlı sonuçta işaretlenen bulgu ikinci

@@ -25,6 +25,7 @@ sütun yoktur; saklama işi için `started_at` dizini vardır (Requirement 14). 
 | Yaşam döngüsü | `app/backend/app/main.py` (başlangıç denetimi, saklama işi) | Requirement 1, 14 |
 | İmaj | `app/backend/certs/corporate-inference-root.crt`, `app/infra/install-backend-system-packages.sh`, iki Dockerfile | Requirement 5 |
 | Bağımlılık | `app/backend/requirements.in` (`httpx==0.28.1`, `httpcore==1.0.9`), kilitli `requirements*.txt`, `dependency-admission.json` | Decision 5 |
+| Gözlemlenebilirlik | `app/backend/app/infrastructure/llm/http_chat.py` (`llm_attempt`), `app/backend/app/services/llm_call_summary_service.py`, `app/backend/app/core/telemetry.py` | Gözlemlenebilirlik, Requirement 10 |
 | Ön yüz | `app/frontend/src/pages/LlmConnectionPage.tsx`, `app/frontend/src/pages/LlmCallsPage.tsx` | Requirement 11, 13 |
 
 ## Uygulama kararları

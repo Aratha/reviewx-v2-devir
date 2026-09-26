@@ -65,6 +65,10 @@ def test_empty_local_settings_start_unconfigured() -> None:
         ({"llm_base_url": "http://llm.corp.example.test/v1"}, "DWHCODEREVIEW_LLM_BASE_URL"),
         ({"llm_chat_url": "http://llm.corp.example.test/chat"}, "DWHCODEREVIEW_LLM_CHAT_URL"),
         ({"llm_model": " "}, "DWHCODEREVIEW_LLM_MODEL"),
+        (
+            {"otel_exporter_otlp_endpoint": "http://otel-collector:4317"},
+            "DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT",
+        ),
         ({"environment": "unknown-value", "mssql_encrypt": False}, "DWHCODEREVIEW_MSSQL_ENCRYPT"),
     ],
 )
@@ -94,6 +98,13 @@ def test_malformed_values_stop_start_up_in_every_environment(
 def test_http_is_accepted_only_locally() -> None:
     url = {"llm_base_url": "http://127.0.0.1:1234/v1"}
     assert integration_setting_errors(_settings(environment="development", **url)) == []
+
+
+def test_a_plaintext_collector_is_accepted_only_locally() -> None:
+    collector = {"otel_exporter_otlp_endpoint": "http://otel-collector:4317"}
+    assert integration_setting_errors(_settings(environment="development", **collector)) == []
+    tls = {"otel_exporter_otlp_endpoint": "https://otel-collector.corp.example.test:4317"}
+    assert integration_setting_errors(_settings(**{**NONPROD_OK, **tls})) == []
 
 
 async def test_the_process_refuses_to_start_with_unsafe_settings() -> None:

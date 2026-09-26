@@ -61,3 +61,4 @@ bu teslimde `helm/` değişmedi.
 | Requirement 2, 11 | Acceptance 3 | Task 3 |
 | Requirement 2, 8 | Acceptance 5 | Task 4 |
 | Acceptance 4 | Acceptance 4 | Task 5 |
+| Gözlemlenebilirlik (ölçüm) | — | Task 6 |

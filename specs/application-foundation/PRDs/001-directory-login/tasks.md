@@ -57,3 +57,15 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
 - [ ] Task 12 — Requirement 1–4, 9, 10 / Acceptance 3: `nonprod` kümede gerçek Active Directory ile
   L2 doğrulaması; CA bundle'ının imaja, dizin ayarlarının runtime Secret'a girmesi ve LDAPS çıkış
   kuralı [kubernetes-delivery](../002-kubernetes-delivery/PRD.md) görevleriyle birlikte.
+
+- [x] Task 13 — Gözlemlenebilirlik: OpenTelemetry altyapısı (tipli `DWHCODEREVIEW_OTEL_*`
+  ayarları, boş adreste dışa aktarım yok, `OTEL_*` süreç değişkeninde başlangıç reddi, `nonprod`'da
+  yalnız `https`, gözlemlenebilirlik Compose katmanında yerel toplayıcı), istek başına sunucu izi,
+  PostgreSQL komut izleri (yalnız komut türü), istek logunda `trace_id`, giriş sonuçları ölçümü
+  `dwhcodereview_auth_login_attempts_total{outcome}`; OpenTelemetry paketlerinin bağımlılık kabulü.
+  Kanıt: `tests/unit/test_telemetry.py`, `tests/unit/test_config.py`,
+  `tests/unit/test_integration_settings.py`, `tests/integration/test_telemetry_signals.py`
+  (`test_login_outcomes_are_counted_without_names_or_passwords`),
+  `python3 scripts/check-dependency-admission.py`, `python3 scripts/check-config-sync.py`,
+  `scripts/quality-gate.sh all`. Yerel gözlemlenebilirlik yığınında giriş ölçümü Prometheus'ta, aynı isteğin izi
+  Tempo'da ve iz kimliği istek logunda gözlendi; bu, yerel ortam gözlemidir, `nonprod` kanıtı değildir.

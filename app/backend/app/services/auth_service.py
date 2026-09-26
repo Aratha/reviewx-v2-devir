@@ -27,6 +27,7 @@ from app.core.security import (
     refresh_token_digest,
     verify_password,
 )
+from app.core.telemetry import record_login_attempt
 from app.domain.directory import (
     DirectoryAccount,
     DirectoryCredentialsRejected,
@@ -140,6 +141,7 @@ class AuthService:
         if blocked is not None:
             limit, retry_after = blocked
             log_event(logger, "auth.login.rate_limited", name_digest=name_digest, limit=limit)
+            record_login_attempt("rate_limited")
             raise ApplicationError(
                 status.HTTP_429_TOO_MANY_REQUESTS,
                 "rate_limited",
@@ -151,6 +153,7 @@ class AuthService:
         except _LoginFailed as failure:
             self.rate_limiter.record_failure(name, client_address)
             log_event(logger, "auth.login.failed", reason=failure.reason, name_digest=name_digest)
+            record_login_attempt(failure.reason)
             raise failure.error from None
         self.rate_limiter.record_success(name, client_address)
         now = datetime.now(UTC)
@@ -163,6 +166,7 @@ class AuthService:
             user_public_id=user.public_id,
             account_type=user.account_type,
         )
+        record_login_attempt("succeeded")
         return issued
 
     async def refresh(self, refresh_token: str | None) -> IssuedSession:
@@ -275,6 +279,7 @@ class AuthService:
             raise _LoginFailed(reason, invalid_credentials()) from None
         except DirectoryUnavailable as unavailable:
             log_event(logger, "auth.directory.unavailable", reason=unavailable.reason)
+            record_login_attempt("directory_unavailable")
             raise ApplicationError(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 "directory_unavailable",

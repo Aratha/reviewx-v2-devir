@@ -27,3 +27,8 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
 - [ ] Task 5 — Acceptance 4: onaylı LLM ucuyla tarayıcıda L2. Aynı akış (etiketli metin, canlı
   ilerleme, satır referanslı bulgu, sabit not, koşum kaydında sürüm ve etiket) Task 4'teki yedek uçla
   gözlendi; onaylı kurum LLM'i yerelden erişilebilir olmadığı için açık.
+- [x] Task 6 — Gözlemlenebilirlik: metin incelemesinin `kind=script` koşum ve kural ölçümleri;
+  etiket ve metin hiçbir ize veya ölçüme girmez. Kanıt:
+  `app/backend/tests/integration/test_telemetry_signals.py`
+  (`test_a_script_review_counts_as_script_and_keeps_its_label_and_text_out`),
+  `scripts/quality-gate.sh all`.

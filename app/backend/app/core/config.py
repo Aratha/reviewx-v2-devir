@@ -1,6 +1,7 @@
 """Typed application settings; this is the only application environment boundary."""
 
 import os
+import re
 from functools import cached_property, lru_cache
 from ipaddress import IPv4Network, IPv6Network, ip_address, ip_network
 from pathlib import Path
@@ -20,6 +21,7 @@ RuntimeEnvironment = Literal["local", "nonprod"]
 # unknown or unreadable value behaves as nonprod, the closed side.
 _LOCAL_ENVIRONMENT_VALUE = "development"
 _DEFAULT_LLM_USER_AGENT = "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"
+_SERVICE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 
 JwtSigningKey = ec.EllipticCurvePrivateKey | rsa.RSAPrivateKey
 JwtVerificationKey = ec.EllipticCurvePublicKey | rsa.RSAPublicKey
@@ -164,6 +166,14 @@ class Settings(BaseSettings):
     review_rate_limit_max_requests: Annotated[int, Field(ge=1, le=10_000)] = 30
     review_history_retention_days: Annotated[int, Field(ge=1, le=365)] = 90
 
+    # OpenTelemetry traces and metrics over OTLP/gRPC (app/core/telemetry.py). Empty disables
+    # export; the local observability Compose overlay points it at its collector. Only these typed
+    # settings configure telemetry: a process variable starting with OTEL_ stops startup.
+    otel_exporter_otlp_endpoint: str = ""
+    otel_service_name: str = "dwhcodereview-backend"
+    otel_traces_sample_ratio: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
+    otel_metric_export_interval_seconds: Annotated[int, Field(ge=5, le=300)] = 60
+
     bootstrap_super_admin_email: str = "admin@example.invalid"
     bootstrap_super_admin_username: str = "super-admin"
     bootstrap_super_admin_password: SecretStr | None = None
@@ -226,6 +236,34 @@ class Settings(BaseSettings):
     @classmethod
     def empty_optional_secret_is_absent(cls, value: object) -> object:
         return None if value == "" else value
+
+    @field_validator("otel_exporter_otlp_endpoint")
+    @classmethod
+    def validate_otel_exporter_otlp_endpoint(cls, value: str) -> str:
+        endpoint = value.strip()
+        if not endpoint:
+            return endpoint
+        parts = urlsplit(endpoint)
+        if (
+            parts.scheme not in {"http", "https"}
+            or not parts.hostname
+            or parts.username is not None
+            or parts.password is not None
+            or parts.path not in {"", "/"}
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError(
+                "otel_exporter_otlp_endpoint must be an http(s)://host[:port] collector address"
+            )
+        return endpoint
+
+    @field_validator("otel_service_name")
+    @classmethod
+    def validate_otel_service_name(cls, value: str) -> str:
+        if _SERVICE_NAME_RE.fullmatch(value) is None:
+            raise ValueError("otel_service_name must be a lowercase name of letters, digits and -")
+        return value
 
     @field_validator("directory_host")
     @classmethod
@@ -340,6 +378,18 @@ class Settings(BaseSettings):
             raise ValueError(
                 "hosted LangSmith and LangGraph services are not allowed: "
                 + ", ".join(sorted(configured))
+            )
+        return self
+
+    @model_validator(mode="after")
+    def reject_untyped_telemetry_configuration(self) -> "Settings":
+        # The OpenTelemetry SDK would otherwise read exporter headers, endpoints, certificates and
+        # resource attributes from OTEL_* process variables behind the typed settings.
+        configured = sorted(name for name in os.environ if name.upper().startswith("OTEL_"))
+        if configured:
+            raise ValueError(
+                "telemetry is configured only through DWHCODEREVIEW_OTEL_* settings: "
+                + ", ".join(configured)
             )
         return self
 

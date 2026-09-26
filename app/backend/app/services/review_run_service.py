@@ -24,6 +24,13 @@ from app.core.errors import ApplicationError
 from app.core.logging import log_event
 from app.core.request_context import RequestContext
 from app.core.review_throttle import ReviewRateLimiter
+from app.core.telemetry import (
+    RunOutcome,
+    record_review_run_started,
+    record_rule_call,
+    record_rule_results,
+    review_run,
+)
 from app.domain.llm import LlmChatPort, LlmEndpoint, LlmNotConfigured, LlmRunSession
 from app.domain.models.review import ReviewRunKind, ReviewRunStatus, RuleResultStatus
 from app.domain.review import (
@@ -319,6 +326,15 @@ class ReviewExecution:
 
     async def _run(self, emit: EventSink) -> None:
         plan = self._plan
+        with review_run(
+            plan.kind.value, object_count=len(plan.objects), rule_count=len(plan.rules)
+        ) as run:
+            await self._run_to_end(emit, run)
+
+    async def _run_to_end(self, emit: EventSink, run: RunOutcome) -> None:
+        """Drive the run and note its stored final status on ``run``; a cancellation re-raises."""
+
+        plan = self._plan
         started = time.monotonic()
         try:
             await emit(
@@ -343,6 +359,7 @@ class ReviewExecution:
                 )
             )
             self._log("review_run.cancelled", started, status=ended.value)
+            run.status = ended.value
             raise
         except Exception as error:  # noqa: BLE001 - reported as a fixed class, never as text
             root = _root_error(error)
@@ -352,12 +369,18 @@ class ReviewExecution:
                 code, message = REVIEW_FAILED_CODE, REVIEW_FAILED_MESSAGE
             await self._finish(ReviewRunStatus.FAILED, code, message)
             self._log("review_run.failed", started, error_code=code, error_type=type(root).__name__)
+            run.status = ReviewRunStatus.FAILED.value
             await emit(ErrorEvent(code=code, message=message))
             return
         if stored is None:
             self._log("review_run.failed", started, error_code=REVIEW_FAILED_CODE)
+            run.status = ReviewRunStatus.FAILED.value
             await emit(ErrorEvent(code=REVIEW_FAILED_CODE, message=REVIEW_FAILED_MESSAGE))
             return
+        record_rule_results(
+            plan.kind.value,
+            (check.status.value for outcome in outcomes for check in outcome.checks),
+        )
         self._log(
             "review_run.completed",
             started,
@@ -369,6 +392,7 @@ class ReviewExecution:
             ),
             object_error_count=sum(1 for outcome in outcomes if outcome.error_code),
         )
+        run.status = ReviewRunStatus.COMPLETED.value
         await emit(
             CompleteEvent(run_id=plan.run_public_id, results=_live_results(plan, outcomes, stored))
         )
@@ -441,6 +465,7 @@ class ReviewExecution:
                     )
                 )
             elif isinstance(event, RuleFinished):
+                record_rule_call(self._plan.kind.value, ok=event.ok)
                 await emit(
                     RuleDoneEvent(
                         **fields,
@@ -777,4 +802,5 @@ class ReviewRunService:
             object_count=len(planned),
             rule_count=len(plan.rules),
         )
+        record_review_run_started(kind.value)
         return ReviewExecution(plan, self.runtime, catalog)

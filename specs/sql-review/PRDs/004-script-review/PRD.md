@@ -169,6 +169,9 @@ rolü gerekir. Hata zarfı `{"detail":{"code":"...","message":"..."}}` biçimind
   taşır; ek olarak metin uzunluğu ve iki parçalı analiz kullanılıp kullanılmadığı yazılır.
 - Etiket günlüğe yazılmaz (kullanıcının yazdığı serbest metindir); metin, kod parçası ve LLM yanıtı
   yazılmaz.
+- Ölçüm ve izler [object-review](../003-object-review/PRD.md) Gözlemlenebilirlik bölümündekilerdir;
+  metin incelemesi `kind=script` etiketiyle sayılır. Etiket ve metin hiçbir ize veya ölçüme girmez.
+  Tüketen test: `app/backend/tests/integration/test_telemetry_signals.py`.
 
 ## Dağıtım etkisi
 

@@ -204,8 +204,14 @@ anahtarlı özeti yazılır.
 | `auth.logout` | kullanıcı `public_id` |
 | `admin.user.role_changed` / `admin.user.active_changed` | yapan, hedef, eski ve yeni değer |
 
-Bu PRD yeni ölçüm (metrik) tanımlamaz. Rol ve durum değişikliği geçmişi ayrıca Requirement 5'teki
-değişiklik kaydı tablosunda kalıcı saklanır (Decision 10).
+Ölçüm: giriş denemeleri `dwhcodereview_auth_login_attempts_total{outcome}` ile sayılır; `outcome`
+`succeeded`, `invalid_credentials`, `account_disabled`, `user_inactive`, `identity_conflict`,
+`rate_limited` veya `directory_unavailable` değerlerinden biridir. Kullanıcı adı, ad özeti ve adres
+ölçüme girmez. Her istek, yöntemi, rota şablonu ve yanıt kodu olan bir sunucu iz aralığı üretir ve
+istek logu aynı iz kimliğini (`trace_id`) taşır. Ortak kurallar ve saklama süresi
+[alan belgesinde](../../DOMAIN.md) tanımlıdır. Tüketen test:
+`app/backend/tests/integration/test_telemetry_signals.py`. Rol ve durum değişikliği geçmişi ayrıca
+Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 10).
 
 ## Dağıtım etkisi
 

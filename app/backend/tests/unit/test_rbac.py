@@ -3,9 +3,9 @@
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
 from app.api.auth.dependencies import require_permission, require_super_admin
+from app.core.errors import ApplicationError
 from app.core.request_context import RequestContext
 from app.core.security import TokenClaims
 from app.middleware.tenant_context import tenant_is_allowed
@@ -22,8 +22,17 @@ async def test_permission_guard_allows_exact_permission() -> None:
 @pytest.mark.asyncio
 async def test_permission_guard_denies_missing_permission() -> None:
     context = RequestContext(subject=uuid4())
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(ApplicationError) as error:
         await require_permission("invoice:read")(context)
+    assert error.value.status_code == 403
+    assert error.value.code == "forbidden"
+
+
+@pytest.mark.asyncio
+async def test_super_admin_guard_denies_ordinary_users() -> None:
+    context = RequestContext(subject=uuid4(), roles=frozenset({"kural-yoneticisi"}))
+    with pytest.raises(ApplicationError) as error:
+        await require_super_admin()(context)
     assert error.value.status_code == 403
 
 

@@ -1,5 +1,7 @@
 """Password hashing and signed JWT access-token primitives."""
 
+import hashlib
+import hmac
 import secrets
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -103,6 +105,32 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     except (ValueError, TypeError):
         return False
     return verified and password_hash is not None
+
+
+REFRESH_TOKEN_BYTES = 32
+_LOGIN_NAME_DIGEST_CONTEXT = b"dwhcodereview:login-name-digest:v1\0"
+
+
+def new_refresh_token() -> str:
+    """Return a CSPRNG refresh token of 256 bits; only its digest is ever stored."""
+
+    return secrets.token_urlsafe(REFRESH_TOKEN_BYTES)
+
+
+def refresh_token_digest(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def login_name_digest(normalized_name: str) -> str:
+    """Keyed digest that lets logs correlate failed logins without the login name.
+
+    The key is derived from the deployment's JWT signing key, so the digest is stable inside one
+    deployment and cannot be reversed by hashing a guessed name without that secret.
+    """
+
+    key_material = get_settings().jwt_private_key.get_secret_value().encode("utf-8")
+    key = hashlib.sha256(_LOGIN_NAME_DIGEST_CONTEXT + key_material).digest()
+    return hmac.new(key, normalized_name.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
 def create_access_token(

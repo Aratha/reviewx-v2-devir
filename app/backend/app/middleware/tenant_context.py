@@ -10,6 +10,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from app.core.config import get_settings
+from app.core.errors import error_body
 from app.core.request_context import RequestContext
 from app.core.security import TokenClaims, decode_access_token
 
@@ -48,6 +49,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
             f"{api_prefix}/liveness",
             f"{api_prefix}/readiness",
             f"{api_prefix}/auth/login",
+            # Cookie-authenticated; the session record, not a header, selects the tenant.
+            f"{api_prefix}/auth/refresh",
+            f"{api_prefix}/auth/logout",
         }
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -58,17 +62,14 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if raw_tenant_id is None:
             return JSONResponse(
                 status_code=400,
-                content={
-                    "detail": "Active tenant header is required",
-                    "code": "tenant_header_required",
-                },
+                content=error_body("tenant_header_required", "Etkin kiracı başlığı gerekli."),
             )
         try:
             active_tenant_id = UUID(raw_tenant_id)
         except ValueError:
             return JSONResponse(
                 status_code=400,
-                content={"detail": "Active tenant header is invalid", "code": "tenant_invalid"},
+                content=error_body("tenant_invalid", "Etkin kiracı başlığı geçersiz."),
             )
 
         token = _bearer_token(request)
@@ -87,7 +88,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if not tenant_is_allowed(claims, active_tenant_id):
             return JSONResponse(
                 status_code=403,
-                content={"detail": "Tenant access denied", "code": "tenant_forbidden"},
+                content=error_body("tenant_forbidden", "Bu kiracıya erişim yetkiniz yok."),
             )
 
         context = RequestContext(

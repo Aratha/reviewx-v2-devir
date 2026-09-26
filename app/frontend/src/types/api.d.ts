@@ -4,6 +4,257 @@
  */
 
 export interface paths {
+    "/api/dwhcodereview/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description List the tenant's users ordered by login name (UPN).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    size?: number;
+                    q?: string | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UserPage"];
+                    };
+                };
+                /** @description Geçersiz istek değeri */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Süper yönetici değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/admin/users/{public_id}/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Active
+         * @description Deactivate or reactivate an account; repeating the same value changes nothing.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    public_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ActiveChange"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ActiveChange"];
+                    };
+                };
+                /** @description Geçersiz istek değeri */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Süper yönetici değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kullanıcı yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kendi hesabı veya süper yönetici */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/admin/users/{public_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Role
+         * @description Assign 'inceleyici' or 'kural-yoneticisi'; repeating the same value changes nothing.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    public_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RoleChange"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleChange"];
+                    };
+                };
+                /** @description Geçersiz istek değeri */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Süper yönetici değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kullanıcı yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Süper yönetici */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/auth/login": {
         parameters: {
             query?: never;
@@ -15,7 +266,7 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Authenticate by username or email and issue a signed access token.
+         * @description Authenticate a local or directory account; issue an access token and a refresh cookie.
          */
         post: {
             parameters: {
@@ -56,6 +307,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description End the refresh session on the server and delete the cookie; works without a token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: {
+                    dwhcodereview_refresh?: string | null;
+                };
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/auth/me": {
         parameters: {
             query?: never;
@@ -65,7 +364,7 @@ export interface paths {
         };
         /**
          * Me
-         * @description Return the active user and tenant after authoritative token validation.
+         * @description Return the active user, display name, current role and account type.
          */
         get: {
             parameters: {
@@ -89,6 +388,56 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh
+         * @description Rotate the refresh cookie and return a new access token with the current role.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: {
+                    dwhcodereview_refresh?: string | null;
+                };
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LoginResponse"];
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -179,12 +528,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActiveChange: {
+            active: boolean;
+        };
         AuthenticatedUser: {
+            /** @enum {string} */
+            account_type: "local" | "directory";
+            display_name: string;
             /** @default false */
             is_super_admin: boolean;
             permissions?: string[];
             /** Format: uuid */
             public_id: string;
+            role?: ("inceleyici" | "kural-yoneticisi") | null;
             roles?: string[];
             /** Format: uuid */
             tenant_id: string;
@@ -200,12 +556,37 @@ export interface components {
         };
         LoginResponse: {
             access_token: string;
+            /** @description Access-token lifetime in seconds. */
+            expires_in: number;
             /**
              * @default bearer
              * @constant
              */
             token_type: "bearer";
             user: components["schemas"]["AuthenticatedUser"];
+        };
+        RoleChange: {
+            /** @enum {string} */
+            role: "inceleyici" | "kural-yoneticisi";
+        };
+        UserPage: {
+            items: components["schemas"]["UserSummary"][];
+            page: number;
+            size: number;
+            total: number;
+        };
+        UserSummary: {
+            /** @enum {string} */
+            account_type: "local" | "directory";
+            display_name: string;
+            email: string;
+            is_active: boolean;
+            is_super_admin: boolean;
+            last_login_at: string | null;
+            /** Format: uuid */
+            public_id: string;
+            role: ("inceleyici" | "kural-yoneticisi") | null;
+            username: string;
         };
         ValidationError: {
             ctx?: Record<string, never>;

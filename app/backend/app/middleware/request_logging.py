@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 from app.core.config import get_settings
+from app.core.logging import request_id_var
 
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 logger = logging.getLogger("app.http")
@@ -22,6 +23,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         supplied = request.headers.get("x-request-id", "")
         request_id = supplied if REQUEST_ID_RE.fullmatch(supplied) else str(uuid4())
         request.state.request_id = request_id
+        request_id_token = request_id_var.set(request_id)
         started = monotonic()
         status_code = 500
         try:
@@ -50,3 +52,4 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     }
                 },
             )
+            request_id_var.reset(request_id_token)

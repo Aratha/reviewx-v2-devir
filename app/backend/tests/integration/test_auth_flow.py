@@ -65,15 +65,20 @@ async def test_super_admin_authentication_flow(migrated_database: None) -> None:
         )
         assert login.status_code == 200, login.text
         payload = login.json()
-        assert set(payload) == {"access_token", "token_type", "user"}
+        assert set(payload) == {"access_token", "token_type", "expires_in", "user"}
         assert set(payload["user"]) == {
             "public_id",
             "username",
+            "display_name",
             "tenant_id",
+            "account_type",
+            "role",
             "roles",
             "permissions",
             "is_super_admin",
         }
+        assert payload["user"]["account_type"] == "local"
+        assert payload["user"]["role"] is None
         assert payload["user"]["is_super_admin"] is True
         assert payload["user"]["tenant_id"] == str(first.tenant_public_id)
 

@@ -14,6 +14,7 @@ import app.db.base  # noqa: F401  # populate mapper metadata before any write
 from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.session import async_session_factory
+from app.domain.directory import InvalidDirectoryName, validate_local_account_name
 from app.domain.models.role import SUPER_ADMIN_ROLE, Role, UserRole
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User
@@ -34,15 +35,18 @@ async def ensure_super_admin(
     password: str,
     tenant_code: str = "platform",
     tenant_name: str = "Platform",
+    upn_suffix: str = "",
 ) -> BootstrapResult:
     """Create or reset the super admin and ensure its system-role assignment."""
 
     normalized_email = email.strip().lower()
-    normalized_username = username.strip().lower()
     if "@" not in normalized_email:
         raise ValueError("email must be a valid address")
-    if not normalized_username:
-        raise ValueError("username is required")
+    try:
+        # The super admin is a local account: its name never carries the directory UPN suffix.
+        normalized_username = validate_local_account_name(username, upn_suffix)
+    except InvalidDirectoryName as exc:
+        raise ValueError(str(exc)) from None
     password_hash = hash_password(
         password, context=(normalized_username, normalized_email.partition("@")[0])
     )
@@ -174,6 +178,7 @@ async def _run(args: argparse.Namespace) -> BootstrapResult:
             password=_password_from_operator(args.password_stdin),
             tenant_code=args.tenant_code,
             tenant_name=args.tenant_name,
+            upn_suffix=settings.directory_upn_suffix,
         )
 
 

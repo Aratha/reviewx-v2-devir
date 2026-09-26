@@ -1,8 +1,29 @@
 {
   "components": {
     "schemas": {
+      "ActiveChange": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "type": "object"
+      },
       "AuthenticatedUser": {
         "properties": {
+          "account_type": {
+            "enum": [
+              "local",
+              "directory"
+            ],
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
           "is_super_admin": {
             "default": false,
             "type": "boolean"
@@ -16,6 +37,20 @@
           "public_id": {
             "format": "uuid",
             "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inceleyici",
+                  "kural-yoneticisi"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "roles": {
             "items": {
@@ -34,7 +69,9 @@
         "required": [
           "public_id",
           "username",
-          "tenant_id"
+          "display_name",
+          "tenant_id",
+          "account_type"
         ],
         "type": "object"
       },
@@ -74,6 +111,10 @@
           "access_token": {
             "type": "string"
           },
+          "expires_in": {
+            "description": "Access-token lifetime in seconds.",
+            "type": "integer"
+          },
           "token_type": {
             "const": "bearer",
             "default": "bearer",
@@ -85,7 +126,116 @@
         },
         "required": [
           "access_token",
+          "expires_in",
           "user"
+        ],
+        "type": "object"
+      },
+      "RoleChange": {
+        "properties": {
+          "role": {
+            "enum": [
+              "inceleyici",
+              "kural-yoneticisi"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "type": "object"
+      },
+      "UserPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "type": "object"
+      },
+      "UserSummary": {
+        "properties": {
+          "account_type": {
+            "enum": [
+              "local",
+              "directory"
+            ],
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "is_super_admin": {
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "public_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inceleyici",
+                  "kural-yoneticisi"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_id",
+          "username",
+          "display_name",
+          "email",
+          "account_type",
+          "role",
+          "is_super_admin",
+          "is_active",
+          "last_login_at"
         ],
         "type": "object"
       },
@@ -142,9 +292,240 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/dwhcodereview/v1/admin/users": {
+      "get": {
+        "description": "List the tenant's users ordered by login name (UPN).",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Ge\u00e7ersiz istek de\u011feri"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "S\u00fcper y\u00f6netici de\u011fil"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "List Users",
+        "tags": [
+          "user-administration"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/admin/users/{public_id}/active": {
+      "put": {
+        "description": "Deactivate or reactivate an account; repeating the same value changes nothing.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActiveChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Ge\u00e7ersiz istek de\u011feri"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "S\u00fcper y\u00f6netici de\u011fil"
+          },
+          "404": {
+            "description": "Kullan\u0131c\u0131 yok"
+          },
+          "409": {
+            "description": "Kendi hesab\u0131 veya s\u00fcper y\u00f6netici"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Set Active",
+        "tags": [
+          "user-administration"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/admin/users/{public_id}/role": {
+      "put": {
+        "description": "Assign 'inceleyici' or 'kural-yoneticisi'; repeating the same value changes nothing.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Ge\u00e7ersiz istek de\u011feri"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "S\u00fcper y\u00f6netici de\u011fil"
+          },
+          "404": {
+            "description": "Kullan\u0131c\u0131 yok"
+          },
+          "409": {
+            "description": "S\u00fcper y\u00f6netici"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Set Role",
+        "tags": [
+          "user-administration"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/auth/login": {
       "post": {
-        "description": "Authenticate by username or email and issue a signed access token.",
+        "description": "Authenticate a local or directory account; issue an access token and a refresh cookie.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -183,9 +564,50 @@
         ]
       }
     },
+    "/api/dwhcodereview/v1/auth/logout": {
+      "post": {
+        "description": "End the refresh session on the server and delete the cookie; works without a token.",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "dwhcodereview_refresh",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/auth/me": {
       "get": {
-        "description": "Return the active user and tenant after authoritative token validation.",
+        "description": "Return the active user, display name, current role and account type.",
         "responses": {
           "200": {
             "content": {
@@ -205,6 +627,54 @@
           }
         ],
         "summary": "Me",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/auth/refresh": {
+      "post": {
+        "description": "Rotate the refresh cookie and return a new access token with the current role.",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "dwhcodereview_refresh",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
         "tags": [
           "authentication"
         ]

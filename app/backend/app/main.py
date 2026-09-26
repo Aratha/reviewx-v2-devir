@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router
 from app.core.config import get_settings
+from app.core.errors import ApplicationError, application_error_handler
 from app.core.logging import configure_logging
 from app.db.session import engine
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -43,6 +44,7 @@ def create_application() -> FastAPI:
         expose_headers=["WWW-Authenticate", "X-Request-ID"],
     )
     application.add_middleware(RequestLoggingMiddleware)
+    application.add_exception_handler(ApplicationError, application_error_handler)
     application.include_router(router)
     return application
 

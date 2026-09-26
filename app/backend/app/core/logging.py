@@ -3,8 +3,15 @@
 import json
 import logging
 import sys
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, TextIO
+
+# The x-request-id of the request being served; request logging middleware sets it so every
+# application event of that request carries the same correlation identifier.
+request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+
+EventValue = str | int | bool | None
 
 
 class JsonFormatter(logging.Formatter):
@@ -17,6 +24,9 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        request_id = request_id_var.get()
+        if request_id is not None:
+            payload["request_id"] = request_id
         fields = getattr(record, "structured_fields", None)
         if isinstance(fields, dict):
             payload.update(fields)
@@ -40,3 +50,9 @@ def configure_logging(level: str) -> None:
     ]
     root.addHandler(handler)
     root.setLevel(level.upper())
+
+
+def log_event(logger: logging.Logger, event: str, **fields: EventValue) -> None:
+    """Emit one structured audit or domain event; callers pass only non-sensitive values."""
+
+    logger.info(event, extra={"structured_fields": {"event": event, **fields}})

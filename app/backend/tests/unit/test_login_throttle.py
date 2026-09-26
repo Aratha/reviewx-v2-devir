@@ -1,16 +1,17 @@
-"""Failed-login rate limit contract tests."""
+"""Failed-login limits and trusted client address (application-foundation 001 Requirement 9)."""
 
-import secrets
-from collections.abc import AsyncIterator, Iterator
+from ipaddress import ip_network
 
 import pytest
-from fastapi import HTTPException, status
-from httpx import ASGITransport, AsyncClient
 
-from app.api.auth.endpoints import get_auth_service
-from app.core.config import get_settings
-from app.core.login_throttle import MAX_FAILED_ATTEMPTS, LoginThrottle, login_throttle
-from app.main import app
+from app.core.client_address import resolve_client_address
+from app.core.login_throttle import (
+    ADDRESS_MAX_FAILURES,
+    NAME_ADDRESS_MAX_FAILURES,
+    WINDOW_SECONDS,
+    LoginRateLimiter,
+    LoginThrottle,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -21,6 +22,12 @@ class _Clock:
 
     def __call__(self) -> float:
         return self.now
+
+
+def test_limits_follow_the_accepted_values() -> None:
+    assert NAME_ADDRESS_MAX_FAILURES == 5
+    assert ADDRESS_MAX_FAILURES == 30
+    assert WINDOW_SECONDS == 15 * 60
 
 
 def test_attempts_are_limited_inside_the_window_and_released_after_it() -> None:
@@ -39,49 +46,63 @@ def test_attempts_are_limited_inside_the_window_and_released_after_it() -> None:
     assert throttle.retry_after(key) is None
 
 
-def test_other_client_address_and_success_are_not_locked() -> None:
-    throttle = LoginThrottle(max_failures=1, window_seconds=60, clock=_Clock())
-    throttle.record_failure(("admin", "10.0.0.1"))
+def test_fifth_failure_of_one_name_and_address_blocks_only_that_pair() -> None:
+    limiter = LoginRateLimiter(clock=_Clock())
+    for _ in range(NAME_ADDRESS_MAX_FAILURES):
+        assert limiter.blocked("ad.soyad", "10.0.0.1") is None
+        limiter.record_failure("ad.soyad", "10.0.0.1")
 
-    assert throttle.retry_after(("admin", "10.0.0.1")) is not None
-    assert throttle.retry_after(("admin", "10.0.0.2")) is None
-    throttle.reset(("admin", "10.0.0.1"))
-    assert throttle.retry_after(("admin", "10.0.0.1")) is None
-
-
-class _RejectingService:
-    async def authenticate(self, username: str, password: str) -> None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    blocked = limiter.blocked("ad.soyad", "10.0.0.1")
+    assert blocked is not None and blocked[0] == "user" and blocked[1] > 0
+    # The same person from another address and another person from this address still pass,
+    # so an attacker cannot lock a real user out.
+    assert limiter.blocked("ad.soyad", "10.0.0.2") is None
+    assert limiter.blocked("baska.kisi", "10.0.0.1") is None
 
 
-@pytest.fixture
-def rejecting_login() -> Iterator[None]:
-    app.dependency_overrides[get_auth_service] = _RejectingService
-    try:
-        yield
-    finally:
-        app.dependency_overrides.pop(get_auth_service, None)
-        login_throttle.reset(("throttled-user", "127.0.0.1"))
+def test_thirtieth_failure_from_one_address_blocks_the_address() -> None:
+    limiter = LoginRateLimiter(clock=_Clock())
+    for index in range(ADDRESS_MAX_FAILURES):
+        limiter.record_failure(f"user-{index}", "10.0.0.9")
+
+    blocked = limiter.blocked("someone-new", "10.0.0.9")
+    assert blocked is not None and blocked[0] == "address"
+    assert limiter.blocked("someone-new", "10.0.0.10") is None
 
 
-@pytest.fixture
-async def client(rejecting_login: None) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app, client=("127.0.0.1", 50000))
-    async with AsyncClient(transport=transport, base_url="http://test") as test_client:
-        yield test_client
+def test_success_resets_only_the_user_counter() -> None:
+    limiter = LoginRateLimiter(clock=_Clock())
+    for _ in range(NAME_ADDRESS_MAX_FAILURES):
+        limiter.record_failure("ad.soyad", "10.0.0.1")
+    limiter.record_success("ad.soyad", "10.0.0.1")
+    assert limiter.blocked("ad.soyad", "10.0.0.1") is None
+    for _ in range(ADDRESS_MAX_FAILURES - NAME_ADDRESS_MAX_FAILURES):
+        limiter.record_failure("other", "10.0.0.1")
+    assert limiter.blocked("ad.soyad", "10.0.0.1") == ("address", WINDOW_SECONDS)
 
 
-async def test_login_endpoint_answers_429_after_repeated_failures(client: AsyncClient) -> None:
-    url = f"{get_settings().api_prefix}/auth/login"
-    body = {"username": "Throttled-User", "password": secrets.token_urlsafe(24)}
+TRUSTED = (ip_network("10.42.0.0/16"),)
 
-    for _ in range(MAX_FAILED_ATTEMPTS):
-        assert (await client.post(url, json=body)).status_code == 401
-    limited = await client.post(url, json=body)
 
-    assert limited.status_code == 429
-    assert int(limited.headers["Retry-After"]) > 0
+@pytest.mark.parametrize(
+    ("peer", "forwarded_for", "expected"),
+    (
+        # A request that did not come through the ingress cannot choose its own address.
+        ("203.0.113.7", "198.51.100.1", "203.0.113.7"),
+        ("10.42.3.4", "198.51.100.1", "198.51.100.1"),
+        ("10.42.3.4", "198.51.100.1, 10.42.9.9", "198.51.100.1"),
+        # Only the hops the trusted proxy appended count; a forged left-most value is skipped.
+        ("10.42.3.4", "1.2.3.4, 198.51.100.1", "198.51.100.1"),
+        ("10.42.3.4", "not-an-address", "10.42.3.4"),
+        ("10.42.3.4", None, "10.42.3.4"),
+        (None, "198.51.100.1", ""),
+    ),
+)
+def test_forwarded_for_is_honoured_only_from_the_trusted_ingress(
+    peer: str | None, forwarded_for: str | None, expected: str
+) -> None:
+    assert resolve_client_address(peer, forwarded_for, TRUSTED) == expected
+
+
+def test_without_trusted_networks_the_header_is_ignored() -> None:
+    assert resolve_client_address("10.42.3.4", "198.51.100.1", ()) == "10.42.3.4"

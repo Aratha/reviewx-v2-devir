@@ -38,8 +38,11 @@ def export_openapi(output: Path) -> dict[str, Any]:
         "in": "header",
         "name": settings.tenant_header,
     }
-    me_operation = raw_schema["paths"][f"{settings.api_prefix}/auth/me"]["get"]
-    me_operation["security"] = [{"HTTPBearer": [], "tenant": []}]
+    # Every bearer-protected operation also needs the active-tenant header.
+    for operations in raw_schema["paths"].values():
+        for operation in operations.values():
+            if {"HTTPBearer": []} in operation.get("security", []):
+                operation["security"] = [{"HTTPBearer": [], "tenant": []}]
     schema = cast(dict[str, Any], _canonicalize(raw_schema))
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n", encoding="utf-8")

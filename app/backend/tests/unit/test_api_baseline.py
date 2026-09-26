@@ -88,7 +88,7 @@ async def test_request_logging_is_correlated_and_excludes_request_data(
 async def test_me_requires_tenant_header_before_authentication(client: AsyncClient) -> None:
     response = await client.get(f"{get_settings().api_prefix}/auth/me")
     assert response.status_code == 400
-    assert response.json()["code"] == "tenant_header_required"
+    assert response.json()["detail"]["code"] == "tenant_header_required"
 
 
 async def test_me_authentication_error_has_bearer_challenge(client: AsyncClient) -> None:
@@ -99,6 +99,21 @@ async def test_me_authentication_error_has_bearer_challenge(client: AsyncClient)
     )
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"] == "Bearer"
+    assert response.json()["detail"]["code"] == "not_authenticated"
+
+
+@pytest.mark.parametrize("header", ("X-API-Key", "X-Admin-Key"))
+async def test_static_api_keys_carry_no_meaning(client: AsyncClient, header: str) -> None:
+    """application-foundation 001 Requirement 12: only the bearer session authenticates."""
+
+    settings = get_settings()
+    for path in ("/auth/me", "/admin/users"):
+        response = await client.get(
+            f"{settings.api_prefix}{path}",
+            headers={settings.tenant_header: str(uuid4()), header: "any-shared-key"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"]["code"] == "not_authenticated"
 
 
 async def test_openapi_contains_frontend_auth_contract(client: AsyncClient) -> None:

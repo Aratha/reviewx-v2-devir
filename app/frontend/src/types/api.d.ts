@@ -485,6 +485,242 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/llm-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Llm Calls
+         * @description Latest call summaries, newest first; metadata only.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LlmCallSummaryPage"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/llm-calls/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Llm Call
+         * @description One call summary with the same fields as the list.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    public_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LlmCallSummaryItem"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Özet yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/llm-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Llm Connection
+         * @description Format and model; addresses and key state only in the local environment.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LlmConnectionView"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Update Llm Connection
+         * @description Change the values of this process only; nothing is written to a file (local only).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LlmConnectionUpdate"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LlmConnectionView"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz adres veya kurum ağı dışı hedef */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/readiness": {
         parameters: {
             query?: never;
@@ -910,6 +1146,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/sql-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Sql Connection
+         * @description Environment and state; server, user and options only in the local environment.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SqlConnectionView"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Update Sql Connection
+         * @description Change the values of this process only; nothing is written to a file (local only).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SqlConnectionChange"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SqlConnectionView"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz sunucu veya kullanıcı adı */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/sql-connection/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Sql Connection
+         * @description Log in to master with the form values without saving them (local only).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SqlConnectionChange"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SqlConnectionTestResult"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Kural yöneticisi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz sunucu veya kullanıcı adı */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -934,6 +1335,55 @@ export interface components {
         };
         HTTPValidationError: {
             detail?: components["schemas"]["ValidationError"][];
+        };
+        LlmCallSummaryItem: {
+            attempt: number;
+            /** @enum {string} */
+            chat_api: "openai" | "api_v1_chat";
+            completion_tokens: number | null;
+            duration_ms: number;
+            endpoint_host: string;
+            http_status: number | null;
+            model: string;
+            object_label: string;
+            /** @enum {string} */
+            outcome: "ok" | "timeout" | "connect_error" | "tls_error" | "network_policy_denied" | "upstream_status" | "invalid_response" | "response_too_large" | "cancelled";
+            /** @description Empty for a single part, 1 or 2 otherwise. */
+            part_index: number | null;
+            prompt_tokens: number | null;
+            public_id: string;
+            response_chars: number | null;
+            review_run_id: string | null;
+            rule_id: string;
+            /** Format: date-time */
+            started_at: string;
+            streamed: boolean;
+        };
+        LlmCallSummaryPage: {
+            items: components["schemas"]["LlmCallSummaryItem"][];
+            limit: number;
+            total: number;
+        };
+        /** @description Partial change; a missing api_key keeps the stored key and an empty one removes it. */
+        LlmConnectionUpdate: {
+            api_key?: string | null;
+            base_url?: string | null;
+            chat_api?: ("openai" | "api_v1_chat") | null;
+            chat_url?: string | null;
+            model?: string | null;
+        };
+        /** @description Nonprod returns only environment, editable, chat_api and model. */
+        LlmConnectionView: {
+            api_key_set?: boolean | null;
+            base_url?: string | null;
+            /** @enum {string} */
+            chat_api: "openai" | "api_v1_chat";
+            chat_url?: string | null;
+            editable: boolean;
+            /** @enum {string} */
+            environment: "local" | "nonprod";
+            model: string;
+            resolved_chat_url?: string | null;
         };
         LoginRequest: {
             /** Format: password */
@@ -1011,6 +1461,36 @@ export interface components {
             normal: components["schemas"]["RuleItem"][];
             /** @description Draft change counter; save and publish must send it. */
             revision: number;
+        };
+        /** @description Partial values; a missing password keeps the stored one and an empty one removes it. */
+        SqlConnectionChange: {
+            encrypt?: boolean | null;
+            password?: string | null;
+            port?: number | null;
+            server?: string | null;
+            trust_server_certificate?: boolean | null;
+            user?: string | null;
+        };
+        SqlConnectionTestResult: {
+            /** @description Failure class of Requirement 8 or password_required; empty on success. */
+            code: string | null;
+            databases: string[];
+            message: string;
+            ok: boolean;
+        };
+        /** @description Nonprod returns only environment, editable and configured; never a password. */
+        SqlConnectionView: {
+            allowed_databases?: string[] | null;
+            configured: boolean;
+            editable: boolean;
+            encrypt?: boolean | null;
+            /** @enum {string} */
+            environment: "local" | "nonprod";
+            password_set?: boolean | null;
+            port?: number | null;
+            server?: string | null;
+            trust_server_certificate?: boolean | null;
+            user?: string | null;
         };
         UserPage: {
             items: components["schemas"]["UserSummary"][];

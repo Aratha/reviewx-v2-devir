@@ -1,0 +1,614 @@
+"""SQL Server connection string, error classes, allow-list, catalog filters and metadata limits.
+
+sql-review/PRDs/002-sql-server-connection Requirement 2, 6, 7 and 8 (Acceptance 1 and 2). A fake
+driver replaces pyodbc; it answers the ported catalog queries from an in-memory server model.
+"""
+
+import asyncio
+import logging
+import threading
+import time
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from typing import Any
+
+import pyodbc
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.core.config import get_settings
+from app.domain.sql_server import (
+    DatabaseNotAllowed,
+    SqlServerConnectionConfig,
+    SqlServerError,
+    SqlServerErrorClass,
+    SqlServerNotConfigured,
+)
+from app.infrastructure.sql_server import queries
+from app.infrastructure.sql_server.catalog_adapter import (
+    PyodbcSqlCatalog,
+    classify_driver_error,
+)
+from app.infrastructure.sql_server.connection_string import (
+    InvalidConnectionValue,
+    build_connection_string,
+)
+from app.infrastructure.sql_server.dependency_metadata import (
+    MAX_OBJECTS_WITH_COLUMNS,
+    MAX_OUTPUT_CHARS,
+    format_column_type,
+    split_sql_identifiers,
+    try_parse_three_part,
+)
+from app.main import app
+
+pytestmark = pytest.mark.unit
+
+PASSWORD = "p;w}d={x"
+CONFIG = SqlServerConnectionConfig(
+    server="sql.corp.example.test", port=1433, user="okuyucu", password=PASSWORD
+)
+
+
+def parse_connection_string(value: str) -> dict[str, str]:
+    """ODBC rules: a value in braces runs to the matching single '}' ('}}' is a literal)."""
+
+    result: dict[str, str] = {}
+    index = 0
+    while index < len(value):
+        equals = value.index("=", index)
+        key = value[index:equals]
+        index = equals + 1
+        if value[index] == "{":
+            index += 1
+            chars: list[str] = []
+            while True:
+                if value[index] == "}":
+                    if value[index + 1 : index + 2] == "}":
+                        chars.append("}")
+                        index += 2
+                        continue
+                    index += 1
+                    break
+                chars.append(value[index])
+                index += 1
+            parsed = "".join(chars)
+        else:
+            end = value.index(";", index)
+            parsed = value[index:end]
+            index = end
+        assert key not in result, f"duplicate keyword {key}"
+        result[key] = parsed
+        assert value[index] == ";"
+        index += 1
+    return result
+
+
+def test_connection_string_braces_every_credential_and_database() -> None:
+    config = SqlServerConnectionConfig(
+        server="sql.corp.example.test",
+        port=14330,
+        user="u;Server=evil",
+        password="p};Encrypt=no;{x=",
+        encrypt=True,
+        trust_server_certificate=False,
+    )
+
+    fields = parse_connection_string(build_connection_string(config, "DB;x}=1"))
+
+    assert fields == {
+        "Driver": "ODBC Driver 18 for SQL Server",
+        "Server": "sql.corp.example.test,14330",
+        "Database": "DB;x}=1",
+        "UID": "u;Server=evil",
+        "PWD": "p};Encrypt=no;{x=",
+        "Encrypt": "yes",
+        "TrustServerCertificate": "no",
+    }
+
+
+@pytest.mark.parametrize(
+    "server", ["sql\nhost", "sql;Encrypt=no", "sql{x}", "sql host", "sql=1", "sql\x00"]
+)
+def test_unsafe_server_names_are_rejected(server: str) -> None:
+    with pytest.raises(InvalidConnectionValue):
+        build_connection_string(SqlServerConnectionConfig(server, 1433, "u", "p"), "master")
+
+
+def test_server_names_with_instances_and_addresses_are_accepted() -> None:
+    for server in ("10.1.2.3", "sql-01.corp.example.test", "SQL01\\DWH", "[fd00::1]"):
+        assert build_connection_string(SqlServerConnectionConfig(server, 1433, "u", "p"), "master")
+
+
+def test_control_characters_in_the_user_name_are_rejected() -> None:
+    with pytest.raises(InvalidConnectionValue):
+        build_connection_string(SqlServerConnectionConfig("sql", 1433, "u\tx", "p"), "master")
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (("08001", "[08001] TCP Provider: Error code 0x2749"), "sql_server_unreachable"),
+        (("08S01", "[08S01] Communication link failure"), "sql_server_unreachable"),
+        (("28000", "[28000] Login failed for user 'x'."), "sql_login_failed"),
+        (("HYT00", "[HYT00] Login timeout expired (0)"), "sql_timeout"),
+        (("HYT01", "[HYT01] Connection timeout expired"), "sql_timeout"),
+        (
+            ("08001", "[08001] SSL Provider: certificate verify failed: unable to get issuer"),
+            "sql_tls_failed",
+        ),
+        (("42000", "[42000] Invalid object name 'x'."), "sql_query_failed"),
+        (
+            ("HYT00", "[HYT00] Login timeout expired; [08001] TCP Provider: timeout"),
+            "sql_server_unreachable",
+        ),
+        ((), "sql_query_failed"),
+    ],
+)
+def test_driver_errors_map_to_fixed_classes(args: tuple[str, ...], expected: str) -> None:
+    classified = classify_driver_error(pyodbc.OperationalError(*args))
+    assert classified.error_class.value == expected
+    assert "Login" not in classified.message and "Provider" not in classified.message
+
+
+# --- fake driver -------------------------------------------------------------------------
+
+
+@dataclass
+class FakeObject:
+    object_id: int
+    schema: str
+    name: str
+    type_code: str
+    definition: str | None = None
+    created: datetime | None = None
+    modified: datetime | None = None
+    references: list[tuple[str, str, int | None]] = field(default_factory=list)
+    columns: list[tuple[str, str, int, int, int, bool]] = field(default_factory=list)
+
+
+@dataclass
+class FakeServer:
+    databases: dict[str, list[FakeObject]] = field(default_factory=dict)
+    offline: set[str] = field(default_factory=set)
+    connections: list[str] = field(default_factory=list)
+    connection_strings: list[str] = field(default_factory=list)
+    delay_seconds: float = 0.0
+    active: int = 0
+    peak: int = 0
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    error: pyodbc.Error | None = None
+
+    def connect(
+        self, connection_string: str, *, timeout: int, autocommit: bool
+    ) -> "FakeConnection":
+        assert autocommit is True and timeout > 0
+        database = parse_connection_string(connection_string)["Database"]
+        self.connection_strings.append(connection_string)
+        self.connections.append(database)
+        if self.error is not None:
+            raise self.error
+        return FakeConnection(self, database)
+
+
+class FakeConnection:
+    def __init__(self, server: FakeServer, database: str) -> None:
+        self.server = server
+        self.database = database
+        self.timeout = 0
+
+    def cursor(self) -> "FakeCursor":
+        return FakeCursor(self)
+
+    def close(self) -> None:
+        pass
+
+
+class FakeCursor:
+    def __init__(self, connection: FakeConnection) -> None:
+        self.connection = connection
+        self.rows: list[tuple[Any, ...]] = []
+
+    @property
+    def objects(self) -> list[FakeObject]:
+        return self.connection.server.databases.get(self.connection.database, [])
+
+    def execute(self, sql: str, *params: Any) -> None:
+        server = self.connection.server
+        with server.lock:
+            server.active += 1
+            server.peak = max(server.peak, server.active)
+        try:
+            if server.delay_seconds:
+                time.sleep(server.delay_seconds)
+            self.rows = self._answer(sql, params)
+        finally:
+            with server.lock:
+                server.active -= 1
+
+    def _answer(self, sql: str, params: tuple[Any, ...]) -> list[tuple[Any, ...]]:
+        if sql == queries.LIST_DATABASES_SQL:
+            names = sorted(set(self.connection.server.databases) | {"master", "tempdb"})
+            return [(name,) for name in names if name not in self.connection.server.offline]
+        if sql == queries.LIST_OBJECTS_SQL:
+            ordered = sorted(self.objects, key=lambda o: (o.schema, o.name))
+            return [
+                (o.schema, o.name, o.type_code.ljust(2), _label(o.type_code), o.created, o.modified)
+                for o in ordered
+                if o.type_code in {"P", "V", "FN", "IF", "TF", "SF"}
+            ]
+        if sql == queries.GET_DEFINITION_SQL:
+            schema, name, type_code = params
+            return [
+                (o.definition,)
+                for o in self.objects
+                if (o.schema, o.name, o.type_code) == (schema, name, type_code)
+            ]
+        if sql == queries.REFERENCED_ENTITIES_SQL:
+            (qualified,) = params
+            match = [o for o in self.objects if f"{o.schema}.{o.name}" == qualified]
+            return list(match[0].references) if match else []
+        if sql == queries.OBJECT_BY_ID_SQL:
+            (object_id,) = params
+            return [(o.object_id, o.type_code) for o in self.objects if o.object_id == object_id]
+        if sql == queries.OBJECT_BY_NAME_SQL:
+            schema, name = params
+            return [
+                (o.object_id, o.type_code)
+                for o in self.objects
+                if (o.schema, o.name) == (schema, name)
+            ]
+        if sql == queries.SCHEMA_AND_NAME_BY_ID_SQL:
+            (object_id,) = params
+            return [(o.schema, o.name) for o in self.objects if o.object_id == object_id]
+        if sql == queries.columns_sql(len(params)):
+            wanted = set(params)
+            rows: list[tuple[Any, ...]] = []
+            for o in self.objects:
+                if o.object_id in wanted:
+                    for index, (name, type_name, length, precision, scale, nullable) in enumerate(
+                        o.columns, 1
+                    ):
+                        rows.append(
+                            (
+                                o.schema,
+                                o.name,
+                                o.type_code,
+                                name,
+                                type_name,
+                                length,
+                                precision,
+                                scale,
+                                nullable,
+                                index,
+                            )
+                        )
+            return rows
+        raise AssertionError("unexpected statement")
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return self.rows
+
+    def fetchone(self) -> tuple[Any, ...] | None:
+        return self.rows[0] if self.rows else None
+
+
+def _sql_datetime(year: int, month: int, day: int) -> datetime:
+    # sys.objects dates are SQL Server datetime values, which carry no time zone.
+    return datetime(year, month, day)  # noqa: DTZ001
+
+
+def _label(type_code: str) -> str:
+    return {"P": "PROCEDURE", "V": "VIEW", "FN": "FUNCTION_SCALAR", "U": "TABLE"}.get(
+        type_code, type_code
+    )
+
+
+def _catalog(
+    server: FakeServer,
+    *,
+    allowed: frozenset[str] = frozenset(),
+    config: SqlServerConnectionConfig = CONFIG,
+    max_concurrency: int = 4,
+) -> PyodbcSqlCatalog:
+    return PyodbcSqlCatalog(
+        config=lambda: config,
+        allowed_databases=allowed,
+        login_timeout_seconds=15,
+        query_timeout_seconds=60,
+        max_concurrency=max_concurrency,
+        connect=server.connect,
+    )
+
+
+@pytest.fixture
+def sql_logs() -> Iterator[list[logging.LogRecord]]:
+    records: list[logging.LogRecord] = []
+
+    class Handler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    handler = Handler()
+    target = logging.getLogger("app.sql_server")
+    previous = target.level
+    target.addHandler(handler)
+    target.setLevel(logging.DEBUG)
+    try:
+        yield records
+    finally:
+        target.removeHandler(handler)
+        target.setLevel(previous)
+
+
+async def test_databases_are_the_online_allow_listed_ones_case_insensitively() -> None:
+    server = FakeServer(
+        databases={"DWH_Sales": [], "dwh_risk": [], "Scratch": []}, offline={"dwh_risk"}
+    )
+    catalog = _catalog(server, allowed=frozenset({"dwh_sales", "DWH_RISK"}))
+    try:
+        assert await catalog.list_databases() == ["DWH_Sales"]
+    finally:
+        catalog.close()
+
+
+async def test_an_empty_local_allow_list_returns_every_online_database() -> None:
+    catalog = _catalog(FakeServer(databases={"A": [], "B": []}))
+    try:
+        assert await catalog.list_databases() == ["A", "B", "master", "tempdb"]
+    finally:
+        catalog.close()
+
+
+async def test_databases_outside_the_allow_list_never_reach_sql_server() -> None:
+    server = FakeServer(databases={"Secret": [FakeObject(1, "dbo", "p", "P", "select 1")]})
+    catalog = _catalog(server, allowed=frozenset({"dwh"}))
+    try:
+        for call in (
+            catalog.list_objects("Secret"),
+            catalog.fetch_definition("Secret", "dbo", "p", "P"),
+            catalog.fetch_object_metadata("Secret", "dbo", "p"),
+        ):
+            with pytest.raises(DatabaseNotAllowed):
+                await call
+        assert server.connections == []
+    finally:
+        catalog.close()
+
+
+async def test_calls_without_configuration_are_refused_before_connecting() -> None:
+    server = FakeServer()
+    catalog = _catalog(server, config=SqlServerConnectionConfig(server="sql", user="u"))
+    try:
+        with pytest.raises(SqlServerNotConfigured):
+            await catalog.list_databases()
+        assert server.connections == []
+    finally:
+        catalog.close()
+
+
+async def test_object_list_filters_by_text_and_date_like_the_source() -> None:
+    objects = [
+        FakeObject(
+            1,
+            "dbo",
+            "usp_Load",
+            "P",
+            created=_sql_datetime(2026, 1, 1),
+            modified=_sql_datetime(2026, 5, 2),
+        ),
+        FakeObject(2, "rpt", "vw_Sales", "V", created=_sql_datetime(2026, 6, 1), modified=None),
+        FakeObject(
+            3,
+            "dbo",
+            "fn_Old",
+            "FN",
+            created=_sql_datetime(2025, 1, 1),
+            modified=_sql_datetime(2025, 2, 1),
+        ),
+        FakeObject(4, "dbo", "Customers", "U"),
+    ]
+    catalog = _catalog(FakeServer(databases={"DWH": objects}))
+    try:
+        everything = await catalog.list_objects("DWH")
+        by_text = await catalog.list_objects("DWH", query="  PROCEDURE ")
+        by_date = await catalog.list_objects("DWH", from_date=date(2026, 5, 2))
+    finally:
+        catalog.close()
+
+    assert [(o.schema, o.name, o.type_code, o.type) for o in everything] == [
+        ("dbo", "fn_Old", "FN", "FUNCTION_SCALAR"),
+        ("dbo", "usp_Load", "P", "PROCEDURE"),
+        ("rpt", "vw_Sales", "V", "VIEW"),
+    ]
+    assert [o.name for o in by_text] == ["usp_Load"]
+    assert [o.name for o in by_date] == ["usp_Load", "vw_Sales"]
+
+
+async def test_definition_is_read_with_parameters_and_missing_is_none() -> None:
+    server = FakeServer(
+        databases={"DWH": [FakeObject(1, "dbo", "p", "P", "CREATE PROC p AS SELECT 1")]}
+    )
+    catalog = _catalog(server)
+    try:
+        assert (
+            await catalog.fetch_definition("DWH", "dbo", "p", " P ") == "CREATE PROC p AS SELECT 1"
+        )
+        assert await catalog.fetch_definition("DWH", "dbo", "missing", "P") is None
+    finally:
+        catalog.close()
+
+
+async def test_driver_failures_surface_as_classes_and_log_without_secrets(
+    sql_logs: list[logging.LogRecord],
+) -> None:
+    server = FakeServer(
+        error=pyodbc.OperationalError(
+            "28000", f"[28000] Login failed for user 'okuyucu' on sql.corp.example.test {PASSWORD}"
+        )
+    )
+    catalog = _catalog(server)
+    try:
+        with pytest.raises(SqlServerError) as raised:
+            await catalog.list_databases()
+    finally:
+        catalog.close()
+
+    assert raised.value.error_class is SqlServerErrorClass.LOGIN_FAILED
+    assert raised.value.__cause__ is None and raised.value.__suppress_context__
+    (event,) = [r for r in sql_logs if r.getMessage() == "sql_server.call"]
+    fields = event.structured_fields  # type: ignore[attr-defined]
+    assert fields["operation"] == "list_databases"
+    assert fields["outcome"] == "sql_login_failed" and fields["sqlstate"] == "28000"
+    rendered = repr(fields)
+    for secret in (PASSWORD, "okuyucu", "sql.corp.example.test", "Login failed"):
+        assert secret not in rendered
+
+
+async def test_successful_calls_log_operation_database_rows_and_duration(
+    sql_logs: list[logging.LogRecord],
+) -> None:
+    catalog = _catalog(FakeServer(databases={"DWH": [FakeObject(1, "dbo", "p", "P")]}))
+    try:
+        await catalog.list_objects("DWH")
+    finally:
+        catalog.close()
+    (event,) = [r for r in sql_logs if r.getMessage() == "sql_server.call"]
+    fields = event.structured_fields  # type: ignore[attr-defined]
+    assert fields["operation"] == "list_objects" and fields["database"] == "DWH"
+    assert fields["outcome"] == "ok" and fields["rows"] == 1 and fields["sqlstate"] is None
+    assert isinstance(fields["duration_ms"], int)
+
+
+def _chain(database: str, length: int, start: int = 1) -> list[FakeObject]:
+    """view_1 -> view_2 -> ... -> view_n, each with one column."""
+
+    objects: list[FakeObject] = []
+    for index in range(start, start + length):
+        references = [("dbo", f"view_{index + 1}", None)] if index < start + length - 1 else []
+        objects.append(
+            FakeObject(
+                index,
+                "dbo",
+                f"view_{index}",
+                "V",
+                references=references,
+                columns=[("c", "int", 4, 10, 0, False)],
+            )
+        )
+    return objects
+
+
+async def test_metadata_follows_dependencies_at_most_four_levels_deep() -> None:
+    objects = [FakeObject(100, "dbo", "usp_Root", "P", references=[("dbo", "view_1", None)])]
+    objects += _chain("DWH", 7)
+    catalog = _catalog(FakeServer(databases={"DWH": objects}))
+    try:
+        text = await catalog.fetch_object_metadata("DWH", "dbo", "usp_Root")
+    finally:
+        catalog.close()
+
+    assert text.startswith("Analiz kökü veritabanı: DWH\n")
+    assert "### Veritabanı: [DWH]" in text
+    listed = [line for line in text.splitlines() if line.startswith("- dbo.view_")]
+    assert listed == [f"- dbo.view_{n} (VIEW)" for n in range(1, 6)]
+
+
+async def test_metadata_is_capped_at_48_objects_and_95000_characters() -> None:
+    wide_columns = [(f"kolon_{n:03d}_" + "x" * 40, "nvarchar", 400, 0, 0, True) for n in range(60)]
+    targets = [
+        FakeObject(1000 + n, "dbo", f"tbl_{n:03d}", "U", columns=wide_columns) for n in range(60)
+    ]
+    root = FakeObject(
+        1, "dbo", "usp_Wide", "P", references=[("dbo", t.name, t.object_id) for t in targets]
+    )
+    catalog = _catalog(FakeServer(databases={"DWH": [root, *targets]}))
+    try:
+        text = await catalog.fetch_object_metadata("DWH", "dbo", "usp_Wide")
+    finally:
+        catalog.close()
+
+    assert len(text) <= MAX_OUTPUT_CHARS
+    assert text.endswith("[… metin uzunluk sınırı nedeniyle kesildi …]")
+    tables = {line for line in text.splitlines() if line.startswith("- dbo.tbl_")}
+    assert 0 < len(tables) <= MAX_OBJECTS_WITH_COLUMNS
+    assert "- dbo.tbl_048 (TABLE)" not in tables
+
+
+async def test_cross_database_lookup_scans_only_allowed_databases() -> None:
+    root = FakeObject(
+        1, "dbo", "usp_Root", "P", references=[("dbo", "Shared", None), ("dbo", "Hidden", None)]
+    )
+    server = FakeServer(
+        databases={
+            "DWH": [root],
+            "Ref": [FakeObject(7, "dbo", "Shared", "U", columns=[("id", "int", 4, 10, 0, False)])],
+            "Other": [
+                FakeObject(8, "dbo", "Hidden", "U", columns=[("gizli", "int", 4, 10, 0, False)])
+            ],
+        }
+    )
+    catalog = _catalog(server, allowed=frozenset({"DWH", "Ref"}))
+    try:
+        text = await catalog.fetch_object_metadata("DWH", "dbo", "usp_Root")
+    finally:
+        catalog.close()
+
+    assert "### Veritabanı: [Ref]" in text and "- dbo.Shared (TABLE)" in text
+    assert "Hidden" not in text and "gizli" not in text
+    assert "Other" not in server.connections
+
+
+async def test_a_failing_metadata_connection_is_reported_as_its_class() -> None:
+    server = FakeServer(error=pyodbc.OperationalError("08001", "[08001] TCP Provider"))
+    catalog = _catalog(server)
+    try:
+        with pytest.raises(SqlServerError) as raised:
+            await catalog.fetch_object_metadata("DWH", "dbo", "p")
+    finally:
+        catalog.close()
+    assert raised.value.error_class is SqlServerErrorClass.UNREACHABLE
+
+
+def test_ported_identifier_and_type_helpers_keep_the_source_semantics() -> None:
+    assert split_sql_identifiers("[Sales DB].[dbo].[Orders]") == ["Sales DB", "dbo", "Orders"]
+    assert split_sql_identifiers(" Ref . dbo.Shared") == ["Ref", "dbo", "Shared"]
+    assert try_parse_three_part("dbo", "Ref.dbo.Shared") == ("Ref", "dbo", "Shared")
+    assert try_parse_three_part("", "srv.Ref.dbo.Shared") == ("Ref", "dbo", "Shared")
+    assert try_parse_three_part("dbo", "Shared") is None
+    assert format_column_type("nvarchar", 100, 0, 0) == "nvarchar(50)"
+    assert format_column_type("varchar", -1, 0, 0) == "varchar(max)"
+    assert format_column_type("decimal", 9, 18, 2) == "decimal(18,2)"
+    assert format_column_type("datetime2", 8, 27, 7) == "datetime2(7)"
+
+
+async def test_a_slow_catalog_call_never_blocks_the_event_loop() -> None:
+    """Requirement 6: a 5 second SQL Server wait leaves the API answering under 200 ms."""
+
+    server = FakeServer(databases={"DWH": []}, delay_seconds=5.0)
+    catalog = _catalog(server)
+    prefix = get_settings().api_prefix
+    try:
+        slow = asyncio.create_task(catalog.list_databases())
+        await asyncio.sleep(0.1)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            started = time.monotonic()
+            response = await client.get(f"{prefix}/liveness")
+            elapsed = time.monotonic() - started
+        assert response.status_code == 200
+        assert elapsed < 0.2
+        assert not slow.done()
+        assert await slow == ["DWH", "master", "tempdb"]
+    finally:
+        catalog.close()
+
+
+async def test_concurrent_calls_never_exceed_the_configured_limit() -> None:
+    server = FakeServer(databases={"DWH": []}, delay_seconds=0.05)
+    catalog = _catalog(server, max_concurrency=2)
+    try:
+        await asyncio.gather(*(catalog.list_databases() for _ in range(8)))
+    finally:
+        catalog.close()
+    assert server.peak == 2

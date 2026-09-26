@@ -30,8 +30,12 @@ def _canonicalize(value: Any, path: tuple[str, ...] = ()) -> Any:
 
 
 def export_openapi(output: Path) -> dict[str, Any]:
-    raw_schema = create_application().openapi()
     settings = get_settings()
+    # The contract lists every route, including the settings write and test endpoints that only
+    # the local environment registers, whatever environment runs the export.
+    raw_schema = create_application(
+        settings.model_copy(update={"environment": "development"})
+    ).openapi()
     schemes = raw_schema.setdefault("components", {}).setdefault("securitySchemes", {})
     schemes["tenant"] = {
         "type": "apiKey",

@@ -39,3 +39,25 @@ kimliğini açıkça beyan eder, salt okunur kök dosya sistemi kullanır, büt�
 (yalnız `cache` profili açıkken kullanılır) ile arka uç imza anahtarının Git dışında üretilen yerel
 sırlarını verir (`scripts/README.md`). Compose bu sırları `stack.sh` olmadan başlatıldığında açık
 hatayla durur.
+
+## Aynı projenin ikinci kopyası
+
+Compose proje adı, yığının kapsayıcı, ağ, veri birimi ve derlenen imaj adlarının önüne gelir. Varsayılan
+ad ürün kısa adıdır (`dwhcodereview`). Aynı bilgisayarda projenin ikinci bir kopyası (örneğin ikinci
+bir Git çalışma ağacı) aynı adla çalışırsa, kendi yığınını kurmak yerine ilk kopyanın kapsayıcılarını
+ve veritabanını kullanır. İkinci kopyaya ayrı bir yığın vermek için onun Git'in yok saydığı
+`app/infra/.env` dosyasına farklı bir ad ve boş portlar yazın:
+
+~~~sh
+COMPOSE_PROJECT_NAME=dwhcodereview-2
+APP_HTTP_PORT=8081
+GRAFANA_PORT=3002
+~~~
+
+Kabuk ortamındaki `COMPOSE_PROJECT_NAME`, `app/infra/.env` içindekinin önüne geçer. Ad yalnız küçük
+harf, rakam ve kısa çizgi içerebilir; kısa çizgiyle başlayamaz ve bitemez. Geçersiz bir ad verilirse
+betik Docker'ı hiç çağırmadan açık bir iletiyle durur. `stack.sh` ve onu kullanan bütün betikler
+(`db.sh`, `quality-gate.sh`, `export-openapi.sh`, `generate-types.sh`, `create-super-admin.sh`) ile
+`compile-dependency-locks.sh` adı aynı yoldan, `scripts/compose-project.sh` ile çözer; bu yüzden hepsi
+aynı yığında çalışır. Tarayıcı testleri ikinci kopyada `APP_E2E_BASE=http://localhost:8081` ile o
+kopyanın portuna yönlendirilir. Yerel sırlar her kopyanın kendi `app/infra/.data/` dizininde durur.

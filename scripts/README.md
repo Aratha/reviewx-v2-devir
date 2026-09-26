@@ -18,10 +18,20 @@ doğrular. Trivy; çalışma zamanı/geliştirme bağımlılık kilitlerini, giz
 yanlış yapılandırmasını tarar; tek uygulama Helm paketini yalnız güvenlik taramasına ait sentetik imaj,
 gizli bilgi referansı, ağ eşleri ve giriş değerleriyle ayrı işler.
 
-`compile-dependency-locks.sh`, sabitlenmiş `pip-tools` aracını profilin Python 3.13 arka uç kapsayıcısında
-çalıştırır ve iki özet kilidini belirli doğrudan otoritelerden yeniden üretir. Aday envanteri kabul
-etmeden kontrol edip yazdırır. Yönetişim yeni özetle sürüm/istisna kanıtını kaydeder ve birleştirme
-öncesinde tam kalite ve güvenlik kapılarını çalıştırır.
+`compile-dependency-locks.sh`, arka uç kilitlerini (`requirements.txt`, `requirements-dev.txt` ve
+`requirements-llm.txt`) `app/backend/*.in` dosyalarından yeniden üretir. Önce aday envanteri kabul
+etmeden kontrol edip yazdırır. Sonra `stack.sh build backend` ile yerel yığının kullandığı arka uç
+geliştirme imajını derler; kilitler böylece uygulamanın çalıştığı Python 3.13 sürümüyle üretilir.
+Sabitlenmiş `pip-tools` aracını bu imajdan açılan ve iş bitince silinen ayrı bir kapsayıcıda
+(`docker run --rm`) çalıştırır. Bu kapsayıcı komutu çalıştıran kullanıcının kimliğiyle çalışır, böylece
+kilit dosyaları o kullanıcıya ait kalır; `app/backend` dizinini bağlar ve paket deposuna Docker'ın
+varsayılan ağından ulaşır. Yerel yığının dışa kapalı ağı değişmez. Kapsayıcıya yalnız vekil sunucu
+(`proxy`, dış ağa çıkışı aracılayan sunucu) değişkenleri `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` ve
+küçük harfli karşılıkları adıyla geçer; değerleri komut satırında görünmez. Paket deposu ayarı
+(`PIP_INDEX_URL` gibi) geçmez, çünkü `pip-compile` varsayılan dışındaki depo adresini içindeki kimlik
+bilgisiyle birlikte kilit dosyasına yazar. Docker yoksa, çalışmıyorsa veya imaj derlenemezse betik
+açık bir iletiyle durur. Yönetişim yeni özetle sürüm/istisna kanıtını kaydeder ve birleştirme öncesinde
+tam kalite ve güvenlik kapılarını çalıştırır.
 
 `verify-offline-bundle.sh` CI/derleme kabul sınırıdır. Banka yönetimli iki değeri, mühürlü yapıtları ve
 ana makine platformunu doğrular; Python wheel deposu, npm önbelleği, Playwright tarayıcı ağacı veya
@@ -45,6 +55,11 @@ içinde tanımlı bir değer üretileni geçersiz kılar. Yığını yeniden olu
 korur. İmza anahtarını silmek bütün yerel oturumları geçersiz kılar; PostgreSQL parolası veri birimi
 ilk oluşturulurken uygulandığı için parolayı değiştirmek `stack.sh down --volumes` ile yerel veriyi
 silmeyi gerektirir. Bu sırlar paylaşılan veya dağıtılmış ortamda kullanılmaz.
+
+`stack.sh` ve `compile-dependency-locks.sh`, Compose proje adını `compose-project.sh` ile çözer:
+varsayılan ürün kısa adıdır, `COMPOSE_PROJECT_NAME` onu değiştirir. Aynı projenin ikinci kopyasını ayrı
+bir yığınla çalıştırmak için `app/infra/README.md` içindeki "Aynı projenin ikinci kopyası" bölümüne
+bakın.
 
 `db.sh`, `KT_SCAFFOLD_TEST_DATABASE` adı `_test` ile biten bir veritabanını gösterdiğinde arka ucun
 yapılandırılmış bağlantısında yalnız veritabanı adını değiştirir; parola komut satırına çıkmaz.

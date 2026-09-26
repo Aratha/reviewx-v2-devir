@@ -5,6 +5,8 @@ root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 base="$root/app/infra/docker-compose.local.yml"
 observability="$root/app/infra/docker-compose.observability.yml"
 dotenv="$root/app/infra/.env"
+. "$root/scripts/compose-project.sh"
+project="$(compose_project_name "$root")" || exit 1
 
 # Hand the disposable local secrets to Compose. A value already in the shell environment or in the
 # developer's Git-ignored app/infra/.env takes precedence over the generated one.
@@ -24,8 +26,8 @@ provide POSTGRES_PASSWORD postgres-password
 provide REDIS_PASSWORD redis-password
 
 if [ -f "$observability" ]; then
-  set -- docker compose --project-directory "$root/app/infra" -p "dwhcodereview" -f "$base" -f "$observability" "$@"
+  set -- docker compose --project-directory "$root/app/infra" -p "$project" -f "$base" -f "$observability" "$@"
 else
-  set -- docker compose --project-directory "$root/app/infra" -p "dwhcodereview" -f "$base" "$@"
+  set -- docker compose --project-directory "$root/app/infra" -p "$project" -f "$base" "$@"
 fi
 exec "$@"

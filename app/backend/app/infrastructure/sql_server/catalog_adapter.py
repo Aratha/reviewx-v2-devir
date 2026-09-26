@@ -4,7 +4,8 @@ Every driver call runs in a thread pool of ``DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY
 on the event loop (Requirement 6). Login and query timeouts come from the settings. The
 allow-list is applied before any connection opens (Requirement 7). Driver errors become the
 fixed classes of Requirement 8; the only log is one ``sql_server.call`` event per operation
-without server, user, password, SQL text or driver message.
+without server, user, password, SQL text or driver message, and the only telemetry is one span and
+the Gözlemlenebilirlik metrics per operation, without the database name either.
 """
 
 import asyncio
@@ -20,6 +21,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import pyodbc
 
 from app.core.logging import log_event
+from app.core.telemetry import sql_server_call
 from app.domain.sql_server import (
     CatalogObject,
     DatabaseNotAllowed,
@@ -168,24 +170,27 @@ class PyodbcSqlCatalog:
         outcome = "ok"
         sqlstate: str | None = None
         rows: int | None = None
-        try:
-            result = await asyncio.get_running_loop().run_in_executor(self._executor, work)
-            rows = len(result) if isinstance(result, list) else int(bool(result))
-        except pyodbc.Error as error:
-            classified = classify_driver_error(error)
-            outcome, sqlstate = classified.error_class.value, classified.sqlstate
-            raise classified from None
-        finally:
-            log_event(
-                logger,
-                "sql_server.call",
-                operation=operation,
-                database=database,
-                outcome=outcome,
-                sqlstate=sqlstate,
-                duration_ms=int((time.monotonic() - started) * 1000),
-                rows=rows,
-            )
+        with sql_server_call(operation) as call:
+            try:
+                result = await asyncio.get_running_loop().run_in_executor(self._executor, work)
+                rows = len(result) if isinstance(result, list) else int(bool(result))
+                call.outcome = outcome
+            except pyodbc.Error as error:
+                classified = classify_driver_error(error)
+                outcome, sqlstate = classified.error_class.value, classified.sqlstate
+                call.outcome = outcome
+                raise classified from None
+            finally:
+                log_event(
+                    logger,
+                    "sql_server.call",
+                    operation=operation,
+                    database=database,
+                    outcome=outcome,
+                    sqlstate=sqlstate,
+                    duration_ms=int((time.monotonic() - started) * 1000),
+                    rows=rows,
+                )
         return result
 
     def _open(

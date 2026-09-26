@@ -50,6 +50,7 @@ from tests.fakes.llm_server import (
     sse_head,
     write_pki,
 )
+from tests.fakes.telemetry import TelemetryCapture
 
 pytestmark = pytest.mark.unit
 
@@ -650,3 +651,84 @@ async def test_no_prompt_sql_or_response_text_reaches_the_logs(
         rendered = record.getMessage() + repr(getattr(record, "structured_fields", {}))
         rendered += repr(record.args) + repr(record.exc_info)
         assert MARKER not in rendered
+
+
+async def test_attempts_emit_the_prd_metrics_and_content_free_spans(
+    server: FakeLlmServer, no_retry_wait: None, telemetry_capture: TelemetryCapture
+) -> None:
+    """Gözlemlenebilirlik: calls, duration, in-flight, tokens, retries and one span per attempt."""
+
+    async def hang(request: RecordedRequest, writer: Writer) -> None:
+        await asyncio.sleep(10)
+
+    api_key = f"anahtar-{MARKER}"
+    server.scenario = hang
+    timed_out = await _one_call(
+        _chat(server, Recorder(), api_key=api_key, read_timeout=0.3, retries=1)
+    )
+    server.scenario = reply(
+        http_response(
+            200,
+            json.dumps(
+                {"choices": [{"message": {"content": MARKER}}], "usage": {"completion_tokens": 7}}
+            ).encode(),
+        )
+    )
+    ok = await _one_call(_chat(server, Recorder(), api_key=api_key))
+
+    assert timed_out.outcome is LlmCallOutcome.TIMEOUT and ok.outcome is LlmCallOutcome.OK
+    calls = "dwhcodereview_llm_calls_total"
+    assert telemetry_capture.value(calls, outcome="timeout", chat_api="openai") == 2
+    assert telemetry_capture.value(calls, outcome="ok", chat_api="openai") == 1
+    assert telemetry_capture.value("dwhcodereview_llm_retries_total") == 1
+    assert telemetry_capture.value("dwhcodereview_llm_completion_tokens_total") == 7
+    assert telemetry_capture.value("dwhcodereview_llm_inflight_calls") == 0
+    assert {
+        labels["outcome"]
+        for labels, _ in telemetry_capture.points("dwhcodereview_llm_call_duration_seconds")
+    } == {"timeout", "ok"}
+
+    spans = telemetry_capture.spans("llm chat")
+    assert [dict(span.attributes or {}) for span in spans] == [
+        {
+            "gen_ai.request.model": "test-model",
+            "dwhcodereview.llm.attempt": 1,
+            "dwhcodereview.llm.outcome": "timeout",
+        },
+        {
+            "gen_ai.request.model": "test-model",
+            "dwhcodereview.llm.attempt": 2,
+            "dwhcodereview.llm.outcome": "timeout",
+        },
+        {
+            "gen_ai.request.model": "test-model",
+            "dwhcodereview.llm.attempt": 1,
+            "dwhcodereview.llm.outcome": "ok",
+            "http.response.status_code": 200,
+        },
+    ]
+    captured = telemetry_capture.everything()
+    for forbidden in (MARKER, HOST_NAME, "/v1/chat/completions", "Musteri", "Kural05"):
+        assert forbidden not in captured
+
+
+async def test_a_cancelled_attempt_is_counted_as_cancelled(
+    server: FakeLlmServer, telemetry_capture: TelemetryCapture
+) -> None:
+    started = asyncio.Event()
+
+    async def hang(request: RecordedRequest, writer: Writer) -> None:
+        started.set()
+        await asyncio.sleep(10)
+
+    server.scenario = hang
+    task = asyncio.create_task(_one_call(_chat(server, Recorder())))
+    await asyncio.wait_for(started.wait(), 5)
+    assert telemetry_capture.value("dwhcodereview_llm_inflight_calls") == 1
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    calls = "dwhcodereview_llm_calls_total"
+    assert telemetry_capture.value(calls, outcome="cancelled", chat_api="openai") == 1
+    assert telemetry_capture.value("dwhcodereview_llm_inflight_calls") == 0

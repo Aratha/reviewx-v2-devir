@@ -42,6 +42,7 @@ from app.infrastructure.sql_server.dependency_metadata import (
     try_parse_three_part,
 )
 from app.main import app
+from tests.fakes.telemetry import TelemetryCapture
 
 pytestmark = pytest.mark.unit
 
@@ -612,3 +613,66 @@ async def test_concurrent_calls_never_exceed_the_configured_limit() -> None:
     finally:
         catalog.close()
     assert server.peak == 2
+
+
+async def test_calls_emit_the_prd_metrics_and_spans_without_names_or_secrets(
+    telemetry_capture: TelemetryCapture,
+) -> None:
+    """Gözlemlenebilirlik: calls, duration and in-flight gauge by operation and outcome class."""
+
+    ok = _catalog(FakeServer(databases={"DWH_Secret_Sales": [FakeObject(1, "dbo", "p", "P")]}))
+    failing = _catalog(
+        FakeServer(
+            error=pyodbc.OperationalError(
+                "28000", f"[28000] Login failed for user 'okuyucu' {PASSWORD}"
+            )
+        )
+    )
+    try:
+        await ok.list_objects("DWH_Secret_Sales", query="musteri")
+        with pytest.raises(SqlServerError):
+            await failing.fetch_definition("DWH_Secret_Sales", "dbo", "p", "P")
+    finally:
+        ok.close()
+        failing.close()
+
+    calls = "dwhcodereview_sql_server_calls_total"
+    assert telemetry_capture.value(calls, operation="list_objects", outcome="ok") == 1
+    assert (
+        telemetry_capture.value(calls, operation="fetch_definition", outcome="sql_login_failed")
+        == 1
+    )
+    assert {
+        labels["operation"]
+        for labels, _ in telemetry_capture.points("dwhcodereview_sql_server_call_duration_seconds")
+    } == {"list_objects", "fetch_definition"}
+    assert telemetry_capture.value("dwhcodereview_sql_server_inflight") == 0
+    (failed_span,) = telemetry_capture.spans("sql_server fetch_definition")
+    assert failed_span.attributes is not None
+    assert failed_span.attributes["dwhcodereview.outcome"] == "sql_login_failed"
+    captured = telemetry_capture.everything()
+    for forbidden in (
+        "DWH_Secret_Sales",
+        "musteri",
+        PASSWORD,
+        "okuyucu",
+        "sql.corp.example.test",
+        "Login failed",
+        "SELECT",
+    ):
+        assert forbidden not in captured
+
+
+async def test_the_in_flight_gauge_counts_calls_waiting_for_the_pool(
+    telemetry_capture: TelemetryCapture,
+) -> None:
+    server = FakeServer(databases={"DWH": []}, delay_seconds=0.2)
+    catalog = _catalog(server, max_concurrency=1)
+    try:
+        calls = [asyncio.create_task(catalog.list_databases()) for _ in range(3)]
+        await asyncio.sleep(0.05)
+        assert telemetry_capture.value("dwhcodereview_sql_server_inflight") == 3
+        await asyncio.gather(*calls)
+    finally:
+        catalog.close()
+    assert telemetry_capture.value("dwhcodereview_sql_server_inflight") == 0

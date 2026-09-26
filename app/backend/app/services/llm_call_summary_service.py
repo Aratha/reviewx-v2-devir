@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.errors import ApplicationError
 from app.core.logging import log_event
 from app.core.request_context import RequestContext
+from app.core.telemetry import record_llm_call_summary_write_failure
 from app.domain.llm import LlmCallAttempt
 from app.domain.models.llm_call import LLM_CALL_SUMMARY_RETENTION_DAYS, LlmCallSummary
 from app.infrastructure.repositories.llm_call_summary_repository import (
@@ -76,6 +77,7 @@ class LlmCallSummaryRecorder:
                 await session.commit()
         except Exception as error:  # noqa: BLE001 - Requirement 10: the review continues
             log_event(logger, "llm_call_summary.write_failed", error_type=type(error).__name__)
+            record_llm_call_summary_write_failure()
 
 
 def _item(summary: LlmCallSummary, review_run_public_id: str | None) -> LlmCallSummaryItem:

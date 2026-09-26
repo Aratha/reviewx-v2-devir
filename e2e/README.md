@@ -2,8 +2,14 @@
 
 Kalıcı tarayıcı paketi varsayılan `http://localhost:8080` olmak üzere `APP_E2E_BASE` üzerinde çalışır.
 Süreç kaynaklı `super-admin` kimlik bilgilerini kullanır ve depoya işlemez. Temel senaryo; korumalı
-yönlendirme, oturum açma, JWT kalıcılığı, kiracı uygulaması, veritabanı destekli `/auth/me`, yeniden
-yükleme sonrası kurtarma ve oturum kapatma temizliği davranışını kanıtlar. İstemciden bağımsız
+yönlendirme, oturum açma, belirtecin yalnız bellekte tutulması, kiracı uygulaması, veritabanı destekli
+`/auth/me`, yeniden yüklemede yenileme çereziyle kurtarma ve oturum kapatma temizliği davranışını kanıtlar.
+
+`sql-review` paketi ayrıca `scripts/create-local-user.sh --role ...` ile açılmış yerel hesapları
+ortam değişkenlerinden alır: `APP_E2E_REVIEWER_USER`/`_PASS`, `APP_E2E_SECOND_REVIEWER_USER`/`_PASS`
+(ikisi `inceleyici`) ve `APP_E2E_RULE_MANAGER_USER`/`_PASS` (`kural-yoneticisi`). Arka ucun ulaşabildiği
+OpenAI uyumlu bir LLM adresi `APP_E2E_LLM_BASE_URL` (isteğe bağlı `APP_E2E_LLM_MODEL`) ile verilirse
+tam SQL betiği incelemesi çalışır; verilmezse yalnız "LLM bağlantısı yapılandırılmamış" reddi doğrulanır. İstemciden bağımsız
 Node.js/Playwright kodudur; eklenti kurmaz veya ikinci MCP sunucusu açmaz. Tarayıcı çalıştırılabilir
 dosyaları kontrollü çevrimdışı paketten gelmeli ve
 `PLAYWRIGHT_BROWSERS_PATH` ile seçilmelidir.

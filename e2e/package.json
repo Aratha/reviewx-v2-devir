@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "auth": "node auth/run-all.mjs"
+    "auth": "node auth/run-all.mjs",
+    "sql-review": "node sql-review/run-all.mjs"
   },
   "dependencies": {
     "@playwright/test": "1.62.1"

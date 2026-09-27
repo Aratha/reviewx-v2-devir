@@ -6,9 +6,16 @@ bir SQL Server'a karşı yapılan yerel gözlem Task 9'dadır.
 
 - [x] Task V1 — Requirement 1 / Acceptance 1: tipli ayar alanları ve aralık doğrulaması. Kanıt:
   `app/backend/tests/unit/test_config.py`, `python3 scripts/check-config-sync.py`.
-- [x] Task 1 — Requirement 1, Decision 5, 6, 10 / Acceptance 1: başlangıç denetimi (`nonprod`'da
-  eksik değer, sistem veritabanı, şifreleme kapalı, sertifikaya güven açık; her ortamda biçimsiz
-  sunucu/kullanıcı). Kanıt: `app/backend/tests/unit/test_integration_settings.py`.
+- [x] Task 1 — Requirement 1, Decision 5, 6, 10, 11 / Acceptance 1: başlangıç denetimi (`nonprod`'da
+  tam bağlantıda boş izin listesi, sistem veritabanı, şifreleme kapalı, sertifikaya güven açık; her
+  ortamda biçimsiz sunucu/kullanıcı) ve eksik bağlantıda "yapılandırılmamış" olarak başlama. Kanıt:
+  `app/backend/tests/unit/test_integration_settings.py`
+  (`test_nonprod_without_a_complete_sql_server_connection_starts_unconfigured`,
+  `test_a_complete_nonprod_connection_still_requires_the_allow_list`,
+  `test_nonprod_without_sql_server_credentials_reports_not_configured`). 2026-09-27'de yayın backend
+  imajı `staging` ayarlarıyla ve SQL Server hesabı olmadan yerelde açıldı: hazır olma yoklaması 200,
+  `GET /sql-connection` `configured: false`, `GET /databases` 503 `sql_connection_not_configured`
+  (kubernetes-delivery Task 5).
 - [x] Task 2 — Requirement 2, 8 / Acceptance 1: bağlantı dizesi yardımcısı ve SQLSTATE hata
   sınıfları. Kanıt: `app/backend/tests/unit/test_sql_server_adapter.py`
   (`test_connection_string_*`, `test_unsafe_server_names_are_rejected`,

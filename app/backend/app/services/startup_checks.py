@@ -1,11 +1,12 @@
 """Start-up refusal of unsafe integration settings.
 
-sql-review/PRDs/002-sql-server-connection Requirement 1 (Decision 5 and 6) and
-006-llm-connection Requirement 1 and 2: in nonprod the SQL Server connection must be complete,
-encrypted with a verified certificate and limited to business databases, and the LLM endpoint
-must be https with a model. In nonprod a configured OpenTelemetry collector endpoint must be
-https as well. In every environment configured values must be well formed. Only setting names are
-reported, never values.
+sql-review/PRDs/002-sql-server-connection Requirement 1 (Decision 5, 6 and 11) and
+006-llm-connection Requirement 1 and 2: in nonprod the SQL Server connection must be encrypted
+with a verified certificate and, once server, user and password are all set, limited to business
+databases; an incomplete connection only leaves the SQL Server area not configured. The LLM
+endpoint must be https with a model. In nonprod a configured OpenTelemetry collector endpoint
+must be https as well. In every environment configured values must be well formed. Only setting
+names are reported, never values.
 """
 
 from pathlib import Path
@@ -54,14 +55,15 @@ def integration_setting_errors(settings: Settings) -> list[str]:
     if local:
         return errors
 
-    if not settings.mssql_server.strip():
-        errors.append("DWHCODEREVIEW_MSSQL_SERVER")
-    if not settings.mssql_user.strip():
-        errors.append("DWHCODEREVIEW_MSSQL_USER")
-    if settings.mssql_password is None:
-        errors.append("DWHCODEREVIEW_MSSQL_PASSWORD")
+    # Without server, user or password the SQL Server area is not configured and the process
+    # starts (Decision 11); a usable connection is never left without the allow-list.
+    connection_complete = bool(
+        settings.mssql_server.strip()
+        and settings.mssql_user.strip()
+        and settings.mssql_password is not None
+    )
     allowed = settings.mssql_allowed_database_names
-    if not allowed or allowed & SYSTEM_DATABASES:
+    if (connection_complete and not allowed) or allowed & SYSTEM_DATABASES:
         errors.append("DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES")
     if not settings.mssql_encrypt:
         errors.append("DWHCODEREVIEW_MSSQL_ENCRYPT")

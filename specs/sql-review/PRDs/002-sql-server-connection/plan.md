@@ -1,6 +1,6 @@
 # Plan — sql-server-connection
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.2.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 
 ## Katmanlar ve dosyalar
@@ -8,7 +8,7 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 | Katman | Dosyalar | Gereksinim |
 |---|---|---|
 | Ayarlar | `app/backend/app/core/config.py` (`DWHCODEREVIEW_MSSQL_*`), `app/backend/.env.example`, `app/infra/docker-compose.local.yml` | Requirement 1 |
-| Başlangıç denetimi | `app/backend/app/services/startup_checks.py`, `app/backend/app/main.py` (uygulama yaşam döngüsü) | Requirement 1, Decision 5, 6, 10 |
+| Başlangıç denetimi | `app/backend/app/services/startup_checks.py`, `app/backend/app/main.py` (uygulama yaşam döngüsü) | Requirement 1, Decision 5, 6, 10, 11 |
 | Port | `app/backend/app/domain/sql_server.py` (`SqlCatalogPort`, `SqlConnectionProbe`, hata sınıfları, sabit Türkçe iletiler) | Decision 2, Requirement 8 |
 | Bağlantı dizesi | `app/backend/app/infrastructure/sql_server/connection_string.py` | Requirement 2, Decision 1 |
 | Sorgular | `app/backend/app/infrastructure/sql_server/queries.py`, `dependency_metadata.py` (kaynaktaki `db/queries.py` ve `services/dependency_metadata.py`) | Requirement 7 |
@@ -36,7 +36,9 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
   metni yalnız sınıflandırmada kullanılır; kullanıcıya, loga ve istisna zincirine geçmez.
 - İzin listesi büyük/küçük harf duyarsızdır ve her işlemden önce, bağlantı açılmadan uygulanır
   (`DatabaseNotAllowed`; 403 eşlemesi uçların sahibi olan nesne incelemesi PRD'sindedir). Boş liste
-  yalnız `local`'de olabilir ve bütün çevrimiçi veritabanları demektir.
+  `local`'de bütün çevrimiçi veritabanları demektir. `nonprod`'da boş liste yalnız bağlantı
+  yapılandırılmamışken olabilir; uyarlayıcı her çağrıda önce bağlantıyı denetlediği için çağrı izin
+  listesine gelmeden 503 `sql_connection_not_configured` alır (Decision 11).
 - Nesne meta verisi kaynaktaki genişlik öncelikli taramayı korur (derinlik 4, en çok 48 veritabanı
   taraması, 95.000 karakter kesme, iç hataların atlanması); çapraz veritabanı çözümü yalnız izinli
   ve çevrimiçi veritabanlarında arar. 48 nesne sınırı kaynakta yalnız kuyruk adımları arasında
@@ -59,9 +61,10 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 
 ## Dağıtım bağımlılığı
 
-Runtime Secret anahtarları, sır olmayan değerlerin chart'a taşınması ve tek adresli ağ çıkış
-kuralı [Kubernetes teslim PRD'sinindir](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md);
-bu teslimde `helm/` değişmedi.
+Runtime Secret anahtarları (`helm/dwhcodereview/deploy-hooks.sh`), sır olmayan değerlerin
+`helm/dwhcodereview/values-project.yaml` ile chart'a taşınması ve SQL Server ağ çıkış kuralı
+[Kubernetes teslim PRD'sinindir](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md).
+Adres gelene kadar değer katmanında SQL Server adresi ve izin listesi yoktur (Decision 11).
 
 ## Doğrulama komutları
 

@@ -1,6 +1,6 @@
 """Start-up refusal of unsafe integration settings and environment-dependent routes.
 
-sql-review/PRDs/002-sql-server-connection Requirement 1 and 5 (Decision 5, 6, 10) and
+sql-review/PRDs/002-sql-server-connection Requirement 1 and 5 (Decision 5, 6, 10, 11) and
 006-llm-connection Requirement 1, 2 and 13 (Acceptance 1).
 """
 
@@ -11,7 +11,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings
+from app.domain.sql_server import SqlServerConnectionConfig
 from app.main import UnsafeIntegrationSettings, create_application
+from app.services.sql_connection_service import (
+    SqlConnectionService,
+    SqlConnectionStore,
+    initial_sql_connection,
+)
 from app.services.startup_checks import integration_setting_errors
 
 pytestmark = pytest.mark.unit
@@ -50,12 +56,60 @@ def test_empty_local_settings_start_unconfigured() -> None:
     assert integration_setting_errors(_settings(environment="development")) == []
 
 
+_SQL_SERVER_CONNECTION = {
+    "mssql_server": "",
+    "mssql_user": "",
+    "mssql_password": "",
+    "mssql_allowed_databases": "",
+}
+
+
+@pytest.mark.parametrize(
+    "blank",
+    [
+        tuple(_SQL_SERVER_CONNECTION),
+        ("mssql_server", "mssql_allowed_databases"),
+        ("mssql_user", "mssql_password"),
+        ("mssql_password",),
+        ("mssql_server",),
+    ],
+)
+def test_nonprod_without_a_complete_sql_server_connection_starts_unconfigured(
+    blank: tuple[str, ...],
+) -> None:
+    # Owner decision 2026-09-27: nonprod starts without operator-supplied SQL Server credentials
+    # or address; the SQL Server area then reports "not configured".
+    settings = _settings(**{**NONPROD_OK, **{name: "" for name in blank}})
+    assert integration_setting_errors(settings) == []
+
+
+def test_a_complete_nonprod_connection_still_requires_the_allow_list() -> None:
+    errors = integration_setting_errors(_settings(**{**NONPROD_OK, "mssql_allowed_databases": ""}))
+    assert errors == ["DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"]
+
+
+async def test_nonprod_without_sql_server_credentials_reports_not_configured() -> None:
+    settings = _settings(**{**NONPROD_OK, **_SQL_SERVER_CONNECTION})
+    application = create_application(settings)
+    async with application.router.lifespan_context(application):
+        view = SqlConnectionService(
+            settings=settings,
+            store=SqlConnectionStore(initial_sql_connection(settings)),
+            probe=_UnusedProbe(),
+        ).view()
+    assert (view.environment, view.editable, view.configured) == ("nonprod", False, False)
+
+
+class _UnusedProbe:
+    async def probe(
+        self, config: SqlServerConnectionConfig
+    ) -> list[str]:  # pragma: no cover - never called
+        raise AssertionError("nonprod never probes")
+
+
 @pytest.mark.parametrize(
     ("change", "setting"),
     [
-        ({"mssql_server": ""}, "DWHCODEREVIEW_MSSQL_SERVER"),
-        ({"mssql_user": ""}, "DWHCODEREVIEW_MSSQL_USER"),
-        ({"mssql_password": ""}, "DWHCODEREVIEW_MSSQL_PASSWORD"),
         ({"mssql_allowed_databases": ""}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),
         ({"mssql_allowed_databases": "DWH_Sales,MASTER"}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),
         ({"mssql_allowed_databases": "tempdb"}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),

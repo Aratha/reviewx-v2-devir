@@ -2,24 +2,24 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.2.0
 
 Acceptance date: 2026-09-27
 
 Domain: [sql-review](../../DOMAIN.md)
 
 Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
-benimseyerek kabul etti.
+(Decision 11 dahil) benimseyerek kabul etti.
 
 ## Amaç
 
-Uygulama, SQL Server veri ambarına ortama göre yapılandırılan salt okunur hesapla bağlanır; veritabanı listesini, **Nesne** listesini, Nesnenin SQL tanımını ve **Nesne meta verisini** yalnız okuma sorgularıyla getirir. Bağlantı ayarı **Ortam** `local` iken arayüzden düzenlenebilir; `nonprod` iken yalnız **Runtime Secret** `dwhcodereview-runtime` üzerinden gelir ve arayüzden değiştirilemez. SQL Server çağrıları uygulamanın diğer isteklerini bekletmez; hatalar kullanıcıya sabit, iç ayrıntı içermeyen iletilerle döner.
+Uygulama, SQL Server veri ambarına ortama göre yapılandırılan salt okunur hesapla bağlanır; veritabanı listesini, **Nesne** listesini, Nesnenin SQL tanımını ve **Nesne meta verisini** yalnız okuma sorgularıyla getirir. Bağlantı ayarı **Ortam** `local` iken arayüzden düzenlenebilir; `nonprod` iken yalnız dağıtımdan gelir (hesap **Runtime Secret** `dwhcodereview-runtime`'tan) ve arayüzden değiştirilemez; hesap veya adres verilmemişse uygulama yine açılır ve SQL Server alanı "yapılandırılmamış" görünür. SQL Server çağrıları uygulamanın diğer isteklerini bekletmez; hatalar kullanıcıya sabit, iç ayrıntı içermeyen iletilerle döner.
 
 ## Aktörler ve sonuçlar
 
 - `inceleyici`: İnceleme sayfasında izinli veritabanlarını ve seçtiği veritabanındaki Nesneleri görür; incelediği Nesnenin tanımı ve Nesne meta verisi bu PRD'nin portundan okunur. SQL Server yavaşken bile uygulamanın diğer ekranları yanıt verir.
 - `kural-yoneticisi`: `local` Ortamda SQL bağlantısı sayfasında sunucu, port, kullanıcı, parola ve şifreleme ayarını düzenler ve kaydetmeden bağlantıyı test eder. `nonprod` Ortamda bu sayfayı görmez.
-- **İşletim ekibi** (uygulama rolü değildir): `nonprod` için ortak salt okunur hesabı Azure gizli değişkenleri `MSSQL_USER` ve `MSSQL_PASSWORD` olarak tanımlar; `helm/dwhcodereview/deploy.sh` bunları Runtime Secret'a yazar.
+- **İşletim ekibi** (uygulama rolü değildir): `nonprod` için ortak salt okunur hesabı isteğe bağlı Azure gizli değişkenleri `MSSQL_USER` ve `MSSQL_PASSWORD` olarak tanımlar; `helm/dwhcodereview/deploy-hooks.sh` bunları Runtime Secret'a yazar. Tanımlamazsa uygulama açılır ve SQL Server alanı "yapılandırılmamış" kalır (Decision 11).
 - [Nesne incelemesi PRD'si](../003-object-review/PRD.md): Veritabanı ve Nesne listeleme uçlarının ve filtrelerinin sahibidir; veritabanı listesini, Nesne listesini, Nesne tanımını ve Nesne meta verisini bu PRD'nin tanımladığı katalog sınırından (Decision 2 portu) alır.
 
 ## Değişmezler ve sınırlar
@@ -53,7 +53,7 @@ Kaynak uygulama `~/codes/dwhcodereview` bugün şöyle çalışır; hedefteki de
 
 ## İşlevsel gereksinimler
 
-Requirement 1: Tipli ayarlar `DWHCODEREVIEW_MSSQL_SERVER`, `DWHCODEREVIEW_MSSQL_PORT` (varsayılan 1433, 1–65535), `DWHCODEREVIEW_MSSQL_USER`, `DWHCODEREVIEW_MSSQL_PASSWORD`, `DWHCODEREVIEW_MSSQL_ENCRYPT`, `DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE`, `DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES`, `DWHCODEREVIEW_MSSQL_LOGIN_TIMEOUT_SECONDS` (varsayılan 15, 1–60), `DWHCODEREVIEW_MSSQL_QUERY_TIMEOUT_SECONDS` (varsayılan 60, 1–300) ve `DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY` (varsayılan 4, 1–16) olarak tanımlanır. `nonprod` Ortamda sunucu, kullanıcı, parola veya izin listesi boşsa, izin listesinde sistem veritabanı (`master`, `tempdb`, `model`, `msdb`) varsa, `ENCRYPT` `true` değilse ya da `TRUST_SERVER_CERTIFICATE` `false` değilse süreç başlangıçta hata verip durur (Decision 5 ve 6); `local`'de boş bırakılabilir ve durum "yapılandırılmamış" olur.
+Requirement 1: Tipli ayarlar `DWHCODEREVIEW_MSSQL_SERVER`, `DWHCODEREVIEW_MSSQL_PORT` (varsayılan 1433, 1–65535), `DWHCODEREVIEW_MSSQL_USER`, `DWHCODEREVIEW_MSSQL_PASSWORD`, `DWHCODEREVIEW_MSSQL_ENCRYPT`, `DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE`, `DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES`, `DWHCODEREVIEW_MSSQL_LOGIN_TIMEOUT_SECONDS` (varsayılan 15, 1–60), `DWHCODEREVIEW_MSSQL_QUERY_TIMEOUT_SECONDS` (varsayılan 60, 1–300) ve `DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY` (varsayılan 4, 1–16) olarak tanımlanır. `nonprod` Ortamda sunucu, kullanıcı ve parolanın üçü de doluyken izin listesi boşsa, izin listesinde sistem veritabanı (`master`, `tempdb`, `model`, `msdb`) varsa, `ENCRYPT` `true` değilse ya da `TRUST_SERVER_CERTIFICATE` `false` değilse süreç başlangıçta hata verip durur (Decision 5 ve 6). Sunucu, kullanıcı veya paroladan biri boşsa bağlantı "yapılandırılmamış" olur ve süreç başlar; katalog uçları 503 `sql_connection_not_configured` döner (Decision 11). `local`'de de boş bırakılabilir ve durum "yapılandırılmamış" olur.
 
 Requirement 2: Bağlantı dizesi yalnız sunucu tarafındaki tek yardımcıyla `Driver={ODBC Driver 18 for SQL Server}` sürücüsü için üretilir. Kullanıcı, parola ve veritabanı adı süslü parantezle kaçışlanır; `;`, `=`, `{` veya `}` içeren değerler dizeye yeni ayar ekleyemez. Denetim karakteri içeren sunucu adı veya kullanıcı adı 422 ile reddedilir.
 
@@ -103,14 +103,14 @@ Bu PRD PostgreSQL'e tablo, şema veya göç eklemez. Port Nesne tanımını yaln
 
 ## Dağıtım etkisi
 
-- **Ayarlar:** Requirement 1 anahtarları `app/backend/.env.example` dosyasına yer tutucuyla, yerel Compose ortam bloğuna ve Runtime Secret'a eklenir; `python3 scripts/check-config-sync.py` geçer.
-- **Secret anahtarları:** `deploy.sh`, Azure gizli değişkenleri `MSSQL_USER` ve `MSSQL_PASSWORD` değerlerini `dwhcodereview-runtime` Secret'ına `DWHCODEREVIEW_MSSQL_USER` ve `DWHCODEREVIEW_MSSQL_PASSWORD` anahtarlarıyla yazar. Değerler komut argümanına, Helm değer dosyasına, betik çıktısına ve Git'e girmez. Sır olmayan sunucu, port ve izin listesi değerlerinin dağıtım yolu [Kubernetes teslim PRD'si](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) sahipliğindedir.
+- **Ayarlar:** Requirement 1 anahtarları `app/backend/.env.example` dosyasına yer tutucuyla, yerel Compose ortam bloğuna ve dağıtıma eklenir (hesap Runtime Secret'a, sır olmayan değerler `helm/dwhcodereview/values-project.yaml`'a); `python3 scripts/check-config-sync.py` geçer.
+- **Secret anahtarları:** `helm/dwhcodereview/deploy-hooks.sh`, verilmişse Azure gizli değişkenleri `MSSQL_USER` ve `MSSQL_PASSWORD` değerlerini `dwhcodereview-runtime` Secret'ına `DWHCODEREVIEW_MSSQL_USER` ve `DWHCODEREVIEW_MSSQL_PASSWORD` anahtarlarıyla yazar; verilmemişse kümedeki değeri korur. Değerler komut argümanına, Helm değer dosyasına, betik çıktısına ve Git'e girmez. Sır olmayan sunucu, port ve izin listesi değerlerinin dağıtım yolu [Kubernetes teslim PRD'si](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) sahipliğindedir.
 - **İmaj:** Backend imajına Microsoft ODBC sürücüsü `msodbcsql18` (`ACCEPT_EULA=Y` ile) ve `unixodbc` kurulur; Python tarafında `pyodbc` eklenir. Üçü de diğer bağımlılıklar gibi bağımlılık kabul kaydına (`dependency-admission.json`) girer; `msodbcsql18` lisansı (Microsoft EULA) kayıtta sahip tarafından 2026-09-26'da kabul edilmiş olarak yazılır (Decision 4). SQL Server sertifikasını imzalayan kurum kök CA'sı imajın sistem güven deposunda bulunur (Decision 6).
-- **Ağ çıkışı:** Backend yalnız `nonprod` SQL Server adresine yapılandırılan port (varsayılan TCP 1433) üzerinden çıkabilir. Kaynaktaki `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` genişliğindeki kural, işletim ekibinin verdiği tek sunucu adresine (`/32`) daraltılır (Decision 9); kural [Kubernetes teslim PRD'sinin](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) Requirement 8'indedir.
+- **Ağ çıkışı:** Backend SQL Server'a yalnız TCP 1433 üzerinden çıkabilir. Kaynaktaki `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` genişliğindeki kural ve 80/443 portları kalkar; adres gelene kadar kural `10.0.0.0/8` TCP 1433'tür ve işletim ekibinin verdiği tek sunucu adresine (`/32`) daraltılır (Decision 9); kural [Kubernetes teslim PRD'sinin](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) Requirement 8'indedir.
 
 ## Test stratejisi
 
-- **Birim:** bağlantı dizesi kaçışlama (`;`, `}` ve `=` içeren parola ve kullanıcı adı), Ortam değerine göre uç kaydı (`staging` ve tanınmayan değerde 404), başlangıç doğrulaması (`nonprod`'da şifreleme kapalı, sertifikaya güven açık veya izin listesinde sistem veritabanı varken durma), izin listesi süzmesi, SQLSTATE eşleme tablosu, değişen sunucuda kayıtlı parolanın kullanılmaması, parola alanının hiçbir yanıtta ve log kaydında bulunmaması.
+- **Birim:** bağlantı dizesi kaçışlama (`;`, `}` ve `=` içeren parola ve kullanıcı adı), Ortam değerine göre uç kaydı (`staging` ve tanınmayan değerde 404), başlangıç doğrulaması (`nonprod`'da şifreleme kapalı, sertifikaya güven açık, izin listesinde sistem veritabanı varken veya tam bağlantıda izin listesi boşken durma; eksik bağlantıda "yapılandırılmamış" olarak başlama), izin listesi süzmesi, SQLSTATE eşleme tablosu, değişen sunucuda kayıtlı parolanın kullanılmaması, parola alanının hiçbir yanıtta ve log kaydında bulunmaması.
 - **Uyarlayıcı sözleşmesi:** sahte port ile Nesne listesi süzmesi (`q`, `from_date`) ve Nesne meta verisi sınırları (derinlik, Nesne sayısı, karakter kesme).
 - **Olay döngüsü:** 5 saniye bekleyen sahte sürücü çağrısı sürerken sağlık ucunun 200 milisaniyenin altında yanıt verdiği ve eşzamanlı çağrı sayısının `MAX_CONCURRENCY`'yi aşmadığı ölçülür.
 - **Tümleşik (`local`):** geliştirici makinesindeki SQL Server Developer sürümüne karşı veritabanı listesi, Nesne listesi, tanım ve meta veri; yanlış parolada `sql_login_failed`, erişilemeyen portta `sql_server_unreachable`.
@@ -132,7 +132,7 @@ Bu PRD PostgreSQL'e tablo, şema veya göç eklemez. Port Nesne tanımını yaln
 - [ ] Acceptance 2: L1 — Otomatik testlerden geçti: Requirement 6 olay döngüsü testi 5 saniyelik SQL Server beklemesi sırasında sağlık ucunun 200 milisaniyenin altında yanıt verdiğini ve eşzamanlılık sınırını doğrular.
 - [ ] Acceptance 3: L1 — Otomatik testlerden geçti: Requirement 5 ve 9 ön yüz testleri ile OpenAPI ve üretilmiş tiplerin güncelliği doğrulanır.
 - [ ] Acceptance 4: L2 — Gerçek istemci/ortamda doğrulandı: `local` Ortamda yerel PostgreSQL ve geliştirici SQL Server'ı ile tarayıcıdan ayar kaydedilir, bağlantı test edilir, İnceleme sayfasında veritabanı ve Nesne listelenir, bir Nesnenin tanımı port üzerinden okunup incelemeye verilir; `app/backend/.env` dosyasının değişmediği gözlenir (Requirement 3, 4, 7, 9).
-- [ ] Acceptance 5: L2 — Gerçek istemci/ortamda doğrulandı: `nonprod` ayarlarıyla yerelde çalışan sürümde yazma ve test uçları 404 döner, arayüzde SQL bağlantısı sayfası görünmez, Runtime Secret'tan gelen salt okunur hesapla izinli veritabanları listelenir ve izin dışı veritabanı 403 alır (Requirement 5, 7). Küme dağıtımı bu kanıtın parçası değildir ve ayrı kullanıcı talimatı ister.
+- [ ] Acceptance 5: L2 — Gerçek istemci/ortamda doğrulandı: `nonprod` ayarlarıyla yerelde çalışan sürümde yazma ve test uçları 404 döner, arayüzde SQL bağlantısı sayfası görünmez, hesap verilmeden açılan sürümde katalog uçları 503 `sql_connection_not_configured` döner, Runtime Secret'tan gelen salt okunur hesapla izinli veritabanları listelenir ve izin dışı veritabanı 403 alır (Requirement 1, 5, 7). Küme dağıtımı bu kanıtın parçası değildir ve ayrı kullanıcı talimatı ister.
 
 ## Kararlar
 
@@ -146,9 +146,11 @@ Decision 7: Windows kimlik doğrulaması (`Trusted_Connection`) kaldırılır. L
 
 Decision 8: `local`'de arayüzden yapılan değişiklik yeniden başlatmadan sonra korunmaz (Decision 3). Kalıcı değer isteyen geliştirici kendi `.env` dosyasını elle düzenler; uygulama parolayı diske yazmaz.
 
-Decision 9: `nonprod` SQL Server adresini ve IP'sini işletim ekibi tek sunucu olarak verir; ağ çıkış kuralı yalnız o adrese ve yapılandırılan porta açılır.
+Decision 9: `nonprod` SQL Server adresini ve IP'sini işletim ekibi tek sunucu olarak verir; ağ çıkış kuralı yalnız o adrese ve yapılandırılan porta açılır. Adres gelene kadar kural `10.0.0.0/8` TCP 1433'tür (proje sahibi, 2026-09-27).
 
 Decision 10: Ortam değeri tek ayar `DWHCODEREVIEW_ENVIRONMENT`'tan okunur: `development` `local`, `staging` `nonprod` demektir; başka ya da okunamayan değer `nonprod` sayılır ([application-foundation alanı](../../../application-foundation/DOMAIN.md)). Ayarın `nonprod` değerini [Kubernetes teslim PRD'si](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) verir; bu PRD yalnız okur.
+
+Decision 11: Proje sahibinin 2026-09-27 kararı: `nonprod` dağıtımı SQL Server hesabını veya adresini beklemez. Sunucu, kullanıcı veya paroladan biri verilmemişse uygulama başlar ve SQL Server alanı "yapılandırılmamış" görünür; üçü de verildiğinde izin listesi ve Decision 5–6 güvenceleri başlangıçta zorunludur.
 
 ## Teslim akışı
 

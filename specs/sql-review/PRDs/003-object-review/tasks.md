@@ -58,6 +58,9 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
   Kanıt: `app/backend/tests/integration/test_telemetry_signals.py`,
   `app/backend/tests/unit/test_telemetry.py`, `scripts/quality-gate.sh all`.
 - [ ] Task 9 — Acceptance 5, Acceptance 6: test SQL Server'ı ve onaylı LLM ucuyla tarayıcıda L2
-  (gerçek ortamda doğrulama). Kurum ağı ve erişilebilir SQL Server gerekli; açık. Aynı canlı pencere,
-  durdurma ve sonuç penceresi metin incelemesinde yerel yedek LLM ucuyla gözlendi
-  ([script-review](../004-script-review/tasks.md) Task 4).
+  (gerçek ortamda doğrulama). 2026-09-27'de yerel Compose'da şema kopyası SQL Server'ı ve geliştirici
+  makinesindeki yerel model (`qwen3.6:35b`, OpenAI uyumlu uç; onaylı kurum LLM'i değil) ile nesne
+  koşumları tamamlandı: tarayıcıda tek görünüm, API ile iki veritabanından üç nesne (biri iki parçalı,
+  46.544 karakter); canlı ilerlemede belirteç sayısı, satır referanslı bulgular, koşum kaydında kural
+  sürümü ve saklanan SQL metni görüldü; uygulama logunda SQL metni yoktu; istemci bağlantısı
+  kapanınca koşum "iptal edildi" oldu. Onaylı kurum LLM ucu yerelden erişilemediği için açık.

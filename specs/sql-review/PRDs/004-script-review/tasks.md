@@ -26,7 +26,9 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   LLM ucuyla (`http://127.0.0.1:8765/v1`) geçti; bu uç onaylı kurum LLM'i değildir.
 - [ ] Task 5 — Acceptance 4: onaylı LLM ucuyla tarayıcıda L2. Aynı akış (etiketli metin, canlı
   ilerleme, satır referanslı bulgu, sabit not, koşum kaydında sürüm ve etiket) Task 4'teki yedek uçla
-  gözlendi; onaylı kurum LLM'i yerelden erişilebilir olmadığı için açık.
+  ve 2026-09-27'de `e2e/sql-review/02-script-review-history.mjs` ile geliştirici makinesindeki yerel
+  modelle (`qwen3.6:35b`; onaylı kurum LLM'i değil) gözlendi; onaylı kurum LLM'i yerelden erişilebilir
+  olmadığı için açık.
 - [x] Task 6 — Gözlemlenebilirlik: metin incelemesinin `kind=script` koşum ve kural ölçümleri;
   etiket ve metin hiçbir ize veya ölçüme girmez. Kanıt:
   `app/backend/tests/integration/test_telemetry_signals.py`

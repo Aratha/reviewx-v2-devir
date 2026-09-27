@@ -1,6 +1,6 @@
 # Plan — kubernetes-delivery
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.2.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Katmanlar ve dosyalar
@@ -25,8 +25,11 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
   ekibin düzenlediği `README.md`, `app/backend/.env.example` ve `app/backend/app/core/config.py`'ye
   aynı fark elle uygulandı ve `.kt-scaffold/manifest.json` özetleri yeni sürüme çekildi.
 - Kanca Secret'ı `kubectl create secret generic --dry-run=client | kubectl apply` ile yazar; yalnız
-  yönettiği dört anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
-  değer yalnız bu dört anahtar için okunur.
+  yönettiği beş anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
+  değer yalnız bu beş anahtar için okunur. Süper yönetici başlangıç parolası
+  (`DWHCODEREVIEW_ADMIN_PASSWORD` → `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD`) diğer isteğe
+  bağlı değişkenlerle aynı kuralla işlenir; kanca parola politikasını denetlemez, politikanın sahibi
+  backend'dir ([directory-login](../001-directory-login/PRD.md) Requirement 14).
 - Kanca, Secret değiştiğinde yalnız kümede aynı imaj etiketiyle çalışan backend'i yeniden başlatır;
   yeni etiket geliyorsa pod şablonu zaten değişir ve yeniden başlatmayı Helm yapar.
 - Güvenilen ingress ağı, ingress denetleyicisi podlarının 2026-09-27'de salt okunur gözlenen pod

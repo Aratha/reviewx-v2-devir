@@ -1,7 +1,7 @@
 # Görevler — directory-login
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
-Compose yığınında geçti (arka uç 616/616, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+Compose yığınında geçti (arka uç 638/638, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
 yönetişim sapması ve chart adımları dahil). Bu, arka uç ve ön yüz için L1 (otomatik testlerden
 geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) Task 11'dedir.
 
@@ -80,3 +80,23 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   Directory grubuna sınırla. Grup üyeliği kullanıcının kendi kaydından okunur; grupta olmayan hesap
   403 alır, servis hesapları girişte reddedilir. Sahip kararı bekliyor (grup adı ve nonprod/yerel
   ayrımı); karar gelince bu PRD Requirement ve Acceptance ile revize edilip yeniden kabul edilir.
+
+- [x] Task 15 — Requirement 14, Decision 13 / Acceptance 1: backend açılışında süper yöneticinin
+  bir kez açılması; komutla ortak açma yolu, danışma kilidi, değişiklik kaydı satırı, arka planda
+  artan aralıkla yeniden deneme, komutun parolayı yalnız istemden veya standart girdiden okuması;
+  `values-project.yaml`'da `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME: admin`. Kanıt:
+  `tests/unit/test_super_admin_bootstrap.py` (ayar yokken veritabanına gidilmemesi, 2–60 saniyelik
+  yeniden deneme, kesin retlerin yeniden denenmemesi, komutun başlangıç parolasını kullanmaması,
+  açılışın arka planda koşup kapanışta durması), `tests/integration/test_super_admin_bootstrap.py`
+  (bir kez açılış ve giriş, sonraki açılışın sahibin değiştirdiği parolayı korması, adı taşıyan
+  başka hesaba dokunulmaması, zayıf parolada hesap açılmaması ve parolanın loga düşmemesi, e-posta
+  çakışması, dört eşzamanlı açılışta tek hesap, veritabanı gelene kadar yeniden deneme). Danışma
+  kilidi kaldırılınca eşzamanlılık testi, açılış var olan hesabı sıfırlayınca iki koruma testi
+  kırmızıya döndü. 2026-09-27 yerel gözlem (küme değil): boş veritabanına bağlanan gerçek backend
+  süreci şema yokken 2, 4, 8 saniye arayla yeniden denedi, `alembic upgrade head` sonrası `admin`
+  hesabını açtı (`created`), giriş 200 ve `is_super_admin: true`, yanlış parola 401; ikinci açılış
+  `exists` yazdı; süreç ve göç loglarında parola yoktu.
+- [ ] Task 16 — Requirement 14, Decision 13 / Acceptance 4: nonprod kümede sahibin
+  `DWHCODEREVIEW_ADMIN_PASSWORD` gizli değişkenini tanımlayıp dağıtım adımının ortamına eşlemesinden
+  sonra ilk dağıtımda `admin` girişi ve `created` olayı, sonraki dağıtımda `exists` olayı ve
+  değişmeyen parola. Sahibin değişkeni eklemesini ve Azure koşumunu bekliyor.

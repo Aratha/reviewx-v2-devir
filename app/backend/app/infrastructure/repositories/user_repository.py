@@ -35,11 +35,23 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+# One application-wide PostgreSQL advisory lock key (ASCII "dwhcr", then 1). Every creation of the
+# local super admin holds it for one transaction (application-foundation 001 Requirement 14).
+_SUPER_ADMIN_CREATION_LOCK_KEY = 0x6477_6863_7200_0001
+
+
 class UserRepository:
     """Persistence adapter used by the authentication and user-administration services."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def lock_super_admin_creation(self) -> None:
+        """Wait for, then hold until the transaction ends, the super admin creation lock."""
+
+        await self.session.execute(
+            select(func.pg_advisory_xact_lock(_SUPER_ADMIN_CREATION_LOCK_KEY))
+        )
 
     async def get_local_by_username(self, normalized_name: str) -> User | None:
         statement = select(User).where(
@@ -48,6 +60,22 @@ class UserRepository:
             User.is_deleted.is_(False),
         )
         return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def get_by_username(self, normalized_name: str) -> User | None:
+        """The account carrying the stored lower-case name, whatever its type or state."""
+
+        statement = select(User).where(User.username == normalized_name)
+        return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def find_email_owner(
+        self, email: str, *, excluding_user_id: int | None = None, include_deleted: bool
+    ) -> User | None:
+        statement = select(User).where(User.email == email)
+        if excluding_user_id is not None:
+            statement = statement.where(User.user_id != excluding_user_id)
+        if not include_deleted:
+            statement = statement.where(User.is_deleted.is_(False))
+        return (await self.session.execute(statement.limit(1))).scalar_one_or_none()
 
     async def get_by_directory_guid(
         self, object_guid: UUID, *, for_update: bool = False
@@ -96,6 +124,21 @@ class UserRepository:
         )
         return (await self.session.execute(statement)).scalar_one_or_none()
 
+    async def get_tenant_record(self, code: str) -> Tenant | None:
+        """The tenant row by code, including an inactive or soft-deleted one."""
+
+        statement = select(Tenant).where(Tenant.code == code)
+        return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def get_tenant_public_id(self, tenant_id: int) -> str:
+        statement = select(Tenant.public_id).where(Tenant.tenant_id == tenant_id)
+        return (await self.session.execute(statement)).scalar_one()
+
+    async def add_tenant(self, tenant: Tenant) -> Tenant:
+        self.session.add(tenant)
+        await self.session.flush()
+        return tenant
+
     async def get_tenant_by_public_id(self, public_id: UUID) -> Tenant | None:
         statement = select(Tenant).where(
             Tenant.public_id == str(public_id),
@@ -107,6 +150,28 @@ class UserRepository:
     async def get_role(self, code: str) -> Role | None:
         statement = select(Role).where(Role.code == code, Role.is_deleted.is_(False))
         return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def get_role_record(self, code: str) -> Role | None:
+        """The role row by code, including a soft-deleted one."""
+
+        statement = select(Role).where(Role.code == code)
+        return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def get_role_assignment(
+        self, *, user_id: int, role_id: int, tenant_id: int
+    ) -> UserRole | None:
+        """The user's assignment of one role in one tenant, including a soft-deleted one."""
+
+        statement = select(UserRole).where(
+            UserRole.user_id == user_id,
+            UserRole.role_id == role_id,
+            UserRole.tenant_id == tenant_id,
+        )
+        return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def add_role_assignment(self, assignment: UserRole) -> None:
+        self.session.add(assignment)
+        await self.session.flush()
 
     async def add_user(self, user: User) -> User:
         self.session.add(user)

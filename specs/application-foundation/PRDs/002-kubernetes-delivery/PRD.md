@@ -2,14 +2,15 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.2.0
 
 Acceptance date: 2026-09-27
 
 Domain: [application-foundation](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, Decision 17'deki sahip kararıyla hizalanmış
-haliyle kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, Decision 17'deki sahip kararıyla ve
+directory-login PRD'sinin Decision 13'teki nonprod ilk süper yönetici kararıyla hizalanmış haliyle
+kabul etti.
 
 ## Amaç
 
@@ -17,9 +18,10 @@ Uygulamayı PostgreSQL 17 dahil tek Helm chart'ı (Kubernetes'e kurulum paketi) 
 kümesine, mevcut Azure dağıtım işinin argümansız çağırdığı `helm/dwhcodereview/deploy.sh` üzerinden
 güvenle dağıtmak. Nonprod dağıtımı işletim ekibinin ayar veya gizli değişken vermesini beklemeden
 çalışır (Decision 17): ortam adresleri ve sır olmayan ayarlar projeye ait değer katmanı
-`helm/dwhcodereview/values-project.yaml` dosyasında, oturum imza anahtarı ve isteğe bağlı SQL Server
-ve LLM kimlik bilgileri projeye ait kanca `helm/dwhcodereview/deploy-hooks.sh`'ın hazırladığı runtime
-Secret'tadır (`dwhcodereview-runtime`); veritabanı sırlarını `deploy.sh` üretir. Kurallar
+`helm/dwhcodereview/values-project.yaml` dosyasında, oturum imza anahtarı, isteğe bağlı SQL Server
+ve LLM kimlik bilgileri ve isteğe bağlı süper yönetici başlangıç parolası projeye ait kanca
+`helm/dwhcodereview/deploy-hooks.sh`'ın hazırladığı runtime Secret'tadır (`dwhcodereview-runtime`);
+veritabanı sırlarını `deploy.sh` üretir. Kurallar
 PostgreSQL'e içe aktarım göçüyle girer.
 
 ## Aktörler ve sonuçlar
@@ -28,6 +30,10 @@ PostgreSQL'e içe aktarım göçüyle girer.
   ayar veya gizli değişken gerekmez; yayımlanmamış imajda kümeye hiç dokunulmaz, hizmet veren sürüm
   silinmez. SQL Server hesabını vermek isterse `MSSQL_USER`/`MSSQL_PASSWORD` gizli değişkenlerini
   tanımlar.
+- **Proje sahibi:** Nonprod `admin` süper yöneticisinin ilk parolasını seçer ve Azure gizli
+  değişkeni `DWHCODEREVIEW_ADMIN_PASSWORD` olarak tanımlar. Sonuç: ilk dağıtımdan sonra `admin`
+  girer; sonraki dağıtımlar hesaba dokunmaz
+  ([directory-login](../001-directory-login/PRD.md) Requirement 14, Decision 13).
 - **Kullanıcı:** `https://dwhcodereview.ailab-test.kuveytturk.com.tr` adresinden uygulamaya ulaşır;
   yayımlanmış kurallar depodaki içe aktarım kopyasıyla birebir aynıdır.
 - **Geliştirici:** Aynı yapıyı yerelde Docker Compose ile PostgreSQL 17 üzerinde çalıştırır.
@@ -123,6 +129,7 @@ hazırlar. Anahtarları ve kaynakları:
 | `DWHCODEREVIEW_MSSQL_USER` | İsteğe bağlı Azure gizli değişkeni `MSSQL_USER`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, SQL Server alanı "yapılandırılmamış" görünür |
 | `DWHCODEREVIEW_MSSQL_PASSWORD` | İsteğe bağlı Azure gizli değişkeni `MSSQL_PASSWORD`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, SQL Server alanı "yapılandırılmamış" görünür |
 | `DWHCODEREVIEW_LLM_API_KEY` | İsteğe bağlı Azure gizli değişkeni `LLM_API_KEY`; yoksa kümedeki değer | Yazılmaz; nonprod LLM ucu anahtar istemiyor |
+| `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD` | İsteğe bağlı Azure gizli değişkeni `DWHCODEREVIEW_ADMIN_PASSWORD`; yoksa kümedeki değer | Yazılmaz; backend süper yönetici açmaz ([directory-login](../001-directory-login/PRD.md) Requirement 14) |
 
 Boş veya tanımsız değişken ve çözülmemiş Azure `$(DEĞİŞKEN)` metni verilmemiş sayılır; kümedeki
 mevcut değer korunur. Kümedeki Secret okunamazsa kanca hiçbir şeyi değiştirmeden durur; geçersiz
@@ -136,8 +143,9 @@ değiştirmeyeceği için) kanca onu yeniden başlatır. Anahtar adları
 Sır olmayan ayarlar `values-project.yaml` içindeki `backend.config` alanındadır: ortam
 `DWHCODEREVIEW_ENVIRONMENT=staging` ([alan belgesindeki](../../DOMAIN.md) `nonprod` Ortamı), uygulamanın
 genel adresi ve CORS kaynağı, güvenilen ingress pod ağı `10.42.0.0/16`, dizin ayarları
-(directory-login PRD'sindeki KT Verim nonprod değerleri ve imajdaki CA dosyası), LLM biçimi, adresi ve
-modeli (llm-connection Decision 3) ve boş OpenTelemetry adresi. SQL Server adresi, portu ve izinli
+(directory-login PRD'sindeki KT Verim nonprod değerleri ve imajdaki CA dosyası), süper yönetici hesap
+adı `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME=admin`, LLM biçimi, adresi ve modeli
+(llm-connection Decision 3) ve boş OpenTelemetry adresi. SQL Server adresi, portu ve izinli
 veritabanı listesi işletim ekibinden gelene kadar yazılmaz; bu sürede SQL Server alanı
 "yapılandırılmamış" kalır (sql-server-connection Decision 11).
 
@@ -211,7 +219,9 @@ Requirement 5'teki isteğe bağlı gizli değişkenler, `IMAGE_WAIT_SECONDS`, `P
 
 - `deploy.sh` mevcut Azure `KUBECONFIG` bağlantısını kullanır; kubeconfig içeriği, Secret değeri ve
   registry belirteci loga yazılmaz; geçici dosyalar yalnız sahibine açıktır.
-- Süper yönetici oluşturma dağıtımın parçası değildir; rules/58 gereği işletim ekibi elle yapar.
+- Nonprod `admin` süper yöneticisini, sahibin rules/58 onayıyla ([directory-login](../001-directory-login/PRD.md)
+  Decision 13), backend ilk açılışında runtime Secret'taki başlangıç parolasıyla bir kez açar;
+  kanca ve `deploy.sh` hesap açmaz, parolayı yalnız Secret'a taşır.
 - Eski geniş çıkış kuralı taşınmaz; SQL Server çıkışı yalnız TCP 1433'e açıktır ve adres gelince tek
   sunucuya daralır (Decision 11).
 
@@ -239,7 +249,9 @@ Yeni ölçüm tanımlanmaz.
 
 Mevcut Azure işi aynı komutla çalışmaya devam eder ve yeni ayar veya gizli değişken istemez.
 `MSSQL_USER` ve `MSSQL_PASSWORD` verilirse SQL Server hesabı olarak kullanılır; `JWT_PRIVATE_KEY` ve
-`LLM_API_KEY` isteğe bağlıdır (Decision 14, 17). `API_ACCESS_TOKEN` ve `API_ADMIN_TOKEN` artık
+`LLM_API_KEY` isteğe bağlıdır (Decision 14, 17). `DWHCODEREVIEW_ADMIN_PASSWORD` verilirse nonprod
+`admin` süper yöneticisinin ilk parolası olur. Azure gizli değişkenleri betiğe kendiliğinden
+geçmediği için her gizli değişken dağıtım adımının ortamına (`env:`) aynı adla açıkça eşlenir. `API_ACCESS_TOKEN` ve `API_ADMIN_TOKEN` artık
 okunmaz. Namespace'te 10Gi `nfs-sc` PostgreSQL diski ve üç veritabanı Secret'ı oluşur. Azure işinin
 kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlatabilmelidir.
 
@@ -253,7 +265,8 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   kurulumda bir kez üretilip sonraki çalıştırmalarda korunmasını, isteğe bağlı değişkenlerin varken
   yazılıp yokken kümedeki değerin korunmasını, çözülmemiş `$(...)` metninin verilmemiş sayılmasını,
   okunamayan Secret'ta ve geçersiz anahtarda durmayı, değerin argümana ve loga düşmemesini ve
-  gereksiz yeniden başlatma olmamasını sınar. `deploy.sh`'ın kendi davranışının testleri fabrikadadır.
+  gereksiz yeniden başlatma olmamasını sınar; süper yönetici başlangıç parolası da aynı kurallarla
+  sınanır. `deploy.sh`'ın kendi davranışının testleri fabrikadadır.
 - Göç: boş veritabanında `alembic upgrade head`, uygulama rolünün tablo oluşturamaması.
 - Aktarım: göç Job'u boş veritabanında içe aktarım göçünü çalıştırır, kural sayısı ve içerik özeti
   depodaki `review_rules.json` kopyasıyla eşleşir, tekrar çalıştırmada değişiklik olmaz (göçün kendi
@@ -342,3 +355,5 @@ Belirtim → Plan → Görevler → Uygulama
 - SQL Server çıkışı adres gelene kadar kurum ağının tamamında TCP 1433'e açıktır (Decision 11).
 - Azure'da `MSSQL_USER` tanımlanmadan eski `MSSQL_PASSWORD` kalırsa yalnız parola yazılır; bağlantı
   sunucu, kullanıcı ve parola tamamlanana kadar "yapılandırılmamış" kalır.
+- `DWHCODEREVIEW_ADMIN_PASSWORD` tanımlanıp dağıtım adımının ortamına eşlenmezse kanca onu görmez ve
+  `admin` açılmaz; kanca logu `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD not provided` der.

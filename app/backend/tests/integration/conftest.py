@@ -35,9 +35,9 @@ from app.domain.directory import (
 from app.domain.models.llm_call import LlmChatApi
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.main import app
-from app.scripts.create_super_admin import ensure_super_admin
 from app.services.llm_connection_service import LlmConnectionConfig, LlmConnectionStore
 from app.services.review_run_service import ReviewRunRegistry
+from app.services.super_admin_service import ensure_super_admin
 from tests.fakes.review_ports import FakeCatalog, ScriptedLlm
 
 

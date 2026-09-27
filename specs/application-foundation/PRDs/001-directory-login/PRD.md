@@ -2,14 +2,14 @@
 
 Status: Accepted
 
-Version: 1.1.2
+Version: 1.2.0
 
 Acceptance date: 2026-09-27
 
 Domain: [application-foundation](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
-benimseyerek kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve Decision 13'teki
+nonprod ilk süper yönetici kararı dahil sahip kararlarını benimseyerek kabul etti.
 
 ## Amaç
 
@@ -23,7 +23,8 @@ yapısı üzerine kurulur; statik API anahtarı koruması kaldırılır.
 
 - **Kullanıcı:** Kurum hesabıyla giriş yapar; ayrı kayıt formu yoktur. İlk girişte kaydı açılır.
 - **Uygulama yöneticisi (süper yönetici):** Yerel hesaptır, dizin çalışmasa da girer; rol verir,
-  alır ve hesabı pasifleştirir.
+  alır ve hesabı pasifleştirir. `nonprod`'da `admin` hesabı dağıtımdan sonra kendiliğinden açılır;
+  ilk parolasını proje sahibi seçer (Decision 13).
 - **İşletim ekibi:** Dizin ayarlarını ve CA bundle'ını (dizin sunucusunun sertifikasına güvenmek
   için kullanılan kök sertifika dosyası) ortam girdisi olarak sağlar.
 - **Geliştirici:** `local` ortamda Active Directory olmadan iki rolü de dener.
@@ -66,7 +67,8 @@ alır; her giriş, çıkış ve rol değişikliği bir denetim olayı üretir.
 Davranış değişiklikleri: statik anahtar koruması kişi bazlı oturum ve rolle değişir (Requirement
 12); `nonprod`'da yerel parolalı giriş yalnız süper yöneticiye açıktır (Requirement 3); belirteç
 60 dakikadan 15 dakikaya iner, `localStorage`'dan çıkar, yenileme ve sunucu tarafı çıkış eklenir
-(Requirement 6–8); KT Verim'den farklı olarak grup ve yönetici zinciri okunmaz.
+(Requirement 6–8); KT Verim'den farklı olarak grup ve yönetici zinciri okunmaz; `nonprod`'da süper
+yönetici elle komutla değil, dağıtımdan sonra backend açılışında bir kez açılır (Requirement 14).
 
 ## İşlevsel gereksinimler
 
@@ -144,6 +146,22 @@ Requirement 13: Ön yüzde giriş ekranı ("Kurum kullanıcı adınız ve parola
 bitince giriş ekranına dönüş ve yalnız süper yöneticiye görünen kullanıcı yönetimi ekranı bulunur.
 Hata iletileri parolanın mı kullanıcı adının mı yanlış olduğunu ayırt etmez.
 
+Requirement 14: Backend her açılışta başlangıç parolası (`DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD`)
+doluysa `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME` adındaki hesabı arar; bu adla hiçbir hesap
+yoksa onu etkin, yerel ve `super_admin` rollü açar. Açılış `python -m app.scripts.create_super_admin`
+komutuyla aynı kod yolunu kullanır: aynı ad kuralı, aynı parola politikası (rules/58: en az 15
+karakter, yaygın parola ve hesap adını içeren parola reddi) ve aynı parola özeti. Bu adla bir hesap
+varsa (etkin, pasif, silinmiş ya da başka rollü olsa da) hiçbir alanına dokunulmaz; yöneticinin
+sonradan değiştirdiği parola, rolü ve durumu yeniden dağıtımda korunur. Parola politikaya uymuyorsa,
+ad geçersizse veya e-posta başka hesaptaysa hesap açılmaz; backend çalışmaya devam eder ve yalnız
+neden sınıfını loglar. Veritabanı veya şema henüz hazır değilse (ilk kurulumda göç sürerken)
+açılışı bekletmeden arka planda 2 saniyeden başlayıp en çok 60 saniyeye çıkan aralıkla yeniden
+dener. Aynı anda açılan birden çok backend kopyası tek hesap açar. Hesap açıldığında aynı işlemde
+Requirement 5'teki değişiklik kaydı tablosuna bir `role` satırı yazılır (eski değer boş, yeni değer
+`super_admin`, yapan açılan hesabın kendisi; işlemi bir kişi değil dağıtım yapar). Başlangıç parolası
+boşsa hiçbir şey yapılmaz. Elle çalıştırılan komut parolayı yalnız istemden veya `--password-stdin`
+ile okur; kümedeki başlangıç parolasını kullanmaz.
+
 ## API sözleşmesi
 
 Taban yol `/api/dwhcodereview/v1`. Hatalar iskeletin tek hata zarfını kullanır:
@@ -170,8 +188,14 @@ aynı sonucu verir. `specs/openapi/` bu tabloyla birlikte güncellenir.
   süresi hesabın var olup olmadığını ele vermez.
 - JWT imza anahtarı ve yenileme belirteci özeti yalnız sunucudadır; tarayıcıya, loga, Git'e girmez.
   Anahtarın kaynağı kubernetes-delivery PRD'sindedir.
-- `nonprod`'da süper yönetici oluşturma veya parola sıfırlama, işletim ekibinin elle çalıştırdığı
-  `python -m app.scripts.create_super_admin --password-stdin` komutudur; dağıtım betiği yapmaz.
+- `nonprod`'da süper yönetici `admin` hesabını dağıtımdan sonra backend açar (Requirement 14,
+  Decision 13). Parolayı proje sahibi seçer ve yalnız Azure gizli değişkeni
+  `DWHCODEREVIEW_ADMIN_PASSWORD` ile verir; değer Git'e, değer dosyalarına, komut argümanına, loga,
+  iz ve ölçümlere, test verisine girmez; kümeye yalnız runtime Secret üzerinden ulaşır
+  ([kubernetes-delivery](../002-kubernetes-delivery/PRD.md) Requirement 5). Parola sıfırlama,
+  işletim ekibinin elle çalıştırdığı `python -m app.scripts.create_super_admin --password-stdin`
+  komutudur; komut hesap adını aynı `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME` ayarından alır.
+  Dağıtım var olan hesabın parolasını değiştirmez.
 - Kurumda kapatılan dizin hesabının açık oturumu en geç 8 saatlik mutlak sürede biter; daha erken
   kapatmak için süper yönetici hesabı pasifleştirir.
 
@@ -186,6 +210,8 @@ aynı sonucu verir. `specs/openapi/` bu tabloyla birlikte güncellenir.
   yoktur.
 - Alembic göçü (şema değişikliği aracı) iki rolü, izinlerini ve `platform` kiracısını tohumlar;
   böylece süper yönetici oluşturulmadan da dizin girişi çalışır. Kaynakta taşınacak kullanıcı yoktur.
+- Süper yönetici açılışı (Requirement 14) yeni tablo veya göç gerektirmez; mevcut `app_user`,
+  `app_user_role` ve değişiklik kaydı tablosunu kullanır.
 
 ## Gözlemlenebilirlik
 
@@ -203,6 +229,8 @@ anahtarlı özeti yazılır.
 | `auth.session.reuse_detected` | kullanıcı `public_id`, oturum ailesi |
 | `auth.logout` | kullanıcı `public_id` |
 | `admin.user.role_changed` / `admin.user.active_changed` | yapan, hedef, eski ve yeni değer |
+| `auth.super_admin.bootstrap` | sonuç (`created`, `exists`, `rejected`, `not_configured`); `created` ve `exists`te hesap `public_id` ve hesabın `super_admin` olup olmadığı; `rejected`te neden (`password_policy`, `invalid_username`, `invalid_email`, `identity_conflict`) |
+| `auth.super_admin.bootstrap_retry` | deneme sırası, hata türü (yalnız sınıf adı), sonraki denemeye kalan saniye |
 
 Ölçüm: giriş denemeleri `dwhcodereview_auth_login_attempts_total{outcome}` ile sayılır; `outcome`
 `succeeded`, `invalid_credentials`, `account_disabled`, `user_inactive`, `identity_conflict`,
@@ -223,6 +251,11 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
   UPN soneki, CA dosyası, eski TLS `true`, keşif kapalı). Bunların değer katmanına
   (`values-project.yaml`) yazılması, CA dosyasının backend'e ulaştırılması ve LDAPS çıkış kuralı
   kubernetes-delivery PRD'sine aittir.
+- Süper yönetici açılışı: `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME` (nonprod `admin`) sır
+  değildir ve `values-project.yaml`'dadır; e-posta `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_EMAIL`
+  varsayılanıdır. Başlangıç parolası runtime Secret'ın
+  `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD` anahtarındadır; kaynağı kubernetes-delivery
+  PRD'sindedir.
 - Kaldırılanlar: `API_ACCESS_TOKEN`, `API_ADMIN_TOKEN` ayarları ve pipeline değişkenleri.
 
 ## Test stratejisi
@@ -234,6 +267,11 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
 - API: her uçta 401/403/409/429/503 negatif testi; `X-API-Key` ile gelen isteğe 401; `inceleyici`'nin
   kural yayımlayamaması; pasif hesap reddi; rol değişikliğinin oturumu kapatması ve değişiklik kaydı
   tablosuna yazılması; `scripts/create-local-user.sh`'ın dizin açıkken çalışmaması.
+- Süper yönetici açılışı (Requirement 14), gerçek PostgreSQL'de: hesabın bir kez açılıp giriş
+  yapabilmesi ve tek değişiklik kaydı; var olan hesabın parolasının, rolünün ve durumunun
+  değişmemesi; zayıf parolada hesap açılmaması ve parolanın loga düşmemesi; eşzamanlı açılışta tek
+  hesap; veritabanına ulaşılamazken artan aralıkla yeniden deneme; ayar boşken veritabanına hiç
+  gidilmemesi; elle komutun başlangıç parolasını kullanmaması.
 - Ön yüz: giriş, sessiz yenileme, çıkış ve rol tabanlı ekran testleri (Vitest) ve tarayıcı senaryosu.
   Canlı AD yalnız `nonprod`'da doğrulanır; yerel test onun yerine sayılmaz.
 
@@ -250,13 +288,18 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
 ## Kabul kriterleri
 
 - [ ] Acceptance 1: L1 — Otomatik testlerden geçti: backend, ön yüz ve göç kapıları; sahte dizinle
-  Requirement 1–5 ve 9–12 negatif testleri, Requirement 6–8 oturum testleri geçer.
+  Requirement 1–5 ve 9–12 negatif testleri, Requirement 6–8 oturum testleri ve Requirement 14
+  süper yönetici açılışı testleri geçer.
 - [ ] Acceptance 2: L2 — Gerçek istemci/ortamda doğrulandı: yerel Compose'da tarayıcıyla yerel test
   hesaplarıyla giriş, 15 dakikalık belirtecin sessiz yenilenmesi, çıkış, `inceleyici`'nin kural
   ekranına erişememesi ve süper yöneticinin rol değiştirmesi gözlenir (Requirement 3, 5–8, 11, 13).
 - [ ] Acceptance 3: L2 — Nonprod kümede gerçek Active Directory hesabıyla tarayıcıdan giriş, ilk
   girişte kaydın açılması, yanlış parolada 401, altıncı hatalı denemede 429 ve denetim olaylarının
   logda görünmesi doğrulanır (Requirement 1–4, 9, 10). Bu kanıt yerel kanıttan ayrı raporlanır.
+- [ ] Acceptance 4: L2 — Nonprod kümede `DWHCODEREVIEW_ADMIN_PASSWORD` tanımlıyken ilk dağıtımdan
+  sonra `admin` hesabıyla tarayıcıdan giriş yapılır ve logda `auth.super_admin.bootstrap` olayı
+  `created` görünür; sonraki dağıtımda olay `exists` olur ve hesabın parolası değişmez
+  (Requirement 14, Decision 13).
 
 ## Kararlar
 
@@ -278,6 +321,13 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
   kullanıcıya göre sayılır; sahibi `sql-review` alanının
   [object-review](../../../sql-review/PRDs/003-object-review/PRD.md) (Requirement 18) ve
   [script-review](../../../sql-review/PRDs/004-script-review/PRD.md) (Requirement 10) PRD'leridir.
+- Decision 13: Proje sahibinin 2026-09-27 kararı; rules/58'in yönetici hesabı oluşturmanın
+  otomatikleşmesi için istediği eylem bazlı açık insan onayı da budur: `nonprod`'da dağıtımdan sonra
+  `admin` adlı yerel süper yönetici hesabı bulunur ve işletim ekibinin elle komut çalıştırması
+  beklenmez (Requirement 14). Parolayı sahip seçer ve yalnız Azure gizli değişkeniyle verir; değer
+  depoda, değer dosyalarında, komut argümanlarında, loglarda ve test verisinde yer almaz. Hesap bir
+  kez açılır; sonraki dağıtımlar ona dokunmaz. Açılış her ortamda yalnız başlangıç parolası
+  verilince çalışır; yerel test hesapları Decision 9'daki komutla açılmaya devam eder.
 
 ## Teslim akışı
 
@@ -295,3 +345,6 @@ Belirtim → Plan → Görevler → Uygulama
   Grup denetimi kullanıcının kendi kaydındaki üyelikle yapılabilir, Decision 2'yi aşmaz.
 - Süper yönetici parolası kaybolursa rol yönetimi durur; sıfırlama işletim ekibinin küme erişimine
   bağlıdır. Aynı e-postalı yerel ve dizin hesabı çakışması elle çözülür.
+- Başlangıç parolası Azure'da ve kümedeki runtime Secret'ta durur. Parola değiştirilmezse bu
+  Secret'ı okuyabilen kişi `admin` olarak girebilir; uygulamada parola değiştirme ekranı yoktur,
+  değiştirme işletim ekibinin elle komutuyla yapılır.

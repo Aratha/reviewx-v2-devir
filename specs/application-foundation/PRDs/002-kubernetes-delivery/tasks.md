@@ -1,8 +1,8 @@
 # Görevler — kubernetes-delivery
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
-Compose yığınında geçti (arka uç 620/620, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
-yönetişim sapması ve proje katmanıyla chart adımı dahil) ve `tests/helm/deploy-hooks.test.sh` 39
+Compose yığınında geçti (arka uç 638/638, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+yönetişim sapması ve proje katmanıyla chart adımı dahil) ve `tests/helm/deploy-hooks.test.sh` 51
 denetimi geçti. Bu, chart, kanca ve arka uç için L1 (otomatik testlerden geçti) kanıtıdır. Canlı
 küme kanıtı (Acceptance 3) yoktur.
 
@@ -17,9 +17,13 @@ küme kanıtı (Acceptance 3) yoktur.
   korunur, isteğe bağlı değişkenler varken yazılır yokken korunur, `$(...)` verilmemiş sayılır,
   okunamayan Secret ve geçersiz anahtarda durur, değer argümana ve loga düşmez, gereksiz yeniden
   başlatma yok); iki bilinçli bozmada (değeri yazdırma, her koşuda yazma) test kırmızıya döndü.
+  Süper yönetici başlangıç parolası `DWHCODEREVIEW_ADMIN_PASSWORD` aynı testte sınanır: verilince
+  `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD` anahtarına dosyayla yazılır, yokken kümedeki değer
+  korunur ve yeniden yazılmaz, `$(...)` saklanmaz, değer çıktıya ve argümana düşmez; değeri log
+  satırına ekleyen ve değişken adını değiştiren iki bilinçli bozmada test kırmızıya döndü.
 - [x] Task 3 — Requirement 2, 5, 8, 10, Decision 9, 11 / Acceptance 1:
   `helm/dwhcodereview/values-project.yaml` (ingress, runtime Secret adı, 10Gi `nfs-sc`, çıkış eşleri,
-  sır olmayan `staging` ayarları). Kanıt: `scripts/render-charts.sh`.
+  sır olmayan `staging` ayarları, süper yönetici hesap adı `admin`). Kanıt: `scripts/render-charts.sh`.
 - [x] Task 4 — Requirement 9 / Acceptance 1: dizin CA dosyası yayın imajına
   `/workspace/app/backend/certs/nonprod-directory-ca.crt` yolunda girer; `image-build.yml`'ın
   yayımladığı `ghcr.io/kt-vibecoding/dwhcodereview-{backend,frontend}` adları (sahip adı küçük harfe

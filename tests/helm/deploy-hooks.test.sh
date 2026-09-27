@@ -113,6 +113,9 @@ valid_p256_key() {
 user='dwh_okuyucu_test'
 password='Parola;=}{ with spaces 42'
 llm_key='test-llm-key-not-real'
+# Not a usable password of any environment; shell metacharacters, spaces and non-ASCII letters prove
+# the value reaches the Secret byte for byte.
+admin_password='test-başlangıç $(yok) `x` "q" parolası 42'
 
 # --- cases -----------------------------------------------------------------------------------------
 new_state first-run
@@ -121,6 +124,9 @@ check 'first run without pipeline secrets succeeds' test "$status" -eq 0
 check 'first run generates a P-256 signing key' valid_p256_key
 check 'first run writes no SQL Server keys' eval '! has_key DWHCODEREVIEW_MSSQL_USER && ! has_key DWHCODEREVIEW_MSSQL_PASSWORD'
 check 'first run writes no LLM key' eval '! has_key DWHCODEREVIEW_LLM_API_KEY'
+check 'first run writes no super admin start-up password' eval '! has_key DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD'
+check 'an absent DWHCODEREVIEW_ADMIN_PASSWORD is reported by key name' \
+  grep -q 'DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD not provided; DWHCODEREVIEW_ADMIN_PASSWORD is absent' "$current/stdout"
 check 'first run reports the generated key by name' grep -q 'DWHCODEREVIEW_JWT_PRIVATE_KEY generated' "$current/stdout"
 check 'no private key material is printed' never_printed 'PRIVATE KEY'
 check 'no private key material reaches kubectl arguments' never_printed "$(sed -n 2p "$current/secrets/dwhcodereview-runtime/DWHCODEREVIEW_JWT_PRIVATE_KEY")"
@@ -148,10 +154,32 @@ check 'a later run without pipeline credentials succeeds' test "$status" -eq 0
 check 'absent MSSQL_USER keeps the cluster value' test "$(stored DWHCODEREVIEW_MSSQL_USER)" = "$user"
 check 'absent MSSQL_PASSWORD keeps the cluster value' test "$(stored DWHCODEREVIEW_MSSQL_PASSWORD)" = "$password"
 
+new_state admin-password
+: > "$current/apply.log"
+run_hook DWHCODEREVIEW_ADMIN_PASSWORD="$admin_password"
+check 'a pipeline super admin start-up password is accepted' test "$status" -eq 0
+check 'DWHCODEREVIEW_ADMIN_PASSWORD maps to DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD' \
+  test "$(stored DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD)" = "$admin_password"
+check 'the start-up password reaches kubectl only as a file' \
+  grep -q -- '--from-file=DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD=/' "$current/argv.log"
+check 'the start-up password is never printed or passed as an argument' never_printed "$admin_password"
+check 'the start-up password is reported by key name only' \
+  grep -q 'DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD set from DWHCODEREVIEW_ADMIN_PASSWORD' "$current/stdout"
+: > "$current/apply.log"
+run_hook
+check 'a later run without DWHCODEREVIEW_ADMIN_PASSWORD succeeds' test "$status" -eq 0
+check 'absent DWHCODEREVIEW_ADMIN_PASSWORD keeps the cluster value' \
+  test "$(stored DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD)" = "$admin_password"
+check 'a kept start-up password rewrites nothing' test ! -s "$current/apply.log"
+check 'a kept start-up password is never printed' never_printed "$admin_password"
+
 new_state unresolved-macro
-run_hook MSSQL_USER='$(MSSQL_USER)' MSSQL_PASSWORD='$(MSSQL_PASSWORD)'
+run_hook MSSQL_USER='$(MSSQL_USER)' MSSQL_PASSWORD='$(MSSQL_PASSWORD)' \
+  DWHCODEREVIEW_ADMIN_PASSWORD='$(DWHCODEREVIEW_ADMIN_PASSWORD)'
 check 'unresolved Azure macros do not stop the deployment' test "$status" -eq 0
 check 'an unresolved macro is never stored' eval '! has_key DWHCODEREVIEW_MSSQL_USER && ! has_key DWHCODEREVIEW_MSSQL_PASSWORD'
+check 'an unresolved start-up password macro is never stored' \
+  eval '! has_key DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD'
 check 'an unresolved macro is reported by name' grep -q 'MSSQL_USER is an unresolved Azure variable' "$current/stdout"
 
 new_state read-failure

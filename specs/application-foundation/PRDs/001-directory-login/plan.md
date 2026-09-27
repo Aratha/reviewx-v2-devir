@@ -1,6 +1,6 @@
 # Plan — directory-login
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Kiracı kapsamı kararı

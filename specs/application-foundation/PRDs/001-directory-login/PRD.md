@@ -2,13 +2,13 @@
 
 Status: Accepted
 
-Version: 1.0.0
+Version: 1.1.0
 
-Acceptance date: 2026-09-26
+Acceptance date: 2026-09-27
 
 Domain: [application-foundation](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-26'da, açık sorulardaki önerileri ve sahip kararlarını
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
 benimseyerek kabul etti.
 
 ## Amaç

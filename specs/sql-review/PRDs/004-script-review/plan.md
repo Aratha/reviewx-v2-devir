@@ -1,6 +1,6 @@
 # Plan — script-review
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uçtur. Ortak inceleme davranışının planı
 [object-review planıdır](../003-object-review/plan.md); bu plan yalnız farkları yazar.
 

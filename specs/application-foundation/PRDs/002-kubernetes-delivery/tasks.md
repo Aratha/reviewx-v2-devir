@@ -1,10 +1,10 @@
 # Görevler — kubernetes-delivery
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
-Compose yığınında geçti (arka uç 652/652, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
-yönetişim sapması ve proje katmanıyla chart adımı dahil) ve `tests/helm/deploy-hooks.test.sh` 51
-denetimi geçti. Bu, chart, kanca ve arka uç için L1 (otomatik testlerden geçti) kanıtıdır. Canlı
-küme kanıtı (Acceptance 3) yoktur.
+Compose yığınında geçti (arka uç 654/654, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+yönetişim sapması ve proje katmanıyla chart adımı dahil), `tests/helm/deploy-hooks.test.sh` 51 ve
+`tests/infra/local-egress.test.sh` 22 denetimi geçti. Bu, chart, kanca, yerel Compose ve arka uç
+için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Acceptance 3) yoktur.
 
 - [x] Task 1 — Requirement 1, 2, 3, 4, 6, 8, 10 / Acceptance 1: fabrikanın proje dağıtım katmanı
   (`deploy.sh`, `values.yaml`, `templates/**`, `render_charts.py`, rules/22 ve rules/45) fabrika `main`
@@ -70,8 +70,31 @@ küme kanıtı (Acceptance 3) yoktur.
   sunucu ve izinli veritabanı listesi yazılır ve çıkış `/32`'ye daraltılır.
 - [ ] Task 14 — Decision 13: eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından
   elle silinir.
-- [ ] Task 15 — Requirement 11, Decision 15: yerelde SQL Server ve LLM erişimini açan, ayrıca seçilen
-  Compose profili yoktur. 2026-09-27 yerel gözlem: varsayılan iç ağdaki backend
-  `host.docker.internal` adını çözemedi; `POST /sql-connection/test` `sql_server_unreachable`,
-  `PUT /llm-connection` `network_policy_denied` döndü. Profil gelene kadar yerel yığında gerçek
-  inceleme yapılamaz ([yerel kurulum](../../../../docs/tr/yerel-kurulum.md)).
+- [x] Task 15 — Requirement 11, Decision 15 / Acceptance 2: yerelde SQL Server ve LLM erişimi ayrıca
+  seçilen `local-egress` Compose profilidir; Git'in yok saydığı `app/infra/.env` içindeki
+  `COMPOSE_PROFILES=local-egress` satırı açar, varsayılan kapalıdır ([plan](plan.md),
+  [yerel kurulum](../../../../docs/tr/yerel-kurulum.md)). Kanıt (L1): `tests/infra/local-egress.test.sh`
+  22 denetimi geçti (profil kapalıyken geçit ve dışa çıkan ağ yok, backend yalnız iç ağlarda;
+  açıkken dışa çıkan köprüde yalnız geçit, `host-gate`'te yalnız backend ve geçit, geçit port
+  yayımlamaz, salt okunur, kök olmayan kullanıcıyla ve yeteneksiz çalışır, yalnız 1433, 11434 ve
+  1234'ü aynı portla `host.docker.internal`'a aktarır, yapılandırması sabit imajda geçerlidir); beş
+  bilinçli bozmada (backend'i dışa çıkan ağa ekleme, profili silme, `host-gate`'i iç ağ olmaktan
+  çıkarma, başka hedefe aktarma, başlat görevinden temizliği silme) test kırmızıya döndü.
+  `app/backend/tests/unit/test_llm_connection_service.py`: geçidin adı iç ağ adresine çözülünce LLM
+  adresi kaydedilir; profil kapalıyken (ad çözülmez) ve ad genel adrese çözülürse
+  `network_policy_denied`, `nonprod`'da 404; ada istisna tanıyan bilinçli bozmada iki test kırmızıya
+  döndü. LLM ağ politikası değişmedi: kapalı durumdaki `network_policy_denied`, adın iç ağda
+  çözülememesinden geliyordu. 2026-09-27 yerel gözlem (L2 yerel, küme değil; ayrı Compose
+  projesiyle, tarayıcı değil API üzerinden): KT Verim'in yerel SQL Server kapsayıcısı
+  (`kt-console-mssql`, ana makine portu 1433, salt okunur hesap) ve ana makinedeki Ollama
+  `qwen3.6:35b` çalışırken, profil kapalıyken backend `host.docker.internal` adını çözemedi;
+  `POST /sql-connection/test` `sql_server_unreachable`, `GET /databases` 503
+  `sql_server_unreachable`, `PUT /llm-connection` 422 `network_policy_denied` döndü; bir metin
+  incelemesinde 11 kural `UNKNOWN` ve 11 LLM çağrı özeti `connect_error` oldu. Profil VS Code başlat
+  göreviyle açılınca bağlantı testi 11 veritabanıyla başarılı oldu, `PUT /llm-connection` 200 döndü;
+  `EDWUTIL` içindeki küçük bir saklı yordamın Nesne incelemesi tanımı ve meta veriyi SQL Server'dan
+  aldı, 11 kural `qwen3.6:35b` ile değerlendirildi (11 `ok` özet, canlı ilerleme olayları, 107 sn).
+  Açıkken backend yalnız bu üç porta ulaştı; ana makinenin başka portu, internet adı ve genel IP
+  kapalı kaldı; ön yüz, nginx ve PostgreSQL `host.docker.internal` adını çözemedi. Ayar kaldırılıp
+  başlat görevi yeniden çalıştırılınca geçit kaldırıldı ve kapalı durumun sonuçları aynen döndü.
+  Kurum ağındaki bir SQL Server'a veya RunAI ucuna yerelden erişim bu profilin kapsamında değildir.

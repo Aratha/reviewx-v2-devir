@@ -30,9 +30,9 @@
     },
     {
       "label": "DWH: Uygulamayı başlat",
-      "detail": "Uygulamayı kurar veya günceller, veritabanını hazırlar. Adres: http://localhost:8080",
+      "detail": "Uygulamayı kurar veya günceller, veritabanını hazırlar; SQL Server ve LLM erişiminin açık mı kapalı mı olduğunu yazar. Adres: http://localhost:8080",
       "type": "shell",
-      "command": "scripts/stack.sh up --detach --build --wait && scripts/db.sh apply && echo 'Uygulama hazır: http://localhost:8080'",
+      "command": "{ scripts/stack.sh config --services 2>/dev/null | grep -qx local-egress || [ -z \"$(scripts/stack.sh ps --all --quiet local-egress 2>/dev/null)\" ] || scripts/stack.sh rm --stop --force local-egress; } && scripts/stack.sh up --detach --build --wait && scripts/db.sh apply && echo 'Uygulama hazır: http://localhost:8080' && if scripts/stack.sh config --services 2>/dev/null | grep -qx local-egress; then echo 'SQL Server ve LLM erişimi açık: uygulama bu bilgisayardaki SQL Server ve modele host.docker.internal adıyla ulaşır.'; else echo 'SQL Server ve LLM erişimi kapalı. Açmak için: docs/tr/yerel-kurulum.md'; fi",
       "windows": {
         "command": "Write-Output 'Windows bilgisayarda yerel çalıştırma henüz desteklenmiyor. Ayrıntı: docs/tr/yerel-kurulum.md, Windows bölümü.'; exit 1"
       },

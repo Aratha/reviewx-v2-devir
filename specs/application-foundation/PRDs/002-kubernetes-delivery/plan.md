@@ -17,6 +17,8 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 | Başlangıç denetimi | `app/backend/app/services/startup_checks.py` ([sql-server-connection](../../../sql-review/PRDs/002-sql-server-connection/PRD.md) Decision 11) | Requirement 5, Decision 17 |
 | Göç | `schema/alembic/versions/*` (içe aktarım göçü `202609260002`) | Requirement 4, 12 |
 | Hazır olma | `app/backend/app/db/readiness.py`, `app/backend/app/api/health.py`, `app/backend/app/main.py` | Requirement 4 |
+| Yerel SQL Server ve LLM erişimi | `app/infra/docker-compose.local.yml` (`local-egress` profili, `host-gate` ve `egress` ağları), `app/infra/nginx/nginx.local-egress.conf`, `app/infra/.env.example`, `.vscode/tasks.json` | Requirement 11, Decision 15 |
+| Yerel erişim testi | `tests/infra/local-egress.test.sh`, `app/backend/tests/unit/test_llm_connection_service.py` | Requirement 11, Decision 15 |
 
 ## Uygulama kararları
 
@@ -32,6 +34,18 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
   kopyalandı; projenin kendi `specs/openapi/dwhcodereview-api.yaml` sözleşmesi ve üretilmiş ön yüz
   tipleri yeni uç nokta açıklamasıyla güncellendi; `.kt-scaffold/manifest.json` özetleri yeni sürüme
   çekildi. Olay yazımı projenin `log_event` biçimini kullanır.
+- Yerel SQL Server ve LLM erişimi (Decision 15) `local-egress` Compose profilidir ve Git'in yok
+  saydığı `app/infra/.env` içindeki tek `COMPOSE_PROFILES=local-egress` satırıyla açılır; fabrikanın
+  yönettiği `scripts/stack.sh` değişmez. Profil, sabitlenmiş nginx imajıyla çalışan bir TCP aktarıcı
+  (geçit) başlatır: geçit yalnız bu bilgisayarın 1433 (SQL Server), 11434 (Ollama) ve 1234 (LM Studio)
+  portlarına, IPv4 adresinden aktarır. Backend yalnız iç ağlarda kalır; geçidi yalnız backend'le
+  paylaştığı iç `host-gate` ağında `host.docker.internal` adıyla görür. Dışa çıkan `egress`
+  köprüsüne yalnız geçit katılır; geçit port yayımlamaz, salt okunur, kök olmayan kullanıcıyla ve
+  yeteneksiz çalışır. Profil kapalıyken ad çözülmez. LLM ağ politikası
+  ([llm-connection](../../../sql-review/PRDs/006-llm-connection/PRD.md) Requirement 4) değişmez:
+  geçidin adresi iç ağ adresi olduğu için kabul edilir; ada istisna tanınmaz. Compose, profili
+  kapatılan servisi `up` ile durdurmadığı için VS Code "DWH: Uygulamayı başlat" görevi ayar
+  kapalıyken kalan geçidi kaldırır.
 - Kanca Secret'ı `kubectl create secret generic --dry-run=client | kubectl apply` ile yazar; yalnız
   yönettiği beş anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
   değer yalnız bu beş anahtar için okunur. Süper yönetici başlangıç parolası
@@ -55,6 +69,7 @@ ve PR #14'ün `main`'e birleşmesine bağlıdır; Azure işini kullanıcı tetik
 ## Doğrulama komutları
 
 - `tests/helm/deploy-hooks.test.sh`
+- `tests/infra/local-egress.test.sh` (Docker Compose gerekir)
 - `scripts/render-charts.sh` (kurulu `kt-iskelet` gerekir) ve
   `IMAGE_TAG=<etiket> helm/dwhcodereview/deploy.sh --render`
 - `python3 scripts/check-config-sync.py`, `python3 scripts/check-governance-drift.py`
@@ -72,5 +87,6 @@ ve PR #14'ün `main`'e birleşmesine bağlıdır; Azure işini kullanıcı tetik
 | Decision 18 | — | — |
 | Requirement 9 | Acceptance 3 | Task 4 |
 | Requirement 11, 12 | Acceptance 2 | Task 6, Task 9 |
+| Requirement 11 (yerel SQL Server ve LLM erişimi), Decision 15 | Acceptance 2 | Task 15 |
 | Decision 7 | — | Task 1 |
 | Decision 11 | Acceptance 3 | Task 13 |

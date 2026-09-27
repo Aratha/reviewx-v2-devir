@@ -137,6 +137,10 @@ Yerelde kural yöneticisi menüde **SQL bağlantısı** ve **LLM bağlantısı**
 - Ekrandan girilen değerler yalnız çalışan uygulamaya uygulanır ve hiçbir dosyaya yazılmaz. Uygulama
   yeniden başlayınca `app/infra/.env` dosyasındaki değerlere dönülür. Kalıcı ayar için
   [yerel kurulum kılavuzuna](yerel-kurulum.md#sql-server-ve-yapay-zekâ-modeline-bağlanmak) bakın.
+- Yerel uygulama bilgisayarınızdaki SQL Server'a ve modele yalnız bu erişimi açtıysanız ulaşır;
+  açılışı [yerel kurulum kılavuzunda](yerel-kurulum.md#erişimi-açmak) anlatılır. Erişim kapalıyken
+  bağlantı testi "SQL Server'a ulaşılamadı." der ve LLM sayfası `host.docker.internal` adresini
+  kaydetmez.
 
 ### Test ortamında: yalnız kurulumla
 

@@ -79,9 +79,11 @@ services:
       DWHCODEREVIEW_DIRECTORY_CONNECT_TIMEOUT_SECONDS: "5"
       DWHCODEREVIEW_DIRECTORY_READ_TIMEOUT_SECONDS: "10"
       # The default local network has no egress; SQL Server and LLM values stay empty unless the
-      # developer supplies them from the shell or the Git-ignored app/infra/.env. A developer SQL
-      # Server with a self-signed certificate needs DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true
-      # there; outside the development environment the backend refuses to start with it.
+      # developer supplies them from the shell or the Git-ignored app/infra/.env. The backend
+      # reaches a SQL Server or LLM on this computer only through the opt-in local-egress gate
+      # below, as host.docker.internal. A developer SQL Server with a self-signed certificate needs
+      # DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true there; outside the development
+      # environment the backend refuses to start with it.
       DWHCODEREVIEW_MSSQL_SERVER: "${DWHCODEREVIEW_MSSQL_SERVER:-}"
       DWHCODEREVIEW_MSSQL_PORT: "${DWHCODEREVIEW_MSSQL_PORT:-1433}"
       DWHCODEREVIEW_MSSQL_USER: "${DWHCODEREVIEW_MSSQL_USER:-}"
@@ -117,9 +119,49 @@ services:
       - ../backend:/workspace/app/backend
       - ../../schema:/workspace/schema
       - ../../specs:/workspace/specs
+    networks:
+      - default
+      - host-gate
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  # Opt-in local egress (specs/application-foundation/PRDs/002-kubernetes-delivery Requirement 11,
+  # Decision 15): starts only when app/infra/.env sets COMPOSE_PROFILES=local-egress. The gate is
+  # host.docker.internal for the backend alone and forwards only SQL Server (1433), Ollama (11434)
+  # and LM Studio (1234) on this computer; the backend itself stays on internal networks. Without
+  # the profile the name does not resolve and nothing leaves the stack.
+  local-egress:
+    profiles: ["local-egress"]
+    image: ${NGINX_IMAGE:-nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752}
+    # Docker maps host.docker.internal to an IPv4 and an IPv6 address of this computer, but the
+    # egress bridge has no IPv6 route; the gate forwards to the IPv4 address only.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        address="$$(awk '$$2 == "host.docker.internal" && $$1 !~ /:/ { print $$1; exit }' /etc/hosts)"
+        test -n "$$address" || { echo "local-egress: host.docker.internal has no IPv4 address" >&2; exit 1; }
+        sed "s/host\.docker\.internal:/$$address:/" /etc/nginx/local-egress.conf > /tmp/local-egress.conf
+        exec nginx -c /tmp/local-egress.conf -g "daemon off;"
+    user: "101:101"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./nginx/nginx.local-egress.conf:/etc/nginx/local-egress.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    dns:
+      - 127.0.0.1
+    networks:
+      host-gate:
+        aliases:
+          - host.docker.internal
+      egress: {}
     restart: unless-stopped
 
   frontend:
@@ -174,4 +216,10 @@ networks:
   # Docker Desktop does not publish ports from an internal-only bridge. Only the
   # reverse proxy joins this host-facing bridge; application and data services do not.
   edge:
+    driver: bridge
+  # Only the backend and the opt-in local-egress gate join this network.
+  host-gate:
+    internal: true
+  # Only the local-egress gate joins this outbound bridge; it exists only with the profile.
+  egress:
     driver: bridge

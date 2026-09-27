@@ -6,8 +6,9 @@ arka uç ona bağımlı değildir. Kabul edilmiş bir önbellek PRD'si onu `--pr
 Uygulama/veri çalışma zamanı ağı kurum içi işaretlidir; bu servisler internete erişemez. Docker
 Desktop, yalnız iç köprüden port yayımlayamadığı için yalnız nginx ve isteğe bağlı Grafana, ana
 makineye dönük uç köprüye de katılır. Port yalnız geri döngü adresindedir, DNS kapalıdır ve
-yapılandırmada dışa giden üst akış yoktur; çevreleyen dış ağ trafiği kontrolü banka ana makine
-güvenlik duvarıdır. Seçiliyse gözlemlenebilirlik de iç ağda kalır.
+varsayılan yapılandırmada dışa giden üst akış yoktur; çevreleyen dış ağ trafiği kontrolü banka ana
+makine güvenlik duvarıdır. Seçiliyse gözlemlenebilirlik de iç ağda kalır. SQL Server ve LLM'e yerel
+erişim yalnız açıkça seçilen `local-egress` profiliyle açılır (aşağıda).
 
 Bütün üçüncü taraf imajları sürüm ve özetle (`@sha256:`) sabitlenmiştir. Makinede yoksa Docker
 bu sabit özeti kayıt deposundan kendisi indirir; özet değişmediği için indirilen imaj incelenen
@@ -39,6 +40,28 @@ kimliğini açıkça beyan eder, salt okunur kök dosya sistemi kullanır, büt�
 (yalnız `cache` profili açıkken kullanılır) ile arka uç imza anahtarının Git dışında üretilen yerel
 sırlarını verir (`scripts/README.md`). Compose bu sırları `stack.sh` olmadan başlatıldığında açık
 hatayla durur.
+
+## SQL Server ve LLM'e yerel erişim (isteğe bağlı)
+
+Arka uç varsayılan olarak hiçbir SQL Server'a ve LLM'e ulaşamaz
+([Kubernetes teslim PRD'si](../../specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md)
+Requirement 11, Decision 15). Git'in yok saydığı `app/infra/.env` dosyasına
+`COMPOSE_PROFILES=local-egress` yazılınca `local-egress` geçidi başlar:
+
+- Geçit, sabitlenmiş nginx imajıyla çalışan TCP aktarıcısıdır
+  (`nginx/nginx.local-egress.conf`). Yalnız bu bilgisayarın 1433 (SQL Server), 11434 (Ollama) ve
+  1234 (LM Studio) portlarına aktarır; başka port ve başka hedef yoktur.
+- Arka uç yine yalnız iç ağlardadır. Geçit, yalnız arka uçla paylaştığı iç `host-gate` ağında
+  `host.docker.internal` adıyla görünür; dışa çıkan `egress` köprüsüne yalnız geçit katılır. Ön yüz,
+  veritabanı ve ters vekil geçide ulaşamaz.
+- Geçit port yayımlamaz, salt okunur kök dosya sistemiyle, kök olmayan kullanıcıyla ve bütün Linux
+  yetenekleri düşürülmüş çalışır; adı yalnız kendi `/etc/hosts` kaydından çözer.
+- Profil kapalıyken `host.docker.internal` adı arka uçta çözülmez. Ayarı kapattıktan sonra
+  **DWH: Uygulamayı başlat** görevi çalışan geçidi kaldırır; komut satırında aynı iş
+  `scripts/stack.sh rm --stop --force local-egress` ile yapılır (Compose, profili kapatılan servisi
+  `up` ile kendiliğinden durdurmaz).
+- Uygulamanın LLM ağ politikası değişmez: geçidin adresi iç ağ adresi olduğu için kabul edilir.
+- Yapısal denetim: `tests/infra/local-egress.test.sh`.
 
 ## Aynı projenin ikinci kopyası
 

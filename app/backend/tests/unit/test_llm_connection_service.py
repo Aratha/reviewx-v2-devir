@@ -160,3 +160,34 @@ async def test_nonprod_refuses_changes() -> None:
     with pytest.raises(ApplicationError) as raised:
         await _service("staging").update(LlmConnectionUpdate(model="x"))
     assert raised.value.status_code == 404
+
+
+GATE_URL = "http://host.docker.internal:11434/v1"
+
+
+async def test_local_egress_gate_address_is_saved_only_while_the_gate_resolves() -> None:
+    """kubernetes-delivery Requirement 11, Decision 15: the opt-in Compose gate answers as
+    host.docker.internal on an internal network, so the unchanged private-network policy accepts
+    it; with the profile off the name does not resolve and nothing is saved."""
+    gate_on = _service(resolver=Resolver({"host.docker.internal": ["172.23.0.9"]}))
+    view = await gate_on.update(LlmConnectionUpdate(base_url=GATE_URL, model="qwen3.6:35b"))
+    assert view.resolved_chat_url == f"{GATE_URL}/chat/completions"
+
+    gate_off = _service(resolver=Resolver())
+    with pytest.raises(ApplicationError) as raised:
+        await gate_off.update(LlmConnectionUpdate(base_url=GATE_URL))
+    assert (raised.value.status_code, raised.value.code) == (422, "network_policy_denied")
+    assert gate_off.store.current() == STORED
+
+
+async def test_the_gate_name_earns_no_exception_from_the_policy() -> None:
+    public = _service(resolver=Resolver({"host.docker.internal": ["93.184.216.34"]}))
+    with pytest.raises(ApplicationError) as raised:
+        await public.update(LlmConnectionUpdate(base_url=GATE_URL))
+    assert (raised.value.status_code, raised.value.code) == (422, "network_policy_denied")
+
+    nonprod = _service("staging", Resolver({"host.docker.internal": ["172.23.0.9"]}))
+    with pytest.raises(ApplicationError) as raised:
+        await nonprod.update(LlmConnectionUpdate(base_url=GATE_URL))
+    assert raised.value.status_code == 404
+    assert nonprod.store.current() == STORED

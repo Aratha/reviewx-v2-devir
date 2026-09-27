@@ -57,7 +57,7 @@ panelinde görünür.
 | Görev | Ne yapar |
 |---|---|
 | DWH: İlk kurulum | Araçları denetler, yerel ayar dosyasını hazırlar. Bir kez çalıştırılır; tekrar çalıştırmak ayar dosyasına dokunmaz. |
-| DWH: Uygulamayı başlat | Uygulamayı kurar veya günceller, veritabanını en son yapısına getirir. |
+| DWH: Uygulamayı başlat | Uygulamayı kurar veya günceller, veritabanını en son yapısına getirir. Sonunda SQL Server ve yapay zekâ modeli erişiminin açık mı kapalı mı olduğunu yazar. |
 | DWH: Uygulamayı durdur | Uygulamayı durdurur. Hesaplar, kurallar ve geçmiş silinmez. |
 | DWH: Uygulamanın durumunu göster | Uygulamanın hangi parçasının çalıştığını listeler. |
 | DWH: Arka uç günlüğünü izle | Uygulamanın sunucu tarafının (arka uç) yaptığı işlerin kaydını (günlük) canlı gösterir. Kapatmak için terminal panelindeki çöp kutusu simgesine basın. |
@@ -114,7 +114,39 @@ okuyabileceğiniz biçimde oluşturur.
 ## SQL Server ve yapay zekâ modeline bağlanmak
 
 Nesne incelemesi için bir SQL Server'a, her iki inceleme türü için de bir yapay zekâ modeline (LLM)
-bağlanmak gerekir. Ayarı iki yoldan verebilirsiniz:
+bağlanmak gerekir. Yerel uygulama güvenlik gereği dışarıya kapalıdır: siz açmadıkça ne
+bilgisayarınızdaki SQL Server'a ne de modele ulaşır.
+
+### Erişimi açmak
+
+1. `app/infra/.env` dosyasına şu satırı ekleyin:
+
+   ```sh
+   COMPOSE_PROFILES=local-egress
+   ```
+
+2. **DWH: Uygulamayı başlat** görevini çalıştırın. Görev, uygulamanın yanında bilgisayarınıza açılan
+   küçük bir geçit başlatır ve sonunda `SQL Server ve LLM erişimi açık` satırını yazar.
+
+Bu ayar uygulamaya yalnız **kendi bilgisayarınızdaki** üç kapıyı (port: bir programın dinlediği kapı
+numarası) açar:
+
+| Kapı (port) | Ne için |
+|---|---|
+| 1433 | SQL Server. Bilgisayarınızda çalışan SQL Server ya da 1433 kapısını (port) açan bir kapsayıcı (Docker'da ayrı kutuda çalışan uygulama), örneğin KT Verim'in yerel SQL Server'ı. |
+| 11434 | Ollama (modeli bilgisayarda çalıştıran araç). |
+| 1234 | LM Studio (modeli bilgisayarda çalıştıran başka bir araç). |
+
+Uygulama bu kapılara `host.docker.internal` adıyla ulaşır; bu ad, uygulamanın kendi kapsayıcısından
+sizin bilgisayarınıza ulaşmak için kullandığı addır. İnternete, kurum ağındaki başka bir
+bilgisayara ve bilgisayarınızın başka kapılarına (port) erişim yine kapalıdır.
+
+**Kapatmak için** satırı silin (ya da başına `#` koyun) ve **DWH: Uygulamayı başlat** görevini yeniden
+çalıştırın. Görev erişimi kapatır ve `SQL Server ve LLM erişimi kapalı` yazar.
+
+### Bağlantı ayarları
+
+Ayarı iki yoldan verebilirsiniz:
 
 - **Kalıcı:** `app/infra/.env` dosyasına aşağıdaki satırları ekleyip **DWH: Uygulamayı başlat**
   görevini çalıştırın.
@@ -124,7 +156,7 @@ bağlanmak gerekir. Ayarı iki yoldan verebilirsiniz:
 SQL Server satırları:
 
 ```sh
-DWHCODEREVIEW_MSSQL_SERVER=<sunucu adı>
+DWHCODEREVIEW_MSSQL_SERVER=host.docker.internal
 DWHCODEREVIEW_MSSQL_PORT=1433
 DWHCODEREVIEW_MSSQL_USER=<okuma hesabı>
 DWHCODEREVIEW_MSSQL_PASSWORD=<parola>
@@ -138,7 +170,7 @@ DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES=<veritabanı1,veritabanı2>
   edilir.
 - Okuma hesabı yalnız okuma yetkili olmalıdır; uygulama SQL Server'da hiçbir şey yazmaz.
 
-Yapay zekâ modeli satırları, bilgisayarınızda çalışan Ollama (katalogda varsa kurulan, modeli
+Yapay zekâ modeli (LLM) satırları, bilgisayarınızda çalışan Ollama (katalogda varsa kurulan, modeli
 bilgisayarda çalıştıran araç) örneğiyle:
 
 ```sh
@@ -147,23 +179,12 @@ DWHCODEREVIEW_LLM_BASE_URL=http://host.docker.internal:11434/v1
 DWHCODEREVIEW_LLM_MODEL=<Ollama'da yüklü modelin adı>
 ```
 
-- `host.docker.internal`, uygulamanın kendi kapsayıcısından sizin bilgisayarınıza ulaşmak için
-  kullandığı addır.
-- LM Studio gibi `/api/v1/chat` biçimini kullanan bir araçta `DWHCODEREVIEW_LLM_CHAT_API=api_v1_chat`
-  yazın.
+- LM Studio (modeli bilgisayarda çalıştıran başka bir araç) için adres
+  `http://host.docker.internal:1234/v1` olur; onun `/api/v1/chat` biçimini kullanıyorsanız
+  `DWHCODEREVIEW_LLM_CHAT_API=api_v1_chat` yazın.
 - Anahtar isteyen bir uç için `DWHCODEREVIEW_LLM_API_KEY` satırını ekleyin.
 - Uygulama yalnız kurum içi (özel) ağdaki adreslere istek gönderir; internetteki bir adres kabul
   edilmez.
-
-> **Bugünkü sınır:** Yerel uygulamanın iç ağı güvenlik gereği dışarıya kapalıdır. Bu yüzden uygulama
-> bugün ne bilgisayarınızdaki modele ne de ağdaki bir SQL Server'a ulaşabilir. **SQL bağlantısı**
-> sayfasındaki test "SQL Server'a ulaşılamadı." der; **LLM bağlantısı** sayfası
-> `host.docker.internal` adresini kaydetmez; `app/infra/.env` ile verilen modelde kurallar
-> "Değerlendirilemedi" olur. Kabul edilmiş
-> [Kubernetes dağıtımı PRD'si](../../specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md)
-> (PRD: bir özelliğin ne yapacağını yazan belge; Decision 15) bu erişimin ayrıca seçilen bir yerel ayarla açılmasını istiyor; o ayar projeye henüz
-> eklenmedi. Eklenene kadar yerelde giriş, kurallar, yayımlanmış kurallar, kullanıcılar ve geçmiş
-> ekranları çalışır, gerçek inceleme yapılamaz.
 
 ## Windows
 
@@ -194,8 +215,10 @@ gerektirir; o gelene kadar bu bölüm geçerlidir.
 | `yerel test hesabı oluşturulmadı: password is too common` | Daha az tahmin edilebilir bir parola seçin. |
 | `yerel test hesabı oluşturulmadı: password must not contain the account name` | Parola kullanıcı adını içermemeli. |
 | Girişte "Kullanıcı adı veya parola geçersiz." | Hesap açma görevini aynı adla yeniden çalıştırıp parolayı sıfırlayın. |
+| **SQL bağlantısı** sayfasındaki test "SQL Server'a ulaşılamadı." diyor ya da kurallar "Değerlendirilemedi" oluyor | [Erişimi açın](#erişimi-açmak) ve **DWH: Uygulamayı başlat** görevini yeniden çalıştırın; görev `SQL Server ve LLM erişimi açık` yazmalı. SQL Server'ın ya da modelin bilgisayarınızda çalıştığına ve [yukarıdaki](#erişimi-açmak) üç kapı numarasından (port) birini kullandığına bakın. |
+| **LLM bağlantısı** sayfası `host.docker.internal` adresini kaydetmiyor ("kurum içi ağda değil" diyor) | Erişim kapalıdır; [erişimi açıp](#erişimi-açmak) **DWH: Uygulamayı başlat** görevini yeniden çalıştırın. |
 | Tarayıcıda sayfa açılmıyor | **DWH: Uygulamanın durumunu göster** ile bütün parçaların çalıştığına bakın; gerekirse uygulamayı yeniden başlatın. |
 
 Kaynak: [Kubernetes dağıtımı PRD'si](../../specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md)
-Requirement 11 (yerel çalışma), [dizin girişi PRD'si](../../specs/application-foundation/PRDs/001-directory-login/PRD.md)
+Requirement 11 ve Decision 15 (yerel çalışma, SQL Server ve modele isteğe bağlı erişim), [dizin girişi PRD'si](../../specs/application-foundation/PRDs/001-directory-login/PRD.md)
 Requirement 11 (yerel test hesapları).

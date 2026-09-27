@@ -75,3 +75,8 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   `python3 scripts/check-dependency-admission.py`, `python3 scripts/check-config-sync.py`,
   `scripts/quality-gate.sh all`. Yerel gözlemlenebilirlik yığınında giriş ölçümü Prometheus'ta, aynı isteğin izi
   Tempo'da ve iz kimliği istek logunda gözlendi; bu, yerel ortam gözlemidir, `nonprod` kanıtı değildir.
+
+- [ ] Task 14 — Riskler (dizindeki her hesabın girebilmesi): girişi sahibin adını vereceği Active
+  Directory grubuna sınırla. Grup üyeliği kullanıcının kendi kaydından okunur; grupta olmayan hesap
+  403 alır, servis hesapları girişte reddedilir. Sahip kararı bekliyor (grup adı ve nonprod/yerel
+  ayrımı); karar gelince bu PRD Requirement ve Acceptance ile revize edilip yeniden kabul edilir.

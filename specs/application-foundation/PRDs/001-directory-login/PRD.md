@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.1.1
 
 Acceptance date: 2026-09-27
 
@@ -288,5 +288,9 @@ Belirtim → Plan → Görevler → Uygulama
   kilitleyebilir; nonprod eşiği teyit edilmelidir.
 - Nonprod dizin sunucusu eski TLS istiyor; bu ayarın üretimde kullanılmaması ayrı karar gerektirir.
 - Hız sınırı sayaçları süreç içindedir; backend birden çok kopyaya çıkarsa sınır kopya başına sayılır.
+- Dizinde hesabı olan herkes girebilir ve ilk girişte `inceleyici` olur; SPN taşımayan servis
+  hesapları da kişi gibi kabul edilir (2026-09-27 yerel sahte dizin gözlemi). Sahip 2026-09-27'de
+  bunu şimdilik kabul etti; girişi bir Active Directory grubuna sınırlama açık işi Task 14'tedir.
+  Grup denetimi kullanıcının kendi kaydındaki üyelikle yapılabilir, Decision 2'yi aşmaz.
 - Süper yönetici parolası kaybolursa rol yönetimi durur; sıfırlama işletim ekibinin küme erişimine
   bağlıdır. Aynı e-postalı yerel ve dizin hesabı çakışması elle çözülür.

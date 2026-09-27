@@ -110,7 +110,7 @@
       "artifact_id": "rule:45-dagitim-hedefi",
       "authority": "mandatory",
       "kind": "rule",
-      "sha256": "62236e9dcb3e0828c8a60f4bf12de0d2c307e1043beccdff15a3a313ba0949d5",
+      "sha256": "b7cdc1f22c0b6b82baa5658d0401fa36ecef40a708ba3ecdd52142be8a2cd7f4",
       "version": "0.4.0"
     },
     {
@@ -364,7 +364,7 @@
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "71d1aac656d8da276924204fbd059e4008c1cf26454572402adf8a9ce3d374f2",
+  "governance_digest": "1eeed1a06d8a4cb46dddc492447bb079d27821a41c3dc5806e019028f3ab549a",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

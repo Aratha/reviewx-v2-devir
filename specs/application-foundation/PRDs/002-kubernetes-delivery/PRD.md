@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.4.0
+Version: 1.5.0
 
 Acceptance date: 2026-09-27
 
@@ -10,7 +10,8 @@ Domain: [application-foundation](../../DOMAIN.md)
 
 Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, Decision 17'deki sahip kararıyla ve
 directory-login PRD'sinin Decision 13'teki nonprod ilk süper yönetici kararıyla hizalanmış haliyle
-kabul etti.
+kabul etti. Aynı gün chart sürümü, nonprod'daki `0.2.0` release'inin fabrikanın `0.1.0` chart'ıyla
+sorunsuz güncellendiği gözlenerek fabrikadan gelen sürüme hizalandı (Decision 19).
 
 ## Amaç
 
@@ -96,7 +97,8 @@ izler; eski adlı Ingress'i silme adımı taşınmaz.
 Requirement 1: `helm template` çıktısı tam olarak backend ve frontend Deployment'ı, PostgreSQL
 StatefulSet'i, göç Job'unu, bunların Service'lerini (hepsi `ClusterIP`), tek Ingress'i ve her iş
 yükü için NetworkPolicy'yi üretir; Secret, düğüm kapısı, yük dengeleyici veya küme kapsamlı nesne
-üretmez. Chart sürümü eski chart'ın `0.2.0` sürümünden büyüktür.
+üretmez. Chart sürümü fabrikanın yönettiği `Chart.yaml`'dan gelir; proje onu değiştirmez
+(Decision 19).
 
 Requirement 2: PostgreSQL 17 imajı yerel Compose ile aynı sürüm ve özetle (`@sha256`) sabitlenir ve
 KT Verim'in çektiği yoldan, düğümün Docker Hub aynası üzerinden `postgres` deposundan çekilir
@@ -116,9 +118,13 @@ yoktur). Veritabanını ilk kez getiren kurulumda veya yükseltmede Job, Postgre
 oluşur ve veritabanı bağlantı kabul edene kadar bekler; sonraki güncellemelerde yeni backend
 podlarından önce çalışan kanca olarak koşar. Job'un toplam süresi `activeDeadlineSeconds` (varsayılan
 600 saniye) ile sınırlıdır ve yeniden denenmez (`backoffLimit: 0`); `deploy.sh` Job'un bitmesini de
-bekler, başarısız göç güncellemeyi durdurur ve `--atomic` önceki sürümü korur. Backend hazır olma yoklaması şema imajın
-beklediği sürüme gelene kadar 503 döner. Göçler yalnız genişletici yazılır (eski sürüm yeni şemayla
-çalışabilir), çünkü geri almada şema geri indirilmez.
+bekler, başarısız göç güncellemeyi durdurur ve `--atomic` önceki sürümü korur. Backend hazır olma
+yoklaması, uygulama rolü veritabanına bağlanana ve veritabanındaki Alembic sürümü imajın taşıdığı
+son göçe (`head`) gelene kadar hata metni içermeyen sabit gövdeyle 503 döner; henüz oluşmamış rolün
+reddedilen girişi 500 veya hata izi üretmez, loga dakikada en çok bir kez yalnız neden ve hata
+sınıfı düşer. Şema bir kez doğrulanınca sonraki yoklamalar yalnız bağlantıyı dener. Göçler yalnız
+genişletici yazılır (eski sürüm yeni şemayla çalışabilir), çünkü geri almada şema geri indirilmez;
+bu yüzden imajın tanımadığı daha yeni şema sürümü hazır sayılır.
 
 Requirement 5: Runtime Secret `dwhcodereview-runtime`'ı `helm/dwhcodereview/deploy-hooks.sh`
 hazırlar. Anahtarları ve kaynakları:
@@ -265,6 +271,11 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   gereksiz yeniden başlatma olmamasını sınar; süper yönetici başlangıç parolası da aynı kurallarla
   sınanır. `deploy.sh`'ın kendi davranışının testleri fabrikadadır.
 - Göç: boş veritabanında `alembic upgrade head`, uygulama rolünün tablo oluşturamaması.
+- Hazır olma: `app/backend/tests/unit/test_readiness.py` head'de 200, tablo yokken, boş tabloda ve
+  eski sürümde 503, reddedilen girişte hata izi olmadan 503, olumlu sonucun önbelleğini, daha yeni
+  şemayı, olay sıklığı sınırını ve canlılığın veritabanından bağımsızlığını;
+  `app/backend/tests/integration/test_readiness_postgres.py` aynı durumları gerçek PostgreSQL'de
+  (head, henüz olmayan rol, geride kalan şema) sınar (Requirement 4).
 - Aktarım: göç Job'u boş veritabanında içe aktarım göçünü çalıştırır, kural sayısı ve içerik özeti
   depodaki `review_rules.json` kopyasıyla eşleşir, tekrar çalıştırmada değişiklik olmaz (göçün kendi
   testleri kural yönetimi PRD'sindedir).
@@ -339,6 +350,10 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   disk yeniden kullanılmaz (Decision 13).
 - Decision 18: Proje sahibinin 2026-09-27 kararı: nonprod'da elle geri alma (`helm rollback`) provası
   gereksizdir ve yapılmaz. Başarısız güncellemede `--atomic` ile kendiliğinden geri dönüş geçerlidir.
+- Decision 19: Chart sürümü fabrikadan gelir. Helm güncellemesi artan chart sürümü istemez:
+  2026-09-27'de nonprod'daki eski `0.2.0` release'i fabrikanın `0.1.0` sürümlü chart'ıyla aynı
+  release'te `helm upgrade` ile sorunsuz güncellendi. Sürümü projede yükseltmek fabrikanın yönettiği
+  `Chart.yaml`'ı elle düzenlemek olurdu (Requirement 1).
 
 ## Teslim akışı
 

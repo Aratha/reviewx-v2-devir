@@ -1,4 +1,4 @@
-"""Application construction, liveness, readiness, and OpenAPI tests."""
+"""Application construction, liveness, request logging, and OpenAPI tests."""
 
 import json
 import logging
@@ -10,7 +10,6 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api import health as health_module
 from app.core.config import get_settings
 from app.core.logging import ApplicationJsonHandler, configure_logging
 from app.main import app
@@ -149,29 +148,3 @@ def test_openapi_export_keeps_properties_named_title(tmp_path: Path) -> None:
     for component in components.values():
         for field in component.get("properties", {}).values():
             assert "title" not in field
-
-
-async def test_readiness_reports_database_state(
-    client: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def ready() -> bool:
-        return True
-
-    monkeypatch.setattr(health_module, "database_is_ready", ready)
-    response = await client.get(f"{get_settings().api_prefix}/readiness")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ready"}
-
-
-async def test_readiness_returns_503_when_database_is_unavailable(
-    client: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def unavailable() -> bool:
-        return False
-
-    monkeypatch.setattr(health_module, "database_is_ready", unavailable)
-    response = await client.get(f"{get_settings().api_prefix}/readiness")
-    assert response.status_code == 503
-    assert response.json() == {"status": "not-ready"}

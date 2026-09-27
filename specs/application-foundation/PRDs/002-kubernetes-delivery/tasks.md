@@ -49,12 +49,17 @@ küme kanıtı (Acceptance 3) yoktur.
   ve fabrikaya aittir.
 - [ ] Task 9 — Requirement 12 / Acceptance 3: güncellemeden sonra PostgreSQL'deki kural sayısı ve
   içerik özetinin depodaki kopyayla karşılaştırılması.
-- [ ] Task 10 — Acceptance 3: PR #14 birleşip GitHub imajları yayımladıktan sonra kullanıcının
-  tetiklediği argümansız Azure koşumu ve kümede doğrulama.
+- [x] Task 10 — Acceptance 3: Azure koşumu her `main` birleştirmesinde kendiliğinden, argümansız
+  çalıştı (2026-09-27: `acc1150` eski sürümü güncelledi; `4c9e903` ve `9722faf` sıradan güncelleme).
+  Kümede gözlendi: veritabanı StatefulSet'i 10Gi `nfs-sc` diskle hazır; ilk kurulumda `migration-init`,
+  sonraki koşumlarda `pre-upgrade` geçiş işi tamamlandı; backend hazır olma yoklaması 200, ön yüz
+  200, dizin girişi yanlış bilgide 401 `invalid_credentials`. İlk kurulumda geçiş bitene kadar
+  (yaklaşık bir dakika) backend istekleri veritabanı rolü henüz yokken hata aldı (Requirement 4 açığı).
 - [ ] Task 11 — Acceptance 4, Requirement 13: sahibin izniyle `helm rollback` provası.
-- [ ] Task 12 — Requirement 7, Decision 13: yeni sürüm sağlıklı açıldıktan sonra (2026-09-27)
-  eski PVC `dwhcodereview-backend-data` `deploy-hooks.sh`'teki tek seferlik adımla silinir; silindiği
-  kümede doğrulanınca adım kancadan ve testinden kaldırılır. Eski Secret anahtarları ve eski Azure
-  değişkenleri sahip tarafından elle silinir.
+- [x] Task 12 — Requirement 7, Decision 13: eski PVC `dwhcodereview-backend-data`, yeni sürüm
+  sağlıklı açıldıktan sonra Azure koşumunda (`9722faf`, 2026-09-27) tek seferlik kanca adımıyla
+  silindi; kümede PVC'nin kalmadığı gözlendi ve adım kancadan ve testinden kaldırıldı.
 - [ ] Task 13 — Decision 11: işletim ekibi SQL Server adresini verince `values-project.yaml`'a
   sunucu ve izinli veritabanı listesi yazılır ve çıkış `/32`'ye daraltılır.
+- [ ] Task 14 — Decision 13: eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından
+  elle silinir.

@@ -2,13 +2,14 @@
 
 Status: Accepted
 
-Version: 1.0.0
+Version: 1.1.0
 
-Acceptance date: 2026-09-26
+Acceptance date: 2026-09-27
 
 Domain: [sql-review](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-26'da, açık sorulardaki önerileri ve sahip kararlarını benimseyerek kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
+benimseyerek kabul etti.
 
 ## Amaç
 
@@ -64,9 +65,9 @@ Requirement 5: `nonprod` Ortamda ayar yazma ve bağlantı testi uçları yönlen
 
 Requirement 6: Her SQL Server çağrısı olay döngüsü dışında, `DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY` ile sınırlı ayrı iş parçacıklarında koşar. Giriş süresi ve sorgu süresi (sürücünün sorgu zaman aşımı) ayardan uygulanır. Bir katalog sorgusu 5 saniye beklerken sağlık ucu ve başka bir API isteği 200 milisaniyenin altında yanıt verir.
 
-Requirement 7: Veritabanı listesi `sys.databases` içinden `state = 0` olanların izin listesiyle kesişimidir (izin listesi büyük/küçük harf duyarsız karşılaştırılır; `local`'de boşsa bütün çevrimiçi veritabanları). Nesne listesi, Nesne tanımı ve Nesne meta verisi izin listesi dışındaki veritabanı için SQL Server'a gitmeden 403 `database_not_allowed` döner. Nesne meta verisinin çapraz veritabanı çözümü de yalnız izinli veritabanlarında arar. Kaynaktaki sınırlar korunur: derinlik 4, 48 Nesne, taranan en fazla 48 veritabanı, 95.000 karakter; Nesne listesi `LIST_OBJECTS_SQL` türlerini ve `q` ile `from_date` süzmesini aynı anlamla uygular.
+Requirement 7: Veritabanı listesi `sys.databases` içinden `state = 0` olanların izin listesiyle kesişimidir (izin listesi büyük/küçük harf duyarsız karşılaştırılır; `local`'de boşsa bütün çevrimiçi veritabanları). Nesne listesi, Nesne tanımı ve Nesne meta verisi izin listesi dışındaki veritabanı için SQL Server'a gitmeden 403 `database_not_allowed` döner. Nesne meta verisinin çapraz veritabanı çözümü de yalnız izinli veritabanlarında arar; üç parçalı başvuru (`veritabanı.şema.nesne`) yalnız adını taşıdığı veritabanında çözülür, o veritabanı izinli değilse atlanır. Kaynaktaki sınırlar korunur: derinlik 4, 48 Nesne, taranan en fazla 48 veritabanı, 95.000 karakter; Nesne listesi `LIST_OBJECTS_SQL` türlerini ve `q` ile `from_date` süzmesini aynı anlamla uygular.
 
-Requirement 8: Sürücü hataları SQLSTATE koduna (sürücünün hata sınıfını gösteren beş karakterli kod) göre sabit sınıflara eşlenir: `08001`/`08S01` → `sql_server_unreachable`, `28000` → `sql_login_failed`, `HYT00`/`HYT01` → `sql_timeout`, TLS/sertifika hatası → `sql_tls_failed`, diğerleri → `sql_query_failed`. Kullanıcıya yalnız sınıf, sabit Türkçe ileti ve istek kimliği (`x-request-id`) döner; ham sürücü metni, sunucu adı, kullanıcı adı veya SQL gösterilmez. Nesne incelemesine giden hata da aynı sınıfı taşır.
+Requirement 8: Sürücü hataları SQLSTATE koduna (sürücünün hata sınıfını gösteren beş karakterli kod) göre sabit sınıflara eşlenir: `08001`/`08S01` → `sql_server_unreachable`, `28000` → `sql_login_failed`, `HYT00`/`HYT01` → `sql_timeout`, TLS/sertifika hatası → `sql_tls_failed`, diğerleri → `sql_query_failed`. Bağlantı kurulurken dolan giriş süresi (`HYT00`) `sql_server_unreachable` sayılır: ODBC Driver 18 kapalı port ve çözülemeyen sunucu adı için yalnız bu kodu verir; sorgu sırasındaki `HYT00`/`HYT01` `sql_timeout` kalır. Kullanıcıya yalnız sınıf, sabit Türkçe ileti ve istek kimliği (`x-request-id`) döner; ham sürücü metni, sunucu adı, kullanıcı adı veya SQL gösterilmez. Nesne incelemesine giden hata da aynı sınıfı taşır.
 
 Requirement 9: Arayüz SQL bağlantısı sayfası (`local`) sunucu, port, kullanıcı, parola (maskeli; "kayıtlı" bilgisi ve "parolayı kaldır" seçeneğiyle), şifreleme ve sertifikaya güven alanlarını, "Kaydet", "Bağlantıyı test et" ve "Yenile" düğmelerini sunar. Test başarılıysa bulunan veritabanı sayısı ve ilk 8 adı gösterilir. Sayfa metni değerlerin yalnız çalışan sürece uygulandığını ve yeniden başlatmada `.env` değerlerine dönüldüğünü söyler; `backend/.env` dosyasına yazıldığını söyleyen metin kalkar.
 

@@ -41,8 +41,10 @@ INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
 WHERE s.name = ? AND o.name = ? AND RTRIM(o.type) = ?;
 """
 
+# referenced_id of a three-part reference is the object id inside referenced_database_name, so
+# the database travels with every row and the id is never looked up in the referencing database.
 REFERENCED_ENTITIES_SQL = """
-SELECT referenced_schema_name, referenced_entity_name, referenced_id
+SELECT referenced_schema_name, referenced_entity_name, referenced_id, referenced_database_name
 FROM sys.dm_sql_referenced_entities (?, 'OBJECT')
 """
 

@@ -2,9 +2,10 @@
 
 ``sys.dm_sql_referenced_entities`` is walked breadth first in each object's own database, at most
 4 levels deep and up to 48 objects; column summaries come from ``sys.columns`` and ``sys.types``
-of the database that holds the object; the text is cut at 95,000 characters. A two-part name that
-is not found locally is searched in at most 48 databases, and only in the allowed databases
-(sql-review/PRDs/002-sql-server-connection Requirement 7). This module runs in a worker thread;
+of the database that holds the object; the text is cut at 95,000 characters. A three-part
+reference is resolved only in the database it names, and only when that database is allowed; a
+two-part name that is not found locally is searched in at most 48 databases, and only in the
+allowed databases (sql-review/PRDs/002-sql-server-connection Requirement 7). This module runs in a worker thread;
 it never logs SQL, names or driver messages.
 """
 
@@ -171,20 +172,21 @@ class DependencyMetadataCollector:
 
     def _referenced_rows(
         self, cursor: Cursor, schema: str, name: str
-    ) -> list[tuple[str, str, int | None]]:
+    ) -> list[tuple[str, str, int | None, str | None]]:
         try:
             cursor.execute(REFERENCED_ENTITIES_SQL, f"{schema}.{name}")
         except Exception as error:  # noqa: BLE001 - the source skips unreadable objects
             _skipped(error)
             return []
-        out: list[tuple[str, str, int | None]] = []
+        out: list[tuple[str, str, int | None, str | None]] = []
         for row in cursor.fetchall():
             rn = row[1]
             if rn is None or str(rn).strip() == "":
                 continue
             rs = str(row[0] or "").strip() or "dbo"
             rid = row[2]
-            out.append((rs, str(rn).strip(), int(rid) if rid is not None else None))
+            rdb = str(row[3] or "").strip() or None
+            out.append((rs, str(rn).strip(), int(rid) if rid is not None else None, rdb))
         return out
 
     @staticmethod
@@ -212,6 +214,27 @@ class DependencyMetadataCollector:
                 _skipped(error)
         return None
 
+    def _resolve_in_named_database(
+        self, ref_db: str, ref_schema: str, ref_name: str, ref_id: int | None
+    ) -> tuple[str | None, int | None, str]:
+        """A three-part reference: its id and name belong to ``ref_db``, never to the caller."""
+
+        db_key = next((d for d in self.database_names if d.lower() == ref_db.lower()), None)
+        if db_key is None:
+            # Outside the allow-list or offline: the named database is never opened or scanned.
+            return None, None, ""
+        with self._open(db_key) as connection:
+            cursor = connection.cursor()
+            if ref_id is not None and int(ref_id) > 0:
+                cursor.execute(OBJECT_BY_ID_SQL, int(ref_id))
+                row = cursor.fetchone()
+                if row:
+                    return db_key, int(row[0]), str(row[1] or "").strip().upper()
+            oid, typ = self._resolve_object(cursor, ref_schema, ref_name)
+        if oid is None:
+            return None, None, ""
+        return db_key, oid, typ
+
     def _resolve_ref_target(
         self,
         context_db: str,
@@ -219,11 +242,15 @@ class DependencyMetadataCollector:
         ref_schema: str,
         ref_name: str,
         ref_id: int | None,
+        ref_db: str | None = None,
     ) -> tuple[str | None, int | None, str]:
         rs = (ref_schema or "").strip() or "dbo"
         rn = (ref_name or "").strip()
         if not rn:
             return None, None, ""
+
+        if ref_db and ref_db.lower() != context_db.lower():
+            return self._resolve_in_named_database(ref_db, rs, rn, ref_id)
 
         if ref_id is not None and int(ref_id) > 0:
             cursor.execute(OBJECT_BY_ID_SQL, int(ref_id))
@@ -278,13 +305,13 @@ class DependencyMetadataCollector:
             try:
                 with self._open(db) as connection:
                     cursor = connection.cursor()
-                    for ref_schema, ref_name, ref_id in self._referenced_rows(cursor, sch, nm):
+                    for ref_schema, ref_name, ref_id, ref_db in self._referenced_rows(
+                        cursor, sch, nm
+                    ):
                         self._visit(
                             db,
                             cursor,
-                            ref_schema,
-                            ref_name,
-                            ref_id,
+                            (ref_schema, ref_name, ref_id, ref_db),
                             depth,
                             queue,
                             seen_expand,
@@ -303,9 +330,7 @@ class DependencyMetadataCollector:
         self,
         db: str,
         cursor: Cursor,
-        ref_schema: str,
-        ref_name: str,
-        ref_id: int | None,
+        reference: tuple[str, str, int | None, str | None],
         depth: int,
         queue: deque[tuple[str, str, str, int]],
         seen_expand: set[tuple[str, str, str]],
@@ -313,7 +338,7 @@ class DependencyMetadataCollector:
         ordered: list[tuple[str, int]],
     ) -> None:
         try:
-            target_db, oid, typ = self._resolve_ref_target(db, cursor, ref_schema, ref_name, ref_id)
+            target_db, oid, typ = self._resolve_ref_target(db, cursor, *reference)
         except Exception as error:  # noqa: BLE001 - skipped like in the source
             _skipped(error)
             return

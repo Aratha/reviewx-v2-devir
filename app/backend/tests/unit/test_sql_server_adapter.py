@@ -165,7 +165,9 @@ class FakeObject:
     definition: str | None = None
     created: datetime | None = None
     modified: datetime | None = None
-    references: list[tuple[str, str, int | None]] = field(default_factory=list)
+    # (schema, name, referenced_id[, referenced_database_name]) as sys.dm_sql_referenced_entities
+    # reports them; the id of a three-part reference belongs to the named database.
+    references: list[tuple[Any, ...]] = field(default_factory=list)
     columns: list[tuple[str, str, int, int, int, bool]] = field(default_factory=list)
 
 
@@ -180,6 +182,7 @@ class FakeServer:
     peak: int = 0
     lock: threading.Lock = field(default_factory=threading.Lock)
     error: pyodbc.Error | None = None
+    query_error: pyodbc.Error | None = None
 
     def connect(
         self, connection_string: str, *, timeout: int, autocommit: bool
@@ -223,6 +226,8 @@ class FakeCursor:
         try:
             if server.delay_seconds:
                 time.sleep(server.delay_seconds)
+            if server.query_error is not None:
+                raise server.query_error
             self.rows = self._answer(sql, params)
         finally:
             with server.lock:
@@ -249,7 +254,7 @@ class FakeCursor:
         if sql == queries.REFERENCED_ENTITIES_SQL:
             (qualified,) = params
             match = [o for o in self.objects if f"{o.schema}.{o.name}" == qualified]
-            return list(match[0].references) if match else []
+            return [(*ref, None)[:4] for ref in match[0].references] if match else []
         if sql == queries.OBJECT_BY_ID_SQL:
             (object_id,) = params
             return [(o.object_id, o.type_code) for o in self.objects if o.object_id == object_id]
@@ -559,6 +564,79 @@ async def test_cross_database_lookup_scans_only_allowed_databases() -> None:
     assert "### Veritabanı: [Ref]" in text and "- dbo.Shared (TABLE)" in text
     assert "Hidden" not in text and "gizli" not in text
     assert "Other" not in server.connections
+
+
+async def test_a_three_part_reference_resolves_its_id_in_the_named_database() -> None:
+    # The referenced id of EDW.CON.Account is its id inside EDW; the referencing database holds
+    # an unrelated object with the same id, which must never be reported or expanded.
+    root = FakeObject(
+        1,
+        "CON",
+        "ins_Summary",
+        "P",
+        references=[("CON", "Account", 7, "edw"), ("CON", "Secret", 8, "Other")],
+    )
+    unrelated = FakeObject(
+        7,
+        "SMT",
+        "vUnrelated",
+        "V",
+        columns=[("ilgisiz", "int", 4, 10, 0, False)],
+        references=[("SMT", "Deeper", 9, None)],
+    )
+    server = FakeServer(
+        databases={
+            "EDWDM": [root, unrelated, FakeObject(9, "SMT", "Deeper", "U")],
+            "EDW": [
+                FakeObject(
+                    7, "CON", "Account", "U", columns=[("AccountId", "int", 4, 10, 0, False)]
+                )
+            ],
+            "Other": [
+                FakeObject(8, "CON", "Secret", "U", columns=[("gizli", "int", 4, 10, 0, False)])
+            ],
+        }
+    )
+    catalog = _catalog(server, allowed=frozenset({"EDWDM", "EDW"}))
+    try:
+        text = await catalog.fetch_object_metadata("EDWDM", "CON", "ins_Summary")
+    finally:
+        catalog.close()
+
+    assert "### Veritabanı: [EDW]\n- CON.Account (TABLE)\n  - AccountId int NOT NULL" in text
+    assert "vUnrelated" not in text and "ilgisiz" not in text and "Deeper" not in text
+    assert "Secret" not in text and "gizli" not in text
+    assert "Other" not in server.connections
+
+
+async def test_a_login_timeout_is_unreachable_but_a_query_timeout_stays_a_timeout(
+    sql_logs: list[logging.LogRecord],
+) -> None:
+    # The driver answers a closed port or an unknown host only with the login timeout HYT00.
+    server = FakeServer(
+        databases={"DWH": []},
+        error=pyodbc.OperationalError("HYT00", "[HYT00] Login timeout expired (0)"),
+    )
+    catalog = _catalog(server)
+    try:
+        with pytest.raises(SqlServerError) as unreachable:
+            await catalog.list_databases()
+        server.error = None
+        server.query_error = pyodbc.OperationalError("HYT00", "[HYT00] Query timeout expired (0)")
+        with pytest.raises(SqlServerError) as timed_out:
+            await catalog.list_objects("DWH")
+    finally:
+        catalog.close()
+
+    assert unreachable.value.error_class is SqlServerErrorClass.UNREACHABLE
+    assert unreachable.value.sqlstate == "HYT00"
+    assert timed_out.value.error_class is SqlServerErrorClass.TIMEOUT
+    outcomes = [
+        record.structured_fields["outcome"]  # type: ignore[attr-defined]
+        for record in sql_logs
+        if getattr(record, "structured_fields", {}).get("event") == "sql_server.call"
+    ]
+    assert outcomes == ["sql_server_unreachable", "sql_timeout"]
 
 
 async def test_a_failing_metadata_connection_is_reported_as_its_class() -> None:

@@ -1,6 +1,6 @@
 # Plan — llm-connection
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uçtur. `technology-profile.yml#llm_orchestration` gereği LLM
 erişimi uygulama portu ile altyapı uyarlayıcısı arasında ayrılır; Decision 5 uyarınca uyarlayıcı
 doğrudan `httpx` kullanır ve `requirements-llm.in` (LangChain) etkin değildir.

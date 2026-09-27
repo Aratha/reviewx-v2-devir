@@ -16,8 +16,9 @@ kurum ağındaki gerçek LLM ucuna çağrı yapılmadı.
   kendi test CA'sı olan gerçek TCP sahte sunucuyla SSE, düz JSON, `api_v1_chat`, 200 + `error`,
   500, yönlendirme, askıda kalma ve deneme sayısı, bağlantı reddi, 4 MiB, güvenilmeyen sertifika,
   genel adrese çözülen ad, bağlantı anında değişen adres, bağlanılan karşı adres, ortam vekili,
-  `User-Agent`/`Authorization`, iptal ve ilerleme sıklığı. Politika ve TLS redlerinde sahte sunucu
-  istek gövdesi almaz. Kanıt: `app/backend/tests/unit/test_llm_adapter.py`.
+  `User-Agent`/`Authorization`, iptal ve ilerleme sıklığı; `stream_options.include_usage` isteği ve
+  akışın boş `choices` taşıyan son kullanım parçasından belirteç sayıları. Politika ve TLS
+  redlerinde sahte sunucu istek gövdesi almaz. Kanıt: `app/backend/tests/unit/test_llm_adapter.py`.
 - [x] Task 3 — Requirement 6, 7 / Acceptance 2: 3 Nesne × 10 kurallı koşumda koşum sınırı, iki
   eşzamanlı koşumda süreç geneli sınır, iptal edilen koşumun bekleyen çağrılarının başlamaması.
   Kanıt: `app/backend/tests/unit/test_llm_adapter.py`.

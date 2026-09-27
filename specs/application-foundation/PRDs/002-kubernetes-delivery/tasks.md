@@ -62,3 +62,8 @@ küme kanıtı (Acceptance 3) yoktur.
   sunucu ve izinli veritabanı listesi yazılır ve çıkış `/32`'ye daraltılır.
 - [ ] Task 14 — Decision 13: eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından
   elle silinir.
+- [ ] Task 15 — Requirement 11, Decision 15: yerelde SQL Server ve LLM erişimini açan, ayrıca seçilen
+  Compose profili yoktur. 2026-09-27 yerel gözlem: varsayılan iç ağdaki backend
+  `host.docker.internal` adını çözemedi; `POST /sql-connection/test` `sql_server_unreachable`,
+  `PUT /llm-connection` `network_policy_denied` döndü. Profil gelene kadar yerel yığında gerçek
+  inceleme yapılamaz ([yerel kurulum](../../../../docs/tr/yerel-kurulum.md)).

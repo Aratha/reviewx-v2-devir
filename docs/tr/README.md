@@ -18,3 +18,11 @@ bilgi, altyapı adresi, ajan oturumu dökümü ve kabul edilmemiş yol haritası
 
 Depo çalışma akışı: [belirtimler](../../specs/README.md). Platform ilk çalıştırma:
 [kök README](../../README.md).
+
+## Kılavuzlar
+
+- [Kullanım kılavuzu](kullanim-kilavuzu.md): uygulamayı kullanan herkes için.
+- [Yönetici kılavuzu](yonetici-kilavuzu.md): süper yönetici, kural yöneticisi ve dağıtımı yöneten ekip
+  için.
+- [Yerel kurulum](yerel-kurulum.md): uygulamayı kendi bilgisayarında VS Code görevleriyle çalıştırmak
+  isteyenler için.

@@ -27,6 +27,12 @@ if not os.environ.get("DWHCODEREVIEW_JWT_PRIVATE_KEY"):
 # Tests never export telemetry, even inside the Compose backend whose overlay sets a collector;
 # they assert signals through the in-memory providers of the telemetry_capture fixture.
 os.environ["DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+# The Compose backend also passes the developer's own SQL Server and LLM values from the Git-ignored
+# app/infra/.env; tests assert the typed defaults and never reach those servers.
+for _name in [
+    name for name in os.environ if name.startswith(("DWHCODEREVIEW_MSSQL_", "DWHCODEREVIEW_LLM_"))
+]:
+    del os.environ[_name]
 # Unit tests never connect; integration runs receive the disposable test database URL explicitly.
 os.environ.setdefault(
     "DWHCODEREVIEW_DATABASE_URL",

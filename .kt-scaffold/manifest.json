@@ -165,7 +165,7 @@
     ".github/workflows/schema-check.yml": "9b8787e6a577bbe4d2be477f2364982f542099a7dc2328d4934dc29662dc3b22",
     ".github/workflows/security-scan.yml": "3de8ca609cac2f4b40dc34504e7e144a32be9385dbefe9e395d3344a77b4d892",
     ".gitignore": "969d412aeffb8e18d009f2a2c02a19ed55a5a0249aefce0ff5f892312d40cd90",
-    ".gitleaks.toml": "e11b46ad50c7ef88eff0a3dd721e0f25b8db8248ef38952c63a08cbc45e11f4b",
+    ".gitleaks.toml": "cc734069ed7c8934c18474b791d9145f8157bb569b514f341ed447178221d89b",
     ".kt-scaffold/agent-projections/.codex/agents/acik-kaynak-lisansi.toml": "60105cb7df65108421b1fc47864857806ae56669ded28236636fa71f3b1423d7",
     ".kt-scaffold/agent-projections/.codex/agents/bilgi-guvenligi.toml": "fceac1f2c7a30c1f75c730e7a3214c0598d6a298787a037af48d24e6f4a19228",
     ".kt-scaffold/agent-projections/.codex/agents/devops.toml": "76fb0d0bbf798b90e695b1b623069917d260c644fc24a3642b224c145db998d9",

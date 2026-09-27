@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.3.1
+Version: 1.4.0
 
 Acceptance date: 2026-09-27
 
@@ -200,11 +200,8 @@ Requirement 9'daki içe aktarım göçüyle, göç Job'u içinde girer; ayrı bi
 güncellemeden önce elle adım yoktur (Decision 12). Güncellemeden sonra kural sayısı ve kimlik+metin
 içerik özeti depodaki `review_rules.json` kopyasıyla eşittir. Eski diskteki dosyalar aktarılmaz.
 
-Requirement 13: Geri alma: başarısız güncelleme `--atomic` ile kendiliğinden önceki sürüme döner;
-elle geri alma `helm rollback` ile yapılır ve şemayı geri indirmez. Geçiş öncesi sürüme dönüş eski
-uygulamayı eski disk ve korunan eski Secret anahtarlarıyla açar; eski disk silindiyse eski uygulama
-boş diskle, koddaki varsayılan kurallarla açılır. Geçişten sonra PostgreSQL'de yapılan kural
-değişiklikleri eski uygulamaya taşınmaz.
+Requirement 13: Geri alma: başarısız güncelleme `--atomic` ile kendiliğinden önceki sürüme döner ve
+şemayı geri indirmez. Elle geri alma için prova yapılmaz (Decision 18).
 
 ## API sözleşmesi
 
@@ -295,9 +292,7 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   PostgreSQL diski 10Gi `nfs-sc` bağlı, göç Job'u başarılı; HTTPS adresi `ailab-tls` ile açılır;
   backend LDAPS ve LLM'e ulaşır, listede olmayan adrese ulaşamaz; SQL Server gizli değişkenleri ve
   adresi yokken SQL Server alanı "yapılandırılmamış" görünür; PostgreSQL'deki kurallar depodaki
-  kopyayla eşleşir; eski disk yerindedir (Requirement 1–10, 12).
-- [ ] Acceptance 4: L2 — Nonprod'da sahibin izniyle geri alma provası: bir önceki sürüme
-  `helm rollback` sonrası uygulama hazır olur ve veri kaybı olmaz (Requirement 13).
+  kopyayla eşleşir (Requirement 1–10, 12).
 
 ## Kararlar
 
@@ -342,6 +337,8 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   vermezse uygulama yine açılır ve SQL Server alanı "yapılandırılmamış" görünür; değerler hiçbir
   zaman yazdırılmaz, loglanmaz veya Git'e girmez. PostgreSQL 10Gi `nfs-sc` diskle çalışır; eski 5Gi
   disk yeniden kullanılmaz (Decision 13).
+- Decision 18: Proje sahibinin 2026-09-27 kararı: nonprod'da elle geri alma (`helm rollback`) provası
+  gereksizdir ve yapılmaz. Başarısız güncellemede `--atomic` ile kendiliğinden geri dönüş geçerlidir.
 
 ## Teslim akışı
 

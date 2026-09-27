@@ -55,7 +55,6 @@ küme kanıtı (Acceptance 3) yoktur.
   sonraki koşumlarda `pre-upgrade` geçiş işi tamamlandı; backend hazır olma yoklaması 200, ön yüz
   200, dizin girişi yanlış bilgide 401 `invalid_credentials`. İlk kurulumda geçiş bitene kadar
   (yaklaşık bir dakika) backend istekleri veritabanı rolü henüz yokken hata aldı (Requirement 4 açığı).
-- [ ] Task 11 — Acceptance 4, Requirement 13: sahibin izniyle `helm rollback` provası.
 - [x] Task 12 — Requirement 7, Decision 13: eski PVC `dwhcodereview-backend-data`, yeni sürüm
   sağlıklı açıldıktan sonra Azure koşumunda (`9722faf`, 2026-09-27) tek seferlik kanca adımıyla
   silindi; kümede PVC'nin kalmadığı gözlendi ve adım kancadan ve testinden kaldırıldı.

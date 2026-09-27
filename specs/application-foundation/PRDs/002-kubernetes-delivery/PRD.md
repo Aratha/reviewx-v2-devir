@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.2.0
+Version: 1.3.0
 
 Acceptance date: 2026-09-27
 
@@ -158,8 +158,8 @@ Backend yalnız `dwhcodereview-database`'i görür.
 
 Requirement 7: Backend'e kural diski bağlanmaz; yazılabilir tek alanı boyutu sınırlı `/tmp`'dir.
 Kurallar, inceleme sonuçları ve LLM çağrı özetleri PostgreSQL'dedir. Eski PVC
-`dwhcodereview-backend-data` güncellemeyle silinmez ve yeniden kullanılmaz; yeni sürüm nonprod'da
-sağlıklı açıldıktan sonra proje sahibi elle siler (Decision 13).
+`dwhcodereview-backend-data` yeniden kullanılmaz; yeni sürüm nonprod'da sağlıklı açıldıktan sonra
+tek seferlik kanca adımıyla silinir (Decision 13).
 
 Requirement 8: Ağ kuralları (varsayılan: her şey kapalı):
 
@@ -233,9 +233,9 @@ Requirement 5'teki isteğe bağlı gizli değişkenler, `IMAGE_WAIT_SECONDS`, `P
   yerinde güncellenir, eski ConfigMap kalkar; (2) göç Job'u (Requirement 4) uygulama rolünü
   hazırlar, şemayı kurar ve kuralları içe aktarır; (3) kural sayısı ve içerik özeti depodaki kopyayla
   karşılaştırılır.
-- Eski PVC `dwhcodereview-backend-data`, eski Secret anahtarları (`MSSQL_CONNECTION_STRING`,
-  `API_ACCESS_TOKEN`, `API_ADMIN_TOKEN` ve öneksiz diğerleri) ve eski Azure değişkenleri
-  güncellemeyle silinmez; sonra elle silinir (Decision 13).
+- Eski PVC `dwhcodereview-backend-data` yeni sürüm sağlıklı açıldıktan sonra tek seferlik kanca
+  adımıyla silinir; eski Secret anahtarları (`MSSQL_CONNECTION_STRING`, `API_ACCESS_TOKEN`,
+  `API_ADMIN_TOKEN` ve öneksiz diğerleri) ve eski Azure değişkenleri elle silinir (Decision 13).
 - Veritabanı yedeği ve yedekten geri dönüş bu teslimin kapsamında değildir (Decision 10).
 
 ## Gözlemlenebilirlik
@@ -323,8 +323,11 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   eski diskte taşınacak kural verisi yoktur; güncelleme eski dosyanın parmak izini beklemez. Böylece
   elle dosya taşıma, `kubectl exec` ile veri verme ve geçici pod gerekmez.
 - Decision 13: Eski disk `dwhcodereview-backend-data`, yeni sürüm nonprod'da sağlıklı açıldıktan
-  sonra proje sahibinin elle yaptığı adımla silinir; eski Secret anahtarları ve eski Azure
-  değişkenleri de elle silinir. `deploy.sh` ve kanca hiç anahtar veya disk silmez.
+  sonra silinir. Sahibin küme hesabında silme yetkisi olmadığından (2026-09-27) silme, Azure
+  koşumunun yetkisiyle `deploy-hooks.sh`'teki tek seferlik adımla yapılır: adım diski yalnız hiçbir
+  pod bağlamıyorsa siler, okuma veya silme hatasında dağıtımı durdurmadan diski yerinde bırakır ve
+  disk silindikten sonra kancadan kaldırılır. Eski Secret anahtarları ve eski Azure değişkenleri
+  elle silinir; kanca başka anahtar veya disk silmez.
 - Decision 14: JWT imza anahtarı Azure değişkeninde taşınmaz; `deploy-hooks.sh` ilk kurulumda P-256
   anahtarını bir kez üretir ve sonraki çalıştırmalarda kümedekini kullanır; pipeline değişkeni
   verilirse o geçerlidir (Requirement 5).

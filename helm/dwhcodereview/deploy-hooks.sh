@@ -106,6 +106,31 @@ if [[ -s "$work/keys/DWHCODEREVIEW_MSSQL_USER" ]] \
   fail 'MSSQL_USER must not contain control characters'
 fi
 
+# One-time step (PRD Decision 13, tasks.md Task 12): delete the previous application's 5Gi rules
+# disk with the Azure run's rights, because the owner's cluster account cannot. The release keeps
+# its data in PostgreSQL and never mounts this claim. A claim that some pod still mounts, or whose
+# use cannot be read, is left in place, and no error here stops the deployment. Remove this block
+# once the claim is gone.
+legacy_claim=dwhcodereview-backend-data
+if claim="$(kubectl --namespace "$namespace" get persistentvolumeclaim "$legacy_claim" \
+  --ignore-not-found --output name 2>/dev/null)"; then
+  if [[ -n "$claim" ]]; then
+    mounted="$(kubectl --namespace "$namespace" get pods --output \
+      'jsonpath={range .items[*]}{range .spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\n"}{end}{end}' \
+      2>/dev/null)" || mounted="$legacy_claim"
+    if grep -qx -- "$legacy_claim" <<< "$mounted"; then
+      echo "[LEGACY] $legacy_claim is mounted or its use is unknown; left in place"
+    elif kubectl --namespace "$namespace" delete persistentvolumeclaim "$legacy_claim" \
+      --wait=false >/dev/null 2>&1; then
+      echo "[LEGACY] $legacy_claim deleted"
+    else
+      echo "[LEGACY] $legacy_claim could not be deleted; left in place"
+    fi
+  fi
+else
+  echo "[LEGACY] $legacy_claim could not be read; left in place"
+fi
+
 if [[ ${#changed[@]} -eq 0 ]]; then
   echo "[RUNTIME] Secret $secret unchanged"
   exit 0

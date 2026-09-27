@@ -60,6 +60,18 @@ case "$1 $2" in
   "get deployment")
     cat "$FAKE_STATE/deployments" 2>/dev/null || true
     ;;
+  "get persistentvolumeclaim")
+    [[ -z "${FAKE_PVC_GET_FAILS:-}" ]] || exit 1
+    if [[ -e "$FAKE_STATE/claims/$3" ]]; then echo "persistentvolumeclaim/$3"; fi
+    ;;
+  "get pods")
+    [[ -z "${FAKE_PODS_GET_FAILS:-}" ]] || exit 1
+    cat "$FAKE_STATE/mounted-claims" 2>/dev/null || true
+    ;;
+  "delete persistentvolumeclaim")
+    [[ -z "${FAKE_PVC_DELETE_FAILS:-}" ]] || exit 1
+    rm -f "$FAKE_STATE/claims/$3"; echo "$3" >> "$FAKE_STATE/delete.log"
+    ;;
   "rollout restart") echo "$3" >> "$FAKE_STATE/restart.log" ;;
   "rollout status") ;;
   *) echo "fake kubectl: unexpected call: $*" >&2; exit 97 ;;
@@ -226,6 +238,44 @@ printf 'dwhcodereview-dwhcodereview-backend-f5594230b40d\texample.test/dwhcodere
 run_hook
 check 'a backend moving to a new image tag is left to Helm' test ! -e "$current/restart.log"
 unset tag
+
+legacy=dwhcodereview-backend-data
+with_legacy_claim() { mkdir -p "$current/claims"; : > "$current/claims/$legacy"; }
+
+new_state legacy-unmounted
+with_legacy_claim
+run_hook
+check 'an unmounted legacy rules disk is deleted' grep -qx "$legacy" "$current/delete.log"
+check 'the legacy disk deletion is reported' grep -q "\[LEGACY\] $legacy deleted" "$current/stdout"
+: > "$current/delete.log"
+run_hook
+check 'a deleted legacy disk is not deleted again' test ! -s "$current/delete.log"
+check 'a missing legacy disk leaves the run green' test "$status" -eq 0
+
+new_state legacy-mounted
+with_legacy_claim
+printf 'data-dwhcodereview-database-0\n%s\n' "$legacy" > "$current/mounted-claims"
+run_hook
+check 'a mounted legacy disk is kept' test -e "$current/claims/$legacy"
+check 'a mounted legacy disk is never deleted' test ! -e "$current/delete.log"
+
+new_state legacy-pods-unreadable
+with_legacy_claim
+run_hook FAKE_PODS_GET_FAILS=1
+check 'a legacy disk with unknown use is kept' test -e "$current/claims/$legacy"
+check 'unknown disk use does not stop the deployment' test "$status" -eq 0
+
+new_state legacy-unreadable
+with_legacy_claim
+run_hook FAKE_PVC_GET_FAILS=1
+check 'an unreadable legacy disk is kept' test -e "$current/claims/$legacy"
+check 'an unreadable legacy disk does not stop the deployment' test "$status" -eq 0
+
+new_state legacy-delete-denied
+with_legacy_claim
+run_hook FAKE_PVC_DELETE_FAILS=1
+check 'a refused legacy disk deletion does not stop the deployment' test "$status" -eq 0
+check 'a refused legacy disk deletion is reported' grep -q "$legacy could not be deleted" "$current/stdout"
 
 check 'the hook writes the Secret values-project.yaml names' \
   grep -qx '  existingSecret: dwhcodereview-runtime' "$layer"

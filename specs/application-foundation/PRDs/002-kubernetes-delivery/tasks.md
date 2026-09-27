@@ -52,8 +52,9 @@ küme kanıtı (Acceptance 3) yoktur.
 - [ ] Task 10 — Acceptance 3: PR #14 birleşip GitHub imajları yayımladıktan sonra kullanıcının
   tetiklediği argümansız Azure koşumu ve kümede doğrulama.
 - [ ] Task 11 — Acceptance 4, Requirement 13: sahibin izniyle `helm rollback` provası.
-- [ ] Task 12 — Requirement 7, Decision 13: yeni sürüm sağlıklı açıldıktan sonra eski PVC
-  `dwhcodereview-backend-data`, eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından
-  elle silinir.
+- [ ] Task 12 — Requirement 7, Decision 13: yeni sürüm sağlıklı açıldıktan sonra (2026-09-27)
+  eski PVC `dwhcodereview-backend-data` `deploy-hooks.sh`'teki tek seferlik adımla silinir; silindiği
+  kümede doğrulanınca adım kancadan ve testinden kaldırılır. Eski Secret anahtarları ve eski Azure
+  değişkenleri sahip tarafından elle silinir.
 - [ ] Task 13 — Decision 11: işletim ekibi SQL Server adresini verince `values-project.yaml`'a
   sunucu ve izinli veritabanı listesi yazılır ve çıkış `/32`'ye daraltılır.

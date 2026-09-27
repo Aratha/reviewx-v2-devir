@@ -2,13 +2,14 @@
 
 Status: Accepted
 
-Version: 1.0.0
+Version: 1.1.0
 
-Acceptance date: 2026-09-26
+Acceptance date: 2026-09-27
 
 Domain: [sql-review](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-26'da, açık sorulardaki önerileri ve sahip kararlarını benimseyerek kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
+benimseyerek kabul etti.
 
 ## Amaç
 
@@ -61,7 +62,7 @@ Requirement 1: Tipli ayarlar: `DWHCODEREVIEW_LLM_CHAT_API` (`openai` veya `api_v
 
 Requirement 2: Sohbet adresi Mevcut davranış bölümündeki kurala göre tek güvenli adres birleştirme yardımcısıyla üretilir. Kullanıcı adı/parola içeren (`kullanıcı:parola@`), parça (`#`) taşıyan veya `http`/`https` dışındaki adres 422 ile reddedilir; `http` yalnız `local` Ortamda kabul edilir.
 
-Requirement 3: `openai` biçimi `model`, iki öğeli `messages` (sistem ve kullanıcı) ve `stream: true` gönderir; SSE parçalarından metni ve `usage.completion_tokens` değerini toplar, akış gelmezse düz JSON gövdeyi okur. `api_v1_chat` biçimi `model`, `system_prompt`, `input` gönderir. İki biçimde de ilerleme olayı `llm_stream` yalnız kural kimliği, belirteç ve karakter sayısını taşır, bir çağrı için saniyede en fazla 5 kez gönderilir. 200 kodlu `{"error": …}` gövdesi ve boş metin başarısız sayılır.
+Requirement 3: `openai` biçimi `model`, iki öğeli `messages` (sistem ve kullanıcı), `stream: true` ve `stream_options: {"include_usage": true}` gönderir; SSE parçalarından metni ve akışın son parçasındaki `usage.completion_tokens` ile `usage.prompt_tokens` değerlerini toplar, akış gelmezse düz JSON gövdeyi okur. `api_v1_chat` biçimi `model`, `system_prompt`, `input` gönderir. İki biçimde de ilerleme olayı `llm_stream` yalnız kural kimliği, belirteç ve karakter sayısını taşır, bir çağrı için saniyede en fazla 5 kez gönderilir. 200 kodlu `{"error": …}` gövdesi ve boş metin başarısız sayılır.
 
 Requirement 4: Her çağrıdan önce adın çözüldüğü bütün adresler ve bağlantının gerçekten kurulduğu karşı adres özel ağ aralığında olmalıdır (RFC1918, loopback, link-local, IPv6 ULA, `100.64.0.0/10`). Aksi durumda istek gövdesi gönderilmeden çağrı `network_policy_denied` sonucuyla biter. `local`'de ayar kaydı da aynı denetimi yapar ve uymayan adresi 422 ile reddeder.
 

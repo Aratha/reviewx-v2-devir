@@ -44,4 +44,6 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   (403) ve silemez (403); sahip onaylı silme yapar.
 - [ ] Task 6 — Acceptance 4 ve 5'in kalan bölümü: CSV'nin Excel'de Türkçe karakterlerle açıldığının
   kişi tarafından görülmesi ve saklama süresi 1 güne ayarlanıp bitiş zamanı geçmişe çekilen koşumun
-  saklama işiyle silinmesinin gözlenmesi; açık.
+  saklama işiyle silinmesinin gözlenmesi; açık. 2026-09-27'de yerel yığında varsayılan 90 günle, bitişi
+  91 gün öncesine çekilen koşum ve başlangıcı 91 gün öncesine çekilen LLM çağrı özeti arka uç
+  açılışındaki saklama işiyle silindi; 1 günlük ayarla koşum ve Excel gözlemi yapılmadı.

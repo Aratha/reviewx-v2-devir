@@ -1,6 +1,6 @@
 # Plan — sql-server-connection
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.0.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 
 ## Katmanlar ve dosyalar

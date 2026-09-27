@@ -2,7 +2,7 @@
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
 Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerden geçti) kanıtıdır. Gerçek
-bir SQL Server'a karşı tümleşik test çalıştırılmadı: yerelde erişilebilir SQL Server yoktu.
+bir SQL Server'a karşı yapılan yerel gözlem Task 9'dadır.
 
 - [x] Task V1 — Requirement 1 / Acceptance 1: tipli ayar alanları ve aralık doğrulaması. Kanıt:
   `app/backend/tests/unit/test_config.py`, `python3 scripts/check-config-sync.py`.
@@ -12,11 +12,14 @@ bir SQL Server'a karşı tümleşik test çalıştırılmadı: yerelde erişileb
 - [x] Task 2 — Requirement 2, 8 / Acceptance 1: bağlantı dizesi yardımcısı ve SQLSTATE hata
   sınıfları. Kanıt: `app/backend/tests/unit/test_sql_server_adapter.py`
   (`test_connection_string_*`, `test_unsafe_server_names_are_rejected`,
-  `test_driver_errors_map_to_fixed_classes`).
+  `test_driver_errors_map_to_fixed_classes`,
+  `test_a_login_timeout_is_unreachable_but_a_query_timeout_stays_a_timeout`).
 - [x] Task 3 — Requirement 6, 7, Decision 2 / Acceptance 1, Acceptance 2: port ve pyodbc
   uyarlayıcısı; izin listesi, Nesne listesi süzmesi, tanım, Nesne meta verisi sınırları, olay
-  döngüsünün 5 saniyelik bekleme sırasında 200 ms altında yanıt vermesi ve eşzamanlılık sınırı.
-  Kanıt: `app/backend/tests/unit/test_sql_server_adapter.py`.
+  döngüsünün 5 saniyelik bekleme sırasında 200 ms altında yanıt vermesi ve eşzamanlılık sınırı;
+  üç parçalı başvurunun yalnız adını taşıdığı izinli veritabanında çözülmesi. Kanıt:
+  `app/backend/tests/unit/test_sql_server_adapter.py`
+  (`test_a_three_part_reference_resolves_its_id_in_the_named_database`).
 - [x] Task 4 — Requirement 3, 4, 5, Decision 3, 8 / Acceptance 1: süreç içi ayar deposu, kısmi
   değişiklik, parola koruma/silme, kayıtlı parolanın başka hedefe gönderilmemesi, parolanın yanıt,
   log, `.env` ve süreç ortamında bulunmaması. Kanıt:
@@ -46,6 +49,12 @@ bir SQL Server'a karşı tümleşik test çalıştırılmadı: yerelde erişileb
   false` iken menü öğesi yok). Yerel tarayıcıda `e2e/sql-review/03-settings-objects-users.mjs`
   sayfayı, kaydetmeden testin sabit hata iletisini ve inceleyiciye kapalı menüyü gözledi.
 - [ ] Task 9 — Requirement 3, 4, 7, 9 / Acceptance 4 ve Requirement 5, 7 / Acceptance 5: geliştirici
-  SQL Server'ı ve `nonprod` ayarlarıyla L2 doğrulaması; gerçek SQL Server'a karşı tümleşik testler
-  (yanlış parola `sql_login_failed`, erişilemeyen port `sql_server_unreachable`). Yerel Compose ağı
-  dışarı çıkamadığı için erişilebilir SQL Server yok; açık.
+  SQL Server'ı ve `nonprod` ayarlarıyla L2 doğrulaması. Acceptance 4 bölümü 2026-09-27'de yerel
+  Compose'da, veri ambarının yalnız şema kopyasını taşıyan SQL Server 2022 Developer sürümüne
+  `CONNECT ANY DATABASE` ve `VIEW ANY DEFINITION` dışında yetkisi olmayan okuyucu hesapla gözlendi:
+  tarayıcıda sertifikaya güven kapalıyken test `sql_tls_failed`, açıkken 11 izinli veritabanıyla
+  başarılı; kayıt `app/infra/.env` dosyasını değiştirmedi; İnceleme sayfasında veritabanı ve Nesne
+  listelendi; üç veritabanında görünüm, yordam ve tablo değerli fonksiyon tanımları ile çapraz
+  veritabanı meta verisi port üzerinden okunup incelemeye verildi; izin dışı ve sistem veritabanı
+  403 aldı; API ile yanlış parola `sql_login_failed`, kapalı port ve çözülemeyen ad
+  `sql_server_unreachable` döndü. Acceptance 5 (`nonprod` ayarlarıyla yerel sürüm) açık.

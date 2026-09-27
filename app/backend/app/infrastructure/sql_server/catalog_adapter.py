@@ -180,6 +180,10 @@ class PyodbcSqlCatalog:
                 outcome, sqlstate = classified.error_class.value, classified.sqlstate
                 call.outcome = outcome
                 raise classified from None
+            except SqlServerError as classified:
+                outcome, sqlstate = classified.error_class.value, classified.sqlstate
+                call.outcome = outcome
+                raise
             finally:
                 log_event(
                     logger,
@@ -196,9 +200,17 @@ class PyodbcSqlCatalog:
     def _open(
         self, config: SqlServerConnectionConfig, database: str, login_timeout: int
     ) -> Connection:
-        connection = self._connect_factory(
-            build_connection_string(config, database), timeout=login_timeout, autocommit=True
-        )
+        try:
+            connection = self._connect_factory(
+                build_connection_string(config, database), timeout=login_timeout, autocommit=True
+            )
+        except pyodbc.Error as error:
+            classified = classify_driver_error(error)
+            if classified.error_class is SqlServerErrorClass.TIMEOUT:
+                # ODBC Driver 18 reports a closed port or an unresolvable name only as the login
+                # timeout HYT00: no session was established, so the server is unreachable.
+                raise SqlServerError(SqlServerErrorClass.UNREACHABLE, classified.sqlstate) from None
+            raise
         connection.timeout = self._query_timeout
         return connection  # type: ignore[no-any-return]
 

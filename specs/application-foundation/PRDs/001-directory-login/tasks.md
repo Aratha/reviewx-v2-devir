@@ -1,7 +1,7 @@
 # Görevler — directory-login
 
-[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti (arka uç 614/614, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
+Compose yığınında geçti (arka uç 616/616, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
 yönetişim sapması ve chart adımları dahil). Bu, arka uç ve ön yüz için L1 (otomatik testlerden
 geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) Task 11'dedir.
 

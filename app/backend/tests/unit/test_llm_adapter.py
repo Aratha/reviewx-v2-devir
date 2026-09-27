@@ -256,7 +256,11 @@ async def test_openai_stream_returns_text_counts_and_throttled_progress(
             writer.write(sse_event(openai_delta(f"parça{index} ")))
             await writer.drain()
             await asyncio.sleep(0.05)
-        writer.write(sse_event(openai_delta(f"{MARKER}", completion_tokens=13)))
+        writer.write(sse_event(openai_delta(f"{MARKER}")))
+        # The usage chunk of a stream with include_usage: empty choices, only the counts.
+        writer.write(
+            sse_event({"choices": [], "usage": {"completion_tokens": 13, "prompt_tokens": 7}})
+        )
         writer.write(chunk(b"data: [DONE]\n\n") + chunk(b""))
         await writer.drain()
 
@@ -282,6 +286,7 @@ async def test_openai_stream_returns_text_counts_and_throttled_progress(
             {"role": "user", "content": f"SELECT '{MARKER}' FROM dbo.Musteri"},
         ],
         "stream": True,
+        "stream_options": {"include_usage": True},
     }
     assert events and all(e.rule_code == "Kural05" for _, e in events)
     gaps = [b[0] - a[0] for a, b in itertools.pairwise(events)]

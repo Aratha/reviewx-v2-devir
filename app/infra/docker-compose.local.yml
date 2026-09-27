@@ -79,13 +79,15 @@ services:
       DWHCODEREVIEW_DIRECTORY_CONNECT_TIMEOUT_SECONDS: "5"
       DWHCODEREVIEW_DIRECTORY_READ_TIMEOUT_SECONDS: "10"
       # The default local network has no egress; SQL Server and LLM values stay empty unless the
-      # developer supplies them from the shell or the Git-ignored app/infra/.env.
+      # developer supplies them from the shell or the Git-ignored app/infra/.env. A developer SQL
+      # Server with a self-signed certificate needs DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true
+      # there; outside the development environment the backend refuses to start with it.
       DWHCODEREVIEW_MSSQL_SERVER: "${DWHCODEREVIEW_MSSQL_SERVER:-}"
       DWHCODEREVIEW_MSSQL_PORT: "${DWHCODEREVIEW_MSSQL_PORT:-1433}"
       DWHCODEREVIEW_MSSQL_USER: "${DWHCODEREVIEW_MSSQL_USER:-}"
       DWHCODEREVIEW_MSSQL_PASSWORD: "${DWHCODEREVIEW_MSSQL_PASSWORD:-}"
-      DWHCODEREVIEW_MSSQL_ENCRYPT: "true"
-      DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE: "false"
+      DWHCODEREVIEW_MSSQL_ENCRYPT: "${DWHCODEREVIEW_MSSQL_ENCRYPT:-true}"
+      DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE: "${DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE:-false}"
       DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES: "${DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES:-}"
       DWHCODEREVIEW_MSSQL_LOGIN_TIMEOUT_SECONDS: "15"
       DWHCODEREVIEW_MSSQL_QUERY_TIMEOUT_SECONDS: "60"

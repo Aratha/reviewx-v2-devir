@@ -206,6 +206,9 @@ async def _openai_call(
             {"role": "user", "content": request.user_content},
         ],
         "stream": True,
+        # Streaming servers (vLLM, Ollama, OpenAI) report usage only when asked: a final chunk
+        # with empty choices carries completion_tokens and prompt_tokens (Requirement 3).
+        "stream_options": {"include_usage": True},
     }
     async with client.stream(
         "POST", endpoint.chat_url, json=payload, headers=_headers(endpoint)

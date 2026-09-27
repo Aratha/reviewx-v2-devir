@@ -12,7 +12,8 @@ import {withBrowser, baseUrl, accounts, message, signIn, apiStatus} from '../sha
 const llmBaseUrl = process.env.APP_E2E_LLM_BASE_URL || '';
 const llmModel = process.env.APP_E2E_LLM_MODEL || 'e2e-model';
 const LABEL = `e2e-betik-${Date.now()}`;
-const SQL = ['CREATE PROCEDURE dbo.e2e_load AS', 'BEGIN', '  SELECT id', '  FROM dbo.kaynak WITH (NOLOCK);', 'END'].join('\n');
+// Line 4 reads a temp table WITH (NOLOCK): a real Kural01 violation, so a real model reports it too.
+const SQL = ['CREATE PROCEDURE dbo.e2e_load AS', 'BEGIN', '  SELECT id', '  FROM #kaynak WITH (NOLOCK);', 'END'].join('\n');
 
 async function openScriptPage(page) {
   await page.getByRole('navigation', {name: message('shell.navigation')}).getByRole('link', {name: 'SQL betiği incelemesi'}).click();
@@ -82,7 +83,8 @@ await withBrowser('script review, live progress, stop, history and exports', asy
     live = reviewer.getByRole('dialog', {name: 'Canlı inceleme'});
     await live.getByRole('progressbar', {name: 'İnceleme ilerlemesi'}).waitFor();
     await live.getByText(/belirteç/).first().waitFor();
-    await live.getByText('İnceleme tamamlandı.').waitFor({timeout: 120_000});
+    // A real model answers every rule in turn; allow minutes, not a stub's seconds.
+    await live.getByText('İnceleme tamamlandı.').waitFor({timeout: 900_000});
     await live.getByRole('button', {name: 'Sonuçları göster'}).click();
     const results = reviewer.getByRole('dialog', {name: 'İnceleme sonuçları'});
     await results.getByText('Satır 4').first().waitFor();

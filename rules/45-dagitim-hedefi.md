@@ -115,8 +115,14 @@ görünen anahtarı işlemeden reddeder.
   geçiş `NetworkPolicy`'si yoksa (ilk kurulum ya da veritabanını ilk kez ekleyen güncelleme) `Job`
   veritabanıyla aynı anda oluşturulan sıradan sürüm kaynağıdır; varsa `Job` yeni backend
   podlarından önce çalışan `pre-upgrade` Helm kancasıdır (`hook`). Geçiş hiçbir durumda backend'in
-  hazır olmasını beklemez; bu yüzden backend hazır olma yoklaması şema güncellenene kadar "hazır
-  değil" yanıtı verebilir ve dağıtım kilitlenmez;
+  hazır olmasını beklemez; dağıtım bu yüzden kilitlenmez;
+- backend hazır olma yoklaması, çalışma zamanı rolü veritabanına bağlanana ve veritabanındaki
+  Alembic sürümü imajın taşıdığı son geçişe (`head`) ulaşana kadar hata metni içermeyen sabit
+  gövdeli `503` döner. İlk kurulumda rol ve şema oluşurken pod trafik almaz; reddedilen giriş
+  süreci durdurmaz ve günlüğe hata izi yerine sıklığı sınırlı, gizli değer taşımayan bir olay
+  düşer. Şemanın güncel olduğu bir kez doğrulanınca sonraki yoklamalar yalnız bağlantıyı dener.
+  İmajın tanımadığı daha yeni bir sürüm hazır sayılır; böylece geri alınan önceki sürüm yeni
+  şemada çalışır;
 - `deploy.sh` Helm'i `--atomic --wait --wait-for-jobs` ile çalıştırır; başarısız geçiş sürümü
   başarısız kılar ve önceki sürüm korunur. Geri almada şema geri indirilmez; geçişler eski sürümün
   çalışabileceği biçimde genişletici yazılır.

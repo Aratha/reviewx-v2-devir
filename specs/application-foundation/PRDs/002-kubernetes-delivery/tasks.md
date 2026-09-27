@@ -1,7 +1,7 @@
 # Görevler — kubernetes-delivery
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
-Compose yığınında geçti (arka uç 638/638, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
+Compose yığınında geçti (arka uç 652/652, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
 yönetişim sapması ve proje katmanıyla chart adımı dahil) ve `tests/helm/deploy-hooks.test.sh` 51
 denetimi geçti. Bu, chart, kanca ve arka uç için L1 (otomatik testlerden geçti) kanıtıdır. Canlı
 küme kanıtı (Acceptance 3) yoktur.
@@ -41,12 +41,19 @@ küme kanıtı (Acceptance 3) yoktur.
   `POST /sql-connection/test` 404; logda parola ve anahtar yoktu.
 - [ ] Task 6 — Requirement 11, 12 / Acceptance 2: yerel Compose'da tarayıcıyla giriş ve kural
   ekranı, içe aktarılan kuralların depodaki kopyayla eşleşmesi bu revizyonda yeniden gözlenmedi.
-- [ ] Task 7 — Requirement 4: backend hazır olma yoklaması bugün yalnız veritabanı bağlantısına
-  bakar; şema imajın beklediği sürüme gelene kadar 503 dönmez. İlk kurulumda göç bitene kadar yeni
-  backend kısa süre şemasız istek alabilir.
-- [ ] Task 8 — Requirement 1: chart sürümü fabrikanın yönettiği `Chart.yaml`'da `0.1.0`'dır, eski
-  chart'ın `0.2.0` sürümünden büyük değildir. Helm güncellemesi buna bağlı değildir; karar sahibe
-  ve fabrikaya aittir.
+- [x] Task 7 — Requirement 4 / Acceptance 1: backend hazır olma yoklaması şemaya duyarlıdır
+  (`app/backend/app/db/readiness.py`; fabrika `main` `73aa97f` ile aynı davranış). Kanıt:
+  `tests/unit/test_readiness.py` ve `tests/integration/test_readiness_postgres.py` (PRD Test
+  stratejisi) `scripts/quality-gate.sh all` içinde geçti. 2026-09-27 yerel ilk kurulum provası
+  (yerel yığının PostgreSQL'i; küme değil): boş veritabanı ve henüz oluşmamış uygulama rolüyle açılan
+  backend yoklamaya 503 verdi (tek `readiness.not_ready` olayı, `InvalidPasswordError`), rol oluşup
+  şema yokken yine 503 (`schema_behind`), `alembic upgrade head` sonrası 200; logda hata izi, 500
+  yanıtı ve parola yoktu. Aynı prova önceki kodla rol yokken 500 ve hata izi, şema yokken 200
+  verdi. Kümedeki davranış bir sonraki Azure koşumunda gözlenir.
+- [x] Task 8 — Requirement 1, Decision 19 / Acceptance 1: chart sürümü fabrikanın yönettiği
+  `Chart.yaml`'daki `0.1.0`'dır. Kanıt: Task 10'daki `acc1150` koşumu nonprod'daki `0.2.0`
+  release'ini bu chart'la aynı release'te sorunsuz güncelledi; PRD bu gözleme hizalandı, yönetilen
+  dosya değişmedi.
 - [ ] Task 9 — Requirement 12 / Acceptance 3: güncellemeden sonra PostgreSQL'deki kural sayısı ve
   içerik özetinin depodaki kopyayla karşılaştırılması.
 - [x] Task 10 — Acceptance 3: Azure koşumu her `main` birleştirmesinde kendiliğinden, argümansız
@@ -54,7 +61,8 @@ küme kanıtı (Acceptance 3) yoktur.
   Kümede gözlendi: veritabanı StatefulSet'i 10Gi `nfs-sc` diskle hazır; ilk kurulumda `migration-init`,
   sonraki koşumlarda `pre-upgrade` geçiş işi tamamlandı; backend hazır olma yoklaması 200, ön yüz
   200, dizin girişi yanlış bilgide 401 `invalid_credentials`. İlk kurulumda geçiş bitene kadar
-  (yaklaşık bir dakika) backend istekleri veritabanı rolü henüz yokken hata aldı (Requirement 4 açığı).
+  (yaklaşık bir dakika) backend istekleri veritabanı rolü henüz yokken hata aldı; Task 7'deki
+  şemaya duyarlı hazır olma bunu önler.
 - [x] Task 12 — Requirement 7, Decision 13: eski PVC `dwhcodereview-backend-data`, yeni sürüm
   sağlıklı açıldıktan sonra Azure koşumunda (`9722faf`, 2026-09-27) tek seferlik kanca adımıyla
   silindi; kümede PVC'nin kalmadığı gözlendi ve adım kancadan ve testinden kaldırıldı.

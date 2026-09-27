@@ -974,7 +974,7 @@ export interface paths {
         };
         /**
          * Readiness
-         * @description Return 503 until PostgreSQL accepts a trivial query.
+         * @description Return 503 until the runtime role connects and the schema reaches the image's head.
          */
         get: {
             parameters: {

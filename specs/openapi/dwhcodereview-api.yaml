@@ -3422,7 +3422,7 @@
     },
     "/api/dwhcodereview/v1/readiness": {
       "get": {
-        "description": "Return 503 until PostgreSQL accepts a trivial query.",
+        "description": "Return 503 until the runtime role connects and the schema reaches the image's head.",
         "responses": {
           "200": {
             "content": {

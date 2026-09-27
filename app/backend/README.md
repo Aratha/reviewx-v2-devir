@@ -76,6 +76,17 @@ Aynı kullanıcı adıyla aynı adresten 15 dakikada 5 hatalı girişten sonra o
 ayrıdır ve ters vekil arkasında vekilin adresini görür; birden çok kopya için ortak sınır giriş
 katmanında (ingress/WAF) kurulur ve bu bir işletim kararıdır.
 
+Canlılık (`/api/dwhcodereview/v1/liveness`) veritabanına bakmaz. Hazır olma
+(`/api/dwhcodereview/v1/readiness`), çalışma zamanı veritabanı rolü bağlanana ve veritabanındaki
+Alembic sürümü imajla gelen son geçişe (`head`) ulaşana kadar sabit `{"status": "not-ready"}`
+gövdesiyle `503` döner (`app/db/readiness.py`). Son geçiş, açılışta `alembic.ini` üzerinden
+`schema/alembic` dizininden bir kez okunur; bu dizin olmadan uygulama açılmaz. Reddedilen giriş veya
+ulaşılamayan sunucu da `503` verir; günlüğe hata izi yerine dakikada en çok bir kez, yalnız neden ve
+hata sınıfını taşıyan `readiness.not_ready` olayı düşer. Şema bir kez doğrulandıktan sonra yoklama
+yalnız bağlantıyı dener. İmajın tanımadığı daha yeni bir şema sürümü hazır sayılır; geçişler
+genişletici yazıldığı için geri alınan önceki sürüm yeni şemada çalışır. Yerel yığında hazır olma
+için önce `scripts/db.sh apply` çalıştırın.
+
 Yararlı kontroller:
 
 ```sh

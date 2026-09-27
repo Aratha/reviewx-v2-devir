@@ -15,6 +15,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import ApplicationError, application_error_handler
 from app.core.logging import configure_logging, log_event
 from app.core.telemetry import configure_telemetry, instrument_engine
+from app.db.readiness import packaged_schema
 from app.db.session import async_session_factory, engine
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.tenant_context import TenantContextMiddleware
@@ -34,6 +35,10 @@ class UnsafeIntegrationSettings(RuntimeError):
 def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # application-foundation 002 Requirement 4: readiness compares the database with the
+        # migration head shipped in this image; reading it here stops an image without its
+        # migrations before it serves.
+        packaged_schema()
         invalid = integration_setting_errors(settings)
         if invalid:
             log_event(logger, "startup.integration_settings_invalid", settings=",".join(invalid))

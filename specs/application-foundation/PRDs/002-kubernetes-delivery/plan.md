@@ -1,6 +1,6 @@
 # Plan — kubernetes-delivery
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.4.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.5.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Katmanlar ve dosyalar
@@ -16,6 +16,7 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 | Yayın imajı | `app/infra/Dockerfile.backend.release` (dizin CA dosyası), `.github/workflows/image-build.yml` | Requirement 9 |
 | Başlangıç denetimi | `app/backend/app/services/startup_checks.py` ([sql-server-connection](../../../sql-review/PRDs/002-sql-server-connection/PRD.md) Decision 11) | Requirement 5, Decision 17 |
 | Göç | `schema/alembic/versions/*` (içe aktarım göçü `202609260002`) | Requirement 4, 12 |
+| Hazır olma | `app/backend/app/db/readiness.py`, `app/backend/app/api/health.py`, `app/backend/app/main.py` | Requirement 4 |
 
 ## Uygulama kararları
 
@@ -24,6 +25,13 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
   taze iskelet üretildi; ikisi arasında değişen yönetilen dosyalar kopyalandı,
   ekibin düzenlediği `README.md`, `app/backend/.env.example` ve `app/backend/app/core/config.py`'ye
   aynı fark elle uygulandı ve `.kt-scaffold/manifest.json` özetleri yeni sürüme çekildi.
+- Şemaya duyarlı hazır olma fabrika `main` `73aa97f` sürümündeki şablon değişikliğinden elle
+  aktarıldı (`app/**` projenindir): `app/db/readiness.py`, `app/api/health.py`, açılışta imajdaki
+  son göçün okunması ve testleri. O sürümün taze iskeletinde değişen yönetilen dosyalardan
+  `rules/45-dagitim-hedefi.md`, `rules/GENERATED.lock` ve `.kt-scaffold/project-manifest.json`
+  kopyalandı; projenin kendi `specs/openapi/dwhcodereview-api.yaml` sözleşmesi ve üretilmiş ön yüz
+  tipleri yeni uç nokta açıklamasıyla güncellendi; `.kt-scaffold/manifest.json` özetleri yeni sürüme
+  çekildi. Olay yazımı projenin `log_event` biçimini kullanır.
 - Kanca Secret'ı `kubectl create secret generic --dry-run=client | kubectl apply` ile yazar; yalnız
   yönettiği beş anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
   değer yalnız bu beş anahtar için okunur. Süper yönetici başlangıç parolası
@@ -57,7 +65,7 @@ ve PR #14'ün `main`'e birleşmesine bağlıdır; Azure işini kullanıcı tetik
 | Gereksinim | Kabul | Görev |
 |---|---|---|
 | Requirement 1, 2, 3, 6, 8, 10 | Acceptance 1, Acceptance 3 | Task 1, Task 3 |
-| Requirement 1 (chart sürümü) | Acceptance 1 | Task 8 |
+| Requirement 1 (chart sürümü), Decision 19 | Acceptance 1, Acceptance 3 | Task 8, Task 10 |
 | Requirement 4 | Acceptance 1, Acceptance 3 | Task 1, Task 7 |
 | Requirement 5 | Acceptance 1, Acceptance 3 | Task 2, Task 3, Task 5 |
 | Requirement 7, 13 | Acceptance 3 | Task 12 |

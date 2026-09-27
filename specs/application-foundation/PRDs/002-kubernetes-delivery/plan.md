@@ -1,6 +1,6 @@
 # Plan — kubernetes-delivery
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.3.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.3.1). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Katmanlar ve dosyalar

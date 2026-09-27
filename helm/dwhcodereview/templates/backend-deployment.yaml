@@ -32,8 +32,20 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - {name: http, containerPort: 8000}
+          {{- include "generated.validateBackendConfig" . }}
+          {{- with .Values.backend.config }}
+          # Non-secret project settings from values-project.yaml; secrets arrive only through envFrom.
+          env:
+            {{- range $key, $value := . }}
+            - {name: {{ $key | quote }}, value: {{ $value | toString | quote }}}
+            {{- end }}
+          {{- end }}
           envFrom:
-            - secretRef: {name: "{{ required "backend.existingSecret must name a pre-created Secret" .Values.backend.existingSecret }}"}
+            - secretRef: {name: "{{ required "backend.existingSecret must name the Secret the project deploy hook prepares" .Values.backend.existingSecret }}"}
+            {{- if .Values.postgres.enabled }}
+            # Listed last so the DML-only runtime connection deploy.sh generates wins.
+            - secretRef: {name: {{ include "generated.databaseSecret" . | quote }}}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

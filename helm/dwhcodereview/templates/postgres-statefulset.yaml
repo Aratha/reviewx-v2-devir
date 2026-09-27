@@ -1,7 +1,8 @@
 {{- if .Values.postgres.enabled -}}
 {{- $postgres := .Values.postgres -}}
 {{- $name := include "generated.resourceName" (list . "database") -}}
-{{- $secret := required "postgres.existingSecret must name a pre-created Secret" $postgres.existingSecret -}}
+{{- include "generated.validateDatabase" . -}}
+{{- $secret := include "generated.postgresSecret" . -}}
 {{- $size := required "postgres.persistence.size must be declared" $postgres.persistence.size -}}
 {{- $storageClass := required "postgres.persistence.storageClassName must name the storage class explicitly" $postgres.persistence.storageClassName -}}
 {{- $probe := `exec psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -w -tAc "SELECT 1"` -}}

@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-EXPECTED_ENV_FROM_REFERENCE_COUNT = 1
+EXPECTED_ENV_FROM_REFERENCE_COUNT = 2
 
 
 class ConfigSyncError(RuntimeError):
@@ -270,20 +270,36 @@ def _check_kubernetes(root: Path, errors: list[str]) -> None:
         errors.append(
             f"{values}: backend existingSecret must be one empty environment-supplied fact"
         )
+    config_matches = re.findall(
+        r"(?m)^  config:\s*([^#]+?)\s*(?:#.*)?$", backend.group(1) if backend else ""
+    )
+    if config_matches != ["{}"]:
+        errors.append(f"{values}: backend config must be one empty project-supplied mapping")
 
     env_from = re.findall(r"(?m)^\s+envFrom:\s*$", source)
     secret_refs = re.findall(r"(?m)^\s+-\s+secretRef:\s*.*$", source)
     if len(env_from) != 1:
         errors.append(f"{deployment}: expected exactly one envFrom boundary")
     if len(secret_refs) != EXPECTED_ENV_FROM_REFERENCE_COUNT:
-        errors.append(f"{deployment}: expected exactly one secretRef under envFrom")
-    elif re.search(r"\.Values\.backend\.existingSecret\b", secret_refs[0]) is None:
-        errors.append(f"{deployment}: secretRef must use .Values.backend.existingSecret")
-    if re.search(r"(?m)^\s+env:\s*$", source) is not None:
-        errors.append(f"{deployment}: per-key container env mappings are forbidden; use envFrom")
-    if "secretKeyRef:" in source or "configMapRef:" in source:
         errors.append(
-            f"{deployment}: only the pre-created existingSecret envFrom boundary is allowed"
+            f"{deployment}: expected the project Secret and the generated database Secret "
+            "under envFrom"
+        )
+    else:
+        if re.search(r"\.Values\.backend\.existingSecret\b", secret_refs[0]) is None:
+            errors.append(f"{deployment}: secretRef must use .Values.backend.existingSecret")
+        if '"generated.databaseSecret"' not in secret_refs[1]:
+            errors.append(f"{deployment}: the second secretRef must be the generated database Secret")
+    # The only env block renders the non-secret backend.config settings.
+    config_env = re.search(
+        r"(?m)^\s+\{\{- with \.Values\.backend\.config \}\}\s*\n(?:\s+#.*\n)?\s+env:\s*$",
+        source,
+    )
+    if len(re.findall(r"(?m)^\s+env:\s*$", source)) != (1 if config_env else 0) or not config_env:
+        errors.append(f"{deployment}: per-key container env mappings are forbidden; use envFrom")
+    if "secretKeyRef:" in source or "configMapRef:" in source or "valueFrom:" in source:
+        errors.append(
+            f"{deployment}: only the envFrom Secret boundary is allowed"
         )
 
 

@@ -6,9 +6,9 @@ set -eu
 #   postgres-password  password of the local PostgreSQL `app` role
 #   redis-password     password of the local Redis server
 # The secrets live only in the Git-ignored app/infra/.data/ directory with owner-only permissions
-# and serve only the local Compose stack and host development runs. Shared and deployed
-# environments receive their secrets through the pre-created backend.existingSecret; their
-# lifecycle stays with the organization's secret management and needs no script here.
+# and serve only the local Compose stack and host development runs. Deployed environments receive
+# their secrets in the cluster: the project's helm deploy hook prepares backend.existingSecret and
+# deploy.sh generates the database Secrets; nothing here reaches a cluster.
 root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 data="$root/app/infra/.data"
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # GitHub publishes images; the existing Azure job supplies KUBECONFIG and runs Helm.
+# Two optional project-owned files sit beside this script and are never written by the scaffold:
+#   values-project.yaml  project environment addressing, layered over the base values; no secrets
+#   deploy-hooks.sh      project Secret preparation, run by apply before any Helm change
 set +x
 set -euo pipefail
 
@@ -7,6 +10,8 @@ chart="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 release="${RELEASE:-dwhcodereview}"
 namespace="${NAMESPACE:-dwhcodereview}"
 values_file="${VALUES_FILE:-$chart/values.yaml}"
+project_values="$chart/values-project.yaml"
+project_hook="$chart/deploy-hooks.sh"
 image_tag="${IMAGE_TAG:-latest}"
 mode=apply
 
@@ -48,7 +53,15 @@ image_args=(
   --set-string "frontend.image.tag=$image_tag"
   --set-string frontend.image.digest=
 )
-common=(--values "$values_file" --namespace "$namespace" "${image_args[@]}")
+values_args=(--values "$values_file")
+if [[ -e "$project_values" ]]; then
+  [[ -f "$project_values" && ! -L "$project_values" ]] || {
+    echo 'values-project.yaml must be a regular file' >&2
+    exit 2
+  }
+  values_args+=(--values "$project_values")
+fi
+common=("${values_args[@]}" --namespace "$namespace" "${image_args[@]}")
 
 helm lint "$chart" "${common[@]}" >&2
 if [[ "$mode" == render ]]; then
@@ -97,8 +110,7 @@ registry_manifest_state() {
 # Wait for every rendered image before any cluster change; a missing image stops here.
 # When the registry cannot answer, Helm still keeps the ready pods of the last release.
 wait_for_published_images() {
-  local rendered references reference state missing unknown deadline
-  rendered="$(helm template "$release" "$chart" "${common[@]}")" || return 1
+  local references reference state missing unknown deadline
   references="$(sed -nE 's/^[[:space:]]*image:[[:space:]]*"?([^"[:space:]]+)"?[[:space:]]*$/\1/p' \
     <<< "$rendered" | sort -u)"
   [[ -n "$references" ]] || { echo '[IMAGE] no workload image was rendered' >&2; return 1; }
@@ -176,12 +188,126 @@ settle_pending_release() {
   esac
 }
 
+# One key of a Secret in the release namespace, empty when the Secret or the key is absent. A read
+# that fails stops the caller, so an unreadable Secret is never mistaken for a missing one and
+# replaced. The value is never printed.
+secret_value() {
+  local encoded
+  encoded="$(kubectl --namespace "$namespace" get secret "$1" --ignore-not-found \
+    --output "jsonpath={.data.$2}")" || return 1
+  [[ -z "$encoded" ]] || base64 --decode <<< "$encoded"
+}
+
+# Writes one Secret from files named after its keys; values never appear as arguments or in logs.
+write_secret() {
+  local name="$1" directory="$2" key sources=()
+  for key in "$directory"/*; do sources+=("--from-file=${key##*/}=$key"); done
+  kubectl --namespace "$namespace" create secret generic "$name" "${sources[@]}" \
+    --dry-run=client --output yaml | kubectl apply --filename - >/dev/null
+}
+
+# When the rendered chart runs the in-chart database, the release needs three Secrets:
+#   <release>-postgres   POSTGRES_USER, POSTGRES_PASSWORD (schema owner, read by the database)
+#   <release>-migration  DWHCODEREVIEW_DATABASE_URL and PG* keys of the schema owner, plus
+#                        RUNTIME_DATABASE_USER and RUNTIME_DATABASE_PASSWORD for the runtime role
+#   <release>-database   DWHCODEREVIEW_DATABASE_URL of the DML-only runtime role (backend only)
+# Credentials are generated on the first run and read back from the cluster afterwards, so a
+# password a volume or a project hook already holds is kept. Only the address is re-derived.
+ensure_database_secrets() {
+  local manifest host port database owner owner_password runtime runtime_password state=reused
+  manifest="$(awk '/^---/ { if (found) exit; document = ""; next }
+    { document = document $0 "\n" } /^kind: StatefulSet$/ { found = 1 }
+    END { if (found) printf "%s", document }' <<< "$rendered")"
+  [[ -n "$manifest" ]] || return 0
+  host="$(sed -nE 's/^  serviceName: ([a-z0-9-]+)$/\1/p' <<< "$manifest" | head -n 1)"
+  port="$(sed -nE 's/.*[{ ]containerPort: ([0-9]+)[,}].*/\1/p' <<< "$manifest" | head -n 1)"
+  database="$(sed -nE 's/.*name: POSTGRES_DB, value: "([A-Za-z0-9_]+)".*/\1/p' <<< "$manifest" \
+    | head -n 1)"
+  [[ -n "$host" && -n "$port" && -n "$database" ]] || {
+    echo '[DATABASE] the rendered database address is incomplete' >&2
+    return 1
+  }
+
+  if ! owner="$(secret_value "$release-postgres" POSTGRES_USER)" \
+    || ! owner_password="$(secret_value "$release-postgres" POSTGRES_PASSWORD)" \
+    || ! runtime="$(secret_value "$release-migration" RUNTIME_DATABASE_USER)" \
+    || ! runtime_password="$(secret_value "$release-migration" RUNTIME_DATABASE_PASSWORD)"; then
+    echo '[DATABASE] the existing database Secrets could not be read; nothing was changed' >&2
+    return 1
+  fi
+  if [[ -z "$owner" || -z "$owner_password" || -z "$runtime" || -z "$runtime_password" ]]; then
+    state=generated
+  fi
+  owner="${owner:-app_owner}"
+  runtime="${runtime:-app_runtime}"
+  [[ -n "$owner_password" ]] || owner_password="$(new_password)"
+  [[ -n "$runtime_password" ]] || runtime_password="$(new_password)"
+  [[ "$owner" =~ ^[a-z_][a-z0-9_]{0,62}$ && "$runtime" =~ ^[a-z_][a-z0-9_]{0,62}$ \
+    && "$owner" != "$runtime" ]] || {
+    echo '[DATABASE] database user names must be distinct lowercase PostgreSQL names' >&2
+    return 1
+  }
+  [[ "$owner_password" =~ ^[A-Za-z0-9._~-]{16,}$ \
+    && "$runtime_password" =~ ^[A-Za-z0-9._~-]{16,}$ ]] || {
+    echo '[DATABASE] database passwords must hold at least 16 URL-safe characters' >&2
+    return 1
+  }
+
+  rm -rf "$work/postgres" "$work/migration" "$work/database"
+  mkdir "$work/postgres" "$work/migration" "$work/database"
+  printf '%s' "$owner" > "$work/postgres/POSTGRES_USER"
+  printf '%s' "$owner_password" > "$work/postgres/POSTGRES_PASSWORD"
+  printf 'postgresql+asyncpg://%s:%s@%s:%s/%s' "$owner" "$owner_password" "$host" "$port" \
+    "$database" > "$work/migration/DWHCODEREVIEW_DATABASE_URL"
+  printf '%s' "$host" > "$work/migration/PGHOST"
+  printf '%s' "$port" > "$work/migration/PGPORT"
+  printf '%s' "$database" > "$work/migration/PGDATABASE"
+  printf '%s' "$owner" > "$work/migration/PGUSER"
+  printf '%s' "$owner_password" > "$work/migration/PGPASSWORD"
+  printf '%s' "$runtime" > "$work/migration/RUNTIME_DATABASE_USER"
+  printf '%s' "$runtime_password" > "$work/migration/RUNTIME_DATABASE_PASSWORD"
+  printf 'postgresql+asyncpg://%s:%s@%s:%s/%s' "$runtime" "$runtime_password" "$host" "$port" \
+    "$database" > "$work/database/DWHCODEREVIEW_DATABASE_URL"
+  write_secret "$release-postgres" "$work/postgres" || return 1
+  write_secret "$release-migration" "$work/migration" || return 1
+  write_secret "$release-database" "$work/database" || return 1
+  echo "[DATABASE] credentials $state: $release-postgres, $release-migration, $release-database"
+}
+
+new_password() {
+  od -An -N24 -tx1 /dev/urandom | tr -d ' \n'
+}
+
+# The optional project hook prepares project Secrets (for example a signing key generated once and
+# reused, or optional external credentials) with the runner's identity. It runs only in apply mode,
+# after the namespace exists and before any Helm change; a failure stops the deployment there.
+run_project_hook() {
+  [[ -e "$project_hook" ]] || return 0
+  [[ -f "$project_hook" && ! -L "$project_hook" ]] || {
+    echo '[HOOK] deploy-hooks.sh must be a regular file' >&2
+    return 1
+  }
+  echo '[HOOK] running the project deploy hook'
+  KT_DEPLOY_RELEASE="$release" KT_DEPLOY_NAMESPACE="$namespace" KT_DEPLOY_CHART_DIR="$chart" \
+    KT_DEPLOY_IMAGE_TAG="$image_tag" KT_DEPLOY_DATABASE_ENABLED="$database_enabled" \
+    bash "$project_hook" || {
+    echo '[HOOK] the project deploy hook failed; no Helm change was made' >&2
+    return 1
+  }
+}
+
 command -v kubectl >/dev/null || {
   echo 'kubectl is required for deployment' >&2
   exit 1
 }
+rendered="$(helm template "$release" "$chart" "${common[@]}")" || exit 1
+database_enabled=false
+if grep -qx 'kind: StatefulSet' <<< "$rendered"; then database_enabled=true; fi
 wait_for_published_images || exit 1
 kubectl get namespace "$namespace" >/dev/null 2>&1 || kubectl create namespace "$namespace"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+umask 077
 
 # The shared wildcard TLS Secret is namespace-scoped. The established nonprod
 # runner may copy its public certificate and private key into a new application
@@ -196,9 +322,8 @@ if [[ "${TF_BUILD:-}" =~ ^[tT][rR][uU][eE]$ ]] \
       echo 'openssl is required to copy the shared TLS Secret' >&2
       exit 1
     }
-    temporary="$(mktemp -d)"
-    trap 'rm -rf "$temporary"' EXIT
-    umask 077
+    temporary="$work/tls"
+    mkdir "$temporary"
     kubectl --namespace "$tls_source_namespace" get secret "$tls_source_secret" \
       --output 'jsonpath={.data.tls\.crt}' | openssl base64 -d -A > "$temporary/tls.crt"
     kubectl --namespace "$tls_source_namespace" get secret "$tls_source_secret" \
@@ -212,6 +337,10 @@ if [[ "${TF_BUILD:-}" =~ ^[tT][rR][uU][eE]$ ]] \
   fi
 fi
 
+run_project_hook || exit 1
+ensure_database_secrets || exit 1
+rm -rf "$work"
+trap - EXIT
 settle_pending_release || exit 1
 
 # --wait-for-jobs makes a failed schema migration fail the release, so --atomic restores the last one.

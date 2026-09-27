@@ -27,21 +27,23 @@ doğrudan kodlama. Yeni ayar, aynı değişiklik tüm geçerli yüzeyleri günce
 1. tipli ayarlar bildirimi ve başlatma doğrulaması;
 2. gerçek sır değil yer tutucu içeren `app/backend/.env.example`;
 3. her tüketen hizmetin yerel `Compose` ortam bloğu;
-4. `helm/<ürün-kısa-adı>/values.yaml` içindeki `backend.existingSecret` ile seçilen, önceden oluşturulmuş
-   tek uygulama `Secret` sınırı.
+4. dağıtımda gizli ayar için projeye ait `helm/<ürün-kısa-adı>/values-project.yaml` içindeki
+   `backend.existingSecret` ile seçilen tek uygulama `Secret` sınırı; gizli olmayan ayar için aynı
+   katmandaki `backend.config`.
 
 Yapılandırma değişikliklerinden sonra `python3 scripts/check-config-sync.py` çalıştır. Kontrol, geçerli
 anahtarları sabit yığın tipli ayarlarından türetir; ön eksiz veya yabancı ön ekli uygulama ortamı
 anahtarlarını ve onaylı ayar yükleyicisi/başlatma sınırları dışındaki doğrudan süreç ortamı
 okumalarını reddeder.
 
-Kök Helm chart'ının tam olarak bir `values.yaml` dosyası vardır. Bu dosyanın bölümleri ile imaj yolu,
-etiket varsayılanı, sunucu adı ve `Secret` gibi dağıtım girdilerinin sahibi `45-dagitim-hedefi`
-kuralıdır; bu kural onları yeniden tanımlamaz. Yapısal işleme testi gizli olmayan sentetik değerleri
-komut satırından sağlar; ikinci bir değer dosyası veya ortam katmanı üretmez.
+Kök Helm chart'ının fabrikanın yönettiği değer dosyası, projeye ait değer katmanı, imaj yolu, etiket
+varsayılanı, sunucu adı ve `Secret` gibi dağıtım girdilerinin sahibi `45-dagitim-hedefi` kuralıdır;
+bu kural onları yeniden tanımlamaz.
 
-Helm chart'ı, arka uçta `envFrom` üzerinden önceden oluşturulmuş `Secret`'a adıyla referans verir;
-anahtar başına sır eşlemesi listelemez. Gizli malzeme; kaynak, örnek dosya, çizelge değeri, günlük,
+Helm chart'ı, arka uçta `envFrom` üzerinden `Secret`'a adıyla referans verir ve anahtar başına sır
+eşlemesi listelemez. Chart içindeki veritabanı açıkken bağlantı, `deploy.sh`'in ürettiği
+`<release>-database` `Secret`'ından gelir. `backend.config` bu bağlantıyı veya başka bir sırrı
+taşıyamaz. Gizli malzeme; kaynak, örnek dosya, çizelge değeri, günlük,
 üretilmiş yanıt veya proje iskeleti bildirimine asla girmez. `super_admin` başlatma parolası
 etkileşimli olarak veya çağıran süreçten okunur, parola özeti saklamak için kullanılır ve atılır;
 normal ayar değildir. Başlatma komutu yapılandırılmış kimlik için tekrarlandığında aynı sonucu verir,

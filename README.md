@@ -13,7 +13,8 @@ Kalıcılık otoritesi: `sqlalchemy-alembic`.
 
 İlk oluşturma işlemi tam proje ağacını kurar. Bundan sonra `app/**` uygulama ekibine aittir; merkezi
 iskelet güncellemesi bu kapsamın üzerine yazmaz veya bu kapsamı silmez. `helm/**` ise temel iskelet
-ve DevOps tarafından yönetilen kapsamdır. DevOps standardı gereği uygulama chart'ı
+ve DevOps tarafından yönetilen kapsamdır; aşağıda anlatılan, projeye ait iki dağıtım dosyası bunun
+dışındadır. DevOps standardı gereği uygulama chart'ı (Kubernetes'e kurulum paketi)
 `helm/dwhcodereview/` dizinindedir: kendi `Chart.yaml`, `templates/**`, `deploy.sh` ve tam olarak
 bir `values.yaml` dosyasından oluşan tek Helm paketi içinde arka uç ve ön yüz iş yüklerini taşır.
 Aynı pakette PostgreSQL 17 veritabanı ve Alembic şema geçişi (veritabanı tablolarını güncelleyen tek
@@ -41,31 +42,102 @@ alınır, hizmet vermiş release kaldırılmaz. Aynı işin eşzamanlı koşmama
 ayarlanmalıdır.
 
 ~~~sh
-TF_BUILD=true BUILD_SOURCEVERSION=<40-character-lowercase-sha> \
-  helm/dwhcodereview/deploy.sh --apply --values /path/to/admitted-values.yaml
+TF_BUILD=true BUILD_SOURCEVERSION=<40-character-lowercase-sha> helm/dwhcodereview/deploy.sh
 
-IMAGE_TAG=<explicit-tag> \
-  helm/dwhcodereview/deploy.sh --render --values /path/to/admitted-values.yaml
+IMAGE_TAG=<explicit-tag> helm/dwhcodereview/deploy.sh --render
 ~~~
 
 Kanonik giriş NetworkPolicy'si yönetilen test RKE2 kümesindeki controller'ın gerçek namespace'i olan
 `kube-system` değerini taşır. `nginx` IngressClass adıdır; `ingress-nginx` namespace varsayımı değildir.
-Ortam değer dosyası mevcut uygulama `Secret`'ını, backend çıkış eşlerini ve ingress host/TLS
-bilgilerini sağlar.
 
 Apply sırasında script, Azure runner'da hedef namespace'te bulunmayan `ailab-tls` Secret'ını
 varsayılan olarak `kt-verim/ailab-tls` kaynağından kopyalar. `TLS_COPY_ENABLED=false` bu davranışı
 kapatır; `TLS_SOURCE_NAMESPACE`, `TLS_SOURCE_SECRET` ve `TLS_TARGET_SECRET` adları değiştirebilir.
 Sertifika ve anahtar yalnız owner-only geçici dizinden geçirilir, Git'e veya Helm argümanına yazılmaz.
-Script önce `helm lint` çalıştırır; beklemedeki release'i kurtarır ve ardından
+Script önce `helm lint` çalıştırır; varsa proje kancasını çalıştırır, veritabanı `Secret`'larını
+hazırlar, beklemedeki release'i kurtarır ve ardından
 `helm upgrade --install --reset-values --atomic --wait --wait-for-jobs` çalıştırır; şema geçişi
-başarısız olursa önceki sürüm korunur. Render kipi cluster'a erişmez veya Secret kopyalamaz.
+başarısız olursa önceki sürüm korunur. Render kipi cluster'a erişmez, kancayı çalıştırmaz ve Secret
+yazmaz.
 
 Güvenilen yerel MCP kurulu üreteçle sabit çalışma alanına doğrudan yazabilir. Uzak HTTP MCP ise aynı
 kanonik dosya baytlarını, modları ve SHA-256 özetlerini sayfalar halinde teslim eder; Claude, Codex
 veya seçilen VS Code istemcisi bunları kendi yerel dosya araçlarıyla uygular ve gözlediği envanteri
 geri bildirir. Uzak sunucu yerel dosya sistemini okuduğunu, yazdığını veya atomik yayın yaptığını
 iddia etmez; canlı HTTP güveni TLS/mTLS/OAuth sınırından gelir.
+
+## Projenin dağıtım dosyaları
+
+Test kümesine dağıtmak için fabrikanın dosyalarını düzenlemeyin; `kt-iskelet guncelle` onları
+yeniden yazar. Bunun yerine chart'ın yanına projenin kendi iki dosyasını ekleyin. İskelet bu
+dosyaları hiç oluşturmaz, değiştirmez veya silmez; ikisi de isteğe bağlıdır.
+
+`helm/dwhcodereview/values-project.yaml` (değer katmanı): `deploy.sh` bu dosyayı `values.yaml`
+dosyasının üstüne ekler. Yalnız adresleri ve gizli olmayan ayarları taşır; parola, anahtar veya
+belirteç yazılırsa `scripts/render-charts.sh` denetimi reddeder. Örnek:
+
+~~~yaml
+backend:
+  existingSecret: dwhcodereview-runtime   # deploy-hooks.sh'in hazırladığı Secret'ın adı
+  config:
+    DWHCODEREVIEW_ENVIRONMENT: staging       # gizli olmayan ayarlar
+  networkPolicy:
+    egress:                                  # arka ucun ulaşabileceği adresler
+      - to:
+          - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+            podSelector: {matchLabels: {k8s-app: kube-dns}}
+        ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+      - to:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/part-of: dwhcodereview
+                app.kubernetes.io/component: database
+        ports: [{protocol: TCP, port: 5432}]
+frontend:
+  ingress:
+    className: nginx
+    host: dwhcodereview.ailab-test.kuveytturk.com.tr
+    tlsSecretName: ailab-tls
+postgres:
+  enabled: true                              # yalnız kabul edilmiş PRD isterse
+  persistence: {storageClassName: <kümenin-depolama-sınıfı>}
+migration:
+  enabled: true
+~~~
+
+`helm/dwhcodereview/deploy-hooks.sh` (dağıtım kancası): `deploy.sh` bunu yalnız gerçek dağıtımda,
+imajlar yayımlandıktan ve namespace hazırlandıktan sonra, Helm hiçbir şeyi değiştirmeden önce `bash`
+ile çalıştırır. Görevi projeye özgü sırları kümede hazırlamaktır: örneğin imza anahtarını ilk
+dağıtımda üretip sonrakilerde kümedekini kullanmak veya isteğe bağlı dış hizmet bilgilerini çalışma
+zamanı `Secret`'ına koymak. Kanca `KT_DEPLOY_RELEASE`, `KT_DEPLOY_NAMESPACE`, `KT_DEPLOY_CHART_DIR`,
+`KT_DEPLOY_IMAGE_TAG` ve `KT_DEPLOY_DATABASE_ENABLED` değişkenlerini alır. Gizli değeri ekrana
+yazdırmamalı, değerleri `kubectl`'e komut argümanıyla değil dosyayla vermelidir. Kanca hata verirse
+dağıtım Helm değişikliği yapmadan durur. Arka ucun imza anahtarını bir kez üreten örnek:
+
+~~~bash
+#!/usr/bin/env bash
+set -euo pipefail
+secret="$KT_DEPLOY_RELEASE-runtime"
+key_file=DWHCODEREVIEW_JWT_PRIVATE_KEY
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+umask 077
+current="$(kubectl --namespace "$KT_DEPLOY_NAMESPACE" get secret "$secret" --ignore-not-found \
+  --output "jsonpath={.data.$key_file}")"
+if [[ -n "$current" ]]; then
+  base64 --decode <<< "$current" > "$work/$key_file"
+else
+  openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$work/$key_file"
+fi
+kubectl --namespace "$KT_DEPLOY_NAMESPACE" create secret generic "$secret" \
+  --from-file="$work/$key_file" --dry-run=client --output yaml | kubectl apply --filename - >/dev/null
+~~~
+
+Veritabanı açıksa `deploy.sh` kancadan sonra üç `Secret` hazırlar ve parolaları ilk dağıtımda üretir,
+sonrakilerde kümedekini yeniden kullanır: `<release>-postgres` (veritabanı sahibi),
+`<release>-migration` (şema geçişi) ve `<release>-database` (arka ucun `DWHCODEREVIEW_DATABASE_URL`
+bağlantısı). Arka uç yalnız veri okuyup yazabilen bir veritabanı rolüyle bağlanır; tabloları yalnız
+şema geçişi değiştirir. Kanca bu `Secret`'lardan birini önceden oluşturursa içindeki değer korunur.
 
 ## İlk çalıştırma
 

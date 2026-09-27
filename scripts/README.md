@@ -5,8 +5,9 @@ Tek seferlik komutlar yerine bu giriş noktalarını kullanın. İskelet sürüm
 güvenli biçimde başarısız olan tarayıcı girişidir; varsayılan olarak
 `KT_SCAFFOLD_OFFLINE_BUNDLE` ile belirtilen kabul edilmiş çevrimdışı paketi kullanır ve
 bant dışı kabul özetini `KT_SCAFFOLD_OFFLINE_BUNDLE_SHA256` içinde ister. Çözülmüş sabit profilin
-türlü ayarları, `.env.example`, yerel Compose ortamı ve kök `helm/` dizinindeki Helm paketinin önceden
-oluşturulmuş `backend.existingSecret` sınırının senkron kaldığını kanıtlamak için
+türlü ayarları, `.env.example`, yerel Compose ortamı ve kök `helm/` dizinindeki Helm paketinin arka uç
+`Secret` sınırının (projenin `backend.existingSecret` adı ve üretilen `<release>-database` bağlantısı)
+ve gizli olmayan `backend.config` ayarlarının senkron kaldığını kanıtlamak için
 `python3 scripts/check-config-sync.py` çalıştırın.
 
 `check-dependency-admission.py`, normalleştirilmiş doğrudan bağımlılık, OCI ve iş akışı eylemi
@@ -74,4 +75,7 @@ araç çıktısı insanlar içindir.
 
 Tam kapının Helm paket politikası adımı, depoya ait işleyiciyi `kt-iskelet` arkasındaki belirli Python
 yorumlayıcısıyla çalıştırır. Bu kabul edilmiş CLI sürümünü Helm ile birlikte `PATH` üzerinde tutun.
-Yoksa `render-charts.sh` işleme öncesinde açık araç zinciri hatasıyla başarısız olur.
+Yoksa `render-charts.sh` işleme öncesinde açık araç zinciri hatasıyla başarısız olur. Adım, chart'ı
+sentetik değerlerle denetler; projeye ait `values-project.yaml` varsa temel değerlerle birlikte onu da
+aynı denetimden geçirir ve içinde gizli bilgi görürse reddeder. `deploy-hooks.sh` varsa yalnız
+yazımını (`bash -n`) denetler, çalıştırmaz.

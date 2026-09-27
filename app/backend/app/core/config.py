@@ -101,14 +101,14 @@ class Settings(BaseSettings):
     trusted_proxy_cidrs: str = ""
 
     # Required in every process because the connection carries credentials. Local Compose builds it
-    # from the disposable password of scripts/dev-secrets.sh; deployments supply it through the
-    # pre-created backend.existingSecret.
+    # from the disposable password of scripts/dev-secrets.sh; with the in-chart database the
+    # deployment supplies the DML-only runtime connection through the <release>-database Secret.
     database_url: str
 
     # Required in every process. rules/58 fixes the asymmetric RS256/ES256 profile: the PEM private
     # key signs, its derived public key verifies. Local Compose receives a disposable development
-    # key from scripts/dev-secrets.sh; a missing key in a pre-created deployment Secret stops
-    # startup instead of enabling a known signing key.
+    # key from scripts/dev-secrets.sh; a missing key in the deployment Secret stops startup instead
+    # of enabling a known signing key.
     jwt_private_key: SecretStr
     jwt_algorithm: Literal["ES256", "RS256"] = "ES256"
     jwt_issuer: str = "dwhcodereview"

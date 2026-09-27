@@ -59,9 +59,11 @@ seçenek olarak en az 2048 bit anahtarla `RS256`. `DWHCODEREVIEW_JWT_PRIVATE_KEY
 anahtarı taşır; doğrulama bu anahtarın açık anahtarıyla, yalnız seçilen algoritmayla yapılır. Anahtar
 her süreçte zorunludur; yoksa ya da algoritmayla uyuşmuyorsa uygulama açılmaz. Yerel yığın ve ana
 makine çalıştırması `scripts/dev-secrets.sh` ile Git'in yok saydığı `app/infra/.data/` altında
-oluşturulan tek kullanımlık geliştirme anahtarını kullanır. Paylaşılan ve dağıtılmış ortamların anahtarı
-yalnız önceden oluşturulmuş `backend.existingSecret` içinden gelir; bu anahtarın üretimi, dönüşümü ve
-iptali kurum anahtar yönetimine ve insan onayına aittir, iskelette betiği yoktur.
+oluşturulan tek kullanımlık geliştirme anahtarını kullanır. Dağıtılmış ortamın anahtarı yalnız
+`backend.existingSecret` ile adı verilen `Secret` içinden gelir. Üretim dışı test kümesinde bu
+`Secret`'ı projenin `helm/dwhcodereview/deploy-hooks.sh` kancası hazırlar (anahtarı bir kez üretir,
+sonra kümedekini kullanır). Üretim ortamında anahtarın üretimi, dönüşümü ve iptali kurum anahtar
+yönetimine ve insan onayına aittir.
 
 Parola politikası `app/core/security.py` içindedir: yalnız parolayla girilen bu akışta en az 15, en
 çok 128 karakter; büyük/küçük harf, rakam veya özel karakter zorunluluğu yoktur, boşluk ve Unicode

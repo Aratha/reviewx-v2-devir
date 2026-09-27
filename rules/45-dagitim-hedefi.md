@@ -21,7 +21,9 @@ DevOps standardı gereği tek uygulama `chart`'ı `helm/<ürün-kısa-adı>/` di
 noktası aynı dizindeki `deploy.sh` dosyasıdır. `chart` kendi kendine yeterlidir; arka uç ve ön yüz iş
 yüklerini, projenin kabul edilmiş `PRD`'si bildirdiğinde ise bir PostgreSQL 17 `StatefulSet`'ini ve bir
 Alembic şema geçişi `Job`'unu içerir. Önbellek, işleyici veya gözlemlenebilirlik iş yükü, alt `chart`,
-ortam katmanı, bağımlılık arşivi veya çalışma zamanı indirmesi içermez.
+bağımlılık arşivi veya çalışma zamanı indirmesi içermez. Ortama özgü bilgi yalnız aşağıdaki projeye ait
+değer katmanıyla gelir. Proje, fabrikanın yönettiği dosyaları elle düzenlemeden ve dışarıdan ayar
+veya `Secret` beklemeden üretim dışı hedefe dağıtılabilir.
 Bu hedefi karşılayamayan değişiklik tamamlanmış değildir.
 
 Oluşturulan her iş yükü şu kontrollerin tamamını karşılamalıdır:
@@ -29,8 +31,8 @@ Oluşturulan her iş yükü şu kontrollerin tamamını karşılamalıdır:
 - arka uç ve ön yüz imajı kanonik iç `GHCR` proxy-cache yolundan gelir; GitHub `main` yapısı tam 40
   karakter kaynak commit etiketini yayımlar ve Azure dağıtımı `latest` isteğini aynı
   `BUILD_SOURCEVERSION` etiketine çözer;
-- `chart`, `Secret` yazmaz; değer/katman gizli malzeme içermez; iş yükü önceden oluşturulmuş
-  `Secret`'a adıyla bağlanır;
+- `chart`, `Secret` yazmaz; değer dosyası ve proje katmanı gizli malzeme içermez; iş yükü `Secret`'a
+  adıyla bağlanır;
 - kapsayıcı açıkça kök olmayan kullanıcı/grupla çalışır, ayrıcalık yükseltmeyi kapatır, tüm
   `Linux` yeteneklerini düşürür, `RuntimeDefault` `seccomp` kullanır ve salt okunur kök dosya sistemine
   sahiptir;
@@ -45,26 +47,49 @@ Oluşturulan her iş yükü şu kontrollerin tamamını karşılamalıdır:
   oluşturmaz;
 - kalıcı birim istemi boyut bildirir; `Job`, `Always` dışı yeniden başlatma politikası kullanır.
 
-Kanonik `values.yaml` `backend` ve `frontend` bölümlerini, ayrıca varsayılanı kapalı `postgres` ve
-`migration` bölümlerini taşır. `backend` ve `frontend` bölümleri
+Fabrikanın yönettiği kanonik `values.yaml` `backend` ve `frontend` bölümlerini, ayrıca varsayılanı
+kapalı `postgres` ve `migration` bölümlerini taşır. `backend` ve `frontend` bölümleri
 `cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/<proje>-<bileşen>` yolunu ve `latest` varsayılanını
 taşır; Azure çağrısında `deploy.sh` bu varsayılanı tam kaynak commit etiketiyle ezer. İstenirse açık
-bir imaj özeti etikete üstün gelir. Önceden oluşturulmuş `Secret`, backend çıkış eşleri ve ingress
-host/TLS değerleri ortam girdisi olarak boş kalır. Backend ve frontend giriş politikaları kanonik RKE2
-controller namespace'i `kube-system` için doğru portu önceden taşır. `scripts/render-charts.sh`,
-kaydedilmiş ortam katmanı kullanmadan sentetik değerlerle yapısal sözleşmeyi hem veritabanı ve geçiş
-kapalıyken hem açıkken kanıtlar.
+bir imaj özeti etikete üstün gelir. Backend ve frontend giriş politikaları kanonik RKE2 controller
+namespace'i `kube-system` için doğru portu önceden taşır. Ortam bilgileri bu dosyada boş kalır ve
+projeye ait iki dosyayla gelir. İskelet (`baslat`, `guncelle`) bu dosyaları oluşturmaz, güncellemez,
+silmez ve yönetilen dosya listesine yazmaz:
+
+- `helm/<ürün-kısa-adı>/values-project.yaml`: `deploy.sh` bu dosyayı render ve apply kiplerinde temel
+  değer dosyasının üstüne katmanlar. Projenin ortam bilgisini taşır: ingress sınıfı, host ve TLS
+  `Secret` adı; `backend.existingSecret` adı; backend çıkış eşleri; depolama sınıfı; `postgres` ve
+  `migration` açma anahtarları; `backend.config` altında `<ENV_PREFIX>` önekli, gizli olmayan ayarlar.
+  Çıkış eşi bir seçici ya da adıyla sınırlı `ipBlock` adres bloğudur; IPv4'te `/8`, IPv6'da `/32`
+  değerinden geniş blok reddedilir. Gizli görünen anahtar (parola, belirteç, özel anahtar, bağlantı
+  adresi gibi), PEM özel anahtarı veya kullanıcı adı ve parola içeren adres taşıyamaz.
+- `helm/<ürün-kısa-adı>/deploy-hooks.sh`: yalnız apply kipinde, imaj yayın denetimi, namespace
+  oluşturma ve `ailab-tls` kopyasından sonra; veritabanı `Secret`'larından, beklemedeki release
+  işleminden ve her Helm değişikliğinden önce `bash` ile çalışır. `KT_DEPLOY_RELEASE`,
+  `KT_DEPLOY_NAMESPACE`, `KT_DEPLOY_CHART_DIR`, `KT_DEPLOY_IMAGE_TAG` ve `KT_DEPLOY_DATABASE_ENABLED`
+  değişkenlerini alır. İşi projeye özgü `Secret` hazırlığıdır: örneğin imza anahtarını bir kez üretip
+  sonraki koşularda kümedekini yeniden kullanmak veya isteğe bağlı dış kimlik bilgilerini çalışma
+  zamanı `Secret`'ına eşlemek. Gizli değeri yazdırmaz. Sıfır dışı çıkış, dağıtımı Helm değişikliği
+  yapmadan durdurur.
+
+`scripts/render-charts.sh`, sentetik değerlerle yapısal sözleşmeyi hem veritabanı ve geçiş kapalıyken
+hem açıkken kanıtlar. Proje katmanı varsa temel değerleri ve katmanı `deploy.sh`'in varsayılan release
+ve namespace adıyla aynı yapısal denetimlerden geçirir; gizli malzemeyi ve geçersiz yapıyı reddeder.
+Kanca varsa sözdizimini `bash -n` ile denetler. `chart` da `backend.config` içinde öneksiz veya gizli
+görünen anahtarı işlemeden reddeder.
 
 `postgres.enabled` açıldığında veritabanı iş yükü yukarıdaki kontrollere ek olarak şunları karşılar:
 
 - tek kopya `StatefulSet`'tir ve bileşen etiketi `database`'dir; imaj, yerel Compose'daki PostgreSQL 17
   imajıyla aynı `sha256` özetiyle sabitlenir, özet boşsa işleme durur; ortam depo yolunu özet
   değişmeden kurum içi aynaya çevirebilir;
+- `postgres.enabled` yalnız `migration.enabled` ile birlikte açılır; çalışma zamanı rolünü geçiş
+  oluşturur;
 - veri, boyutu ve depolama sınıfı adı açıkça yazılmış `ReadWriteOnce` kalıcı birim istemindedir;
-  depolama sınıfı ortam girdisidir ve boşsa işleme durur;
+  depolama sınıfı proje katmanından gelir ve boşsa işleme durur;
 - kapsayıcı `999` kullanıcı/grubuyla kök olmadan çalışır; `/var/run/postgresql` ve `/tmp` boyutu
   sınırlı birimlerdir; veri sağlama toplamı (`--data-checksums`) açıktır; kapanışa 60 saniye tanınır;
-- kimlik bilgileri yalnız önceden oluşturulmuş `postgres.existingSecret`'tan `envFrom` ile gelir;
+- kimlik bilgileri yalnız `<release>-postgres` `Secret`'ından `envFrom` ile gelir;
   başlatma/hazırlık/canlılık yoklamaları yapılandırılmış kullanıcıyla gerçek `SELECT 1` sorgusu
   çalıştırır;
 - `NetworkPolicy` girişi yalnız aynı sürümün backend ve geçiş podlarından veritabanı portuna açar;
@@ -76,8 +101,13 @@ kapalıyken hem açıkken kanıtlar.
 - backend imaj kimliğiyle `alembic upgrade head` çalıştırır; ayrı geçiş imajı yoktur;
 - yeniden başlatma politikası `Never`, `backoffLimit` değeri `0`'dır ve `activeDeadlineSeconds` süre
   sınırı vardır; başarısız geçiş yeniden denenmez, incelenir;
-- bağlantısını yalnız önceden oluşturulmuş `migration.existingSecret`'tan `envFrom` ile alır; backend
-  bu `Secret`'ı görmez;
+- bağlantısını yalnız `<release>-migration` `Secret`'ından `envFrom` ile alır; backend bu `Secret`'ı
+  görmez;
+- Alembic'ten önce veritabanı imajıyla çalışan ikinci hazırlık kapsayıcısı, şema sahibi olarak
+  çalışma zamanı rolünü oluşturur veya günceller. Rol süper kullanıcı değildir; veritabanı veya rol
+  oluşturamaz; `public` şemasında yalnız `SELECT`, `INSERT`, `UPDATE`, `DELETE` ve dizi kullanımı
+  yetkisi alır. Varsayılan yetkiler Alembic'in sonradan oluşturduğu tablolara da uzanır. Oturum,
+  ifadelerini sunucu günlüğüne yazdırmaz;
 - `NetworkPolicy` girişi kapatır; çıkışı yalnız küme DNS'ine ve veritabanı portuna açar;
 - kimlik bilgisi taşımayan bekleme kapsayıcısı, veritabanı `Service`'i bağlantı kabul edene kadar
   bekler; `Service` bağlantıyı yalnız `SELECT 1` hazırlık yoklaması geçtikten sonra kabul eder;
@@ -101,6 +131,20 @@ namespace, `Secret` veya Helm değişikliği yapmadan durur. Registry yanıt ver
 Helm'in hazır podu koruyan rollout güvencesiyle devam eder.
 Apply yolu yeni namespace'te eksik olan paylaşılan `ailab-tls` Secret'ını mevcut `kt-verim`
 namespace'inden runner kimliğiyle kopyalar; değerleri Git'e, Helm argümanına veya loga yazmaz.
+Render edilen `chart` veritabanını içeriyorsa apply yolu kancadan sonra ve Helm'den önce üç `Secret`
+hazırlar:
+
+- `<release>-postgres`: şema sahibinin `POSTGRES_USER` ve `POSTGRES_PASSWORD` değerleri;
+- `<release>-migration`: şema sahibinin `<ENV_PREFIX>DATABASE_URL`, `PGHOST`, `PGPORT`,
+  `PGDATABASE`, `PGUSER` ve `PGPASSWORD` değerleri ile çalışma zamanı rolünün
+  `RUNTIME_DATABASE_USER` ve `RUNTIME_DATABASE_PASSWORD` değerleri;
+- `<release>-database`: çalışma zamanı rolünün `<ENV_PREFIX>DATABASE_URL` değeri. Backend bu
+  `Secret`'ı, proje `Secret`'ından sonra `envFrom` ile okur.
+
+Parolalar ilk koşuda rastgele üretilir; sonraki koşularda kümedeki değer okunup yeniden kullanılır.
+Kancanın önceden hazırladığı değer de korunur; yalnız adres, render edilen `chart`'tan yeniden
+türetilir. Mevcut `Secret` okunamazsa hiçbir şeyi değiştirmeden durur. Değerler `kubectl`'e yalnız
+sahibine özel geçici dosyalardan geçer; Git'e, değer dosyasına, komut argümanına veya loga yazılmaz.
 Beklemedeki (`pending-*`) Helm release için önce çalışan işlemin bitmesi beklenir. Yarım kalmış
 `pending-upgrade` veya `pending-rollback` son release'e geri alınır; geri alma başarısızsa upgrade
 yapılmaz. Hizmet vermiş release kaldırılmaz; yalnız hiç kurulmamış `pending-install` kaldırılır.

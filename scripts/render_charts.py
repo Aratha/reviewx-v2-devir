@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import ipaddress
 import re
 import subprocess
 import sys
@@ -19,6 +20,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 CHART_PATH = "helm/dwhcodereview"
 CHART = ROOT / CHART_PATH
+# Project-owned files beside the chart; the scaffold never creates, updates or deletes them.
+PROJECT_VALUES = "values-project.yaml"
+PROJECT_HOOK = "deploy-hooks.sh"
 EXPECTED_TEMPLATES = {
     "_helpers.tpl",
     "application-ingress.yaml",
@@ -66,6 +70,25 @@ RKE2_DNS_PEERS = [
         "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
     }
 ]
+# The narrowest address block an ipBlock peer may admit; wider blocks approach open egress.
+MINIMUM_IP_PREFIX = {4: 8, 6: 32}
+# Keys that name a Secret are addressing; any other secret-looking key would carry the value itself.
+SECRET_NAME_KEYS = {"existingSecret", "tlsSecretName"}
+SECRET_KEY = re.compile(
+    r"passw|credential|private_?key|api_?key|access_?key|signing_?key|secret_?key|database_?url|"
+    r"dsn|connection_?string|(?:secret|token|key)$"
+)
+SECRET_VALUE = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----|://[^/\s:@]+:[^/\s@]+@")
+CONFIG_KEY = re.compile(r"^DWHCODEREVIEW_[A-Z0-9_]+$")
+RUNTIME_ROLE_TERMS = (
+    "psql",
+    "RUNTIME_DATABASE_USER",
+    "RUNTIME_DATABASE_PASSWORD",
+    "NOSUPERUSER",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES",
+    "ALTER DEFAULT PRIVILEGES",
+    "log_min_error_statement",
+)
 
 
 class PolicyError(RuntimeError):
@@ -159,6 +182,11 @@ def validate_chart_layout() -> tuple[dict[str, Any], dict[str, Any]]:
         backend.get("existingSecret") == "",
         "backend.existingSecret must not hardcode an environment deployment fact",
     )
+    require(
+        backend.get("config") == {},
+        "backend.config must stay empty in values.yaml; project settings belong to "
+        f"{PROJECT_VALUES}",
+    )
     backend_policy = backend.get("networkPolicy")
     frontend_policy = frontend.get("networkPolicy")
     ingress = frontend.get("ingress")
@@ -222,10 +250,6 @@ def validate_optional_defaults(values: dict[str, Any]) -> None:
         DIGEST.fullmatch(str(image.get("digest", ""))) is not None,
         "postgres image default must pin a sha256 digest",
     )
-    require(
-        postgres.get("existingSecret") == "",
-        "postgres.existingSecret must not hardcode an environment deployment fact",
-    )
     require(postgres.get("port") == 5432, "postgres.port must be 5432")
     database = postgres.get("database")
     require(
@@ -247,10 +271,6 @@ def validate_optional_defaults(values: dict[str, Any]) -> None:
     require(has_requests_and_limits(postgres.get("resources")), "postgres resources incomplete")
 
     require(migration.get("enabled") is False, "migration must be disabled by default")
-    require(
-        migration.get("existingSecret") == "",
-        "migration.existingSecret must not hardcode an environment deployment fact",
-    )
     deadline = migration.get("activeDeadlineSeconds")
     require(
         isinstance(deadline, int) and not isinstance(deadline, bool) and deadline > 0,
@@ -261,6 +281,88 @@ def validate_optional_defaults(values: dict[str, Any]) -> None:
         "migration DNS egress must target the canonical RKE2 cluster DNS",
     )
     require(has_requests_and_limits(migration.get("resources")), "migration resources incomplete")
+
+
+def secret_looking_key(key: str) -> bool:
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key).lower().replace("-", "_")
+    return key not in SECRET_NAME_KEYS and SECRET_KEY.search(words) is not None
+
+
+def validate_no_secret_material(value: object, path: str) -> None:
+    """The project layer is addressing and settings only; secret values live in Secrets."""
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            where = f"{path}.{key}"
+            require(
+                not secret_looking_key(str(key)),
+                f"{where}: secret-looking key; keep the value in a Secret the project hook prepares",
+            )
+            validate_no_secret_material(item, where)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            validate_no_secret_material(item, f"{path}[{index}]")
+    elif isinstance(value, str):
+        require(
+            SECRET_VALUE.search(value) is None,
+            f"{path}: value carries secret material; keep it in a Secret",
+        )
+
+
+def load_project_layer() -> dict[str, Any] | None:
+    """Read the optional project-owned values layer; absent means the project adds nothing."""
+
+    path = CHART / PROJECT_VALUES
+    if not path.exists() and not path.is_symlink():
+        return None
+    require(
+        path.is_file() and not path.is_symlink(),
+        f"{CHART_PATH}/{PROJECT_VALUES} must be a regular file",
+    )
+    layer = load_yaml(path)
+    require(
+        set(layer) <= VALUE_SECTIONS,
+        f"{PROJECT_VALUES} may set only backend/frontend/postgres/migration values",
+    )
+    for section, value in layer.items():
+        require(isinstance(value, dict), f"{PROJECT_VALUES}: {section} must be a mapping")
+    validate_no_secret_material(layer, PROJECT_VALUES.removesuffix(".yaml"))
+    return layer
+
+
+def validate_project_hook() -> bool:
+    """The optional project hook must be a regular file that bash can parse."""
+
+    path = CHART / PROJECT_HOOK
+    if not path.exists() and not path.is_symlink():
+        return False
+    require(
+        path.is_file() and not path.is_symlink(),
+        f"{CHART_PATH}/{PROJECT_HOOK} must be a regular file",
+    )
+    completed = subprocess.run(
+        ["bash", "-n", str(path)], text=True, capture_output=True, check=False
+    )
+    require(
+        completed.returncode == 0,
+        f"{CHART_PATH}/{PROJECT_HOOK} is not valid bash: {completed.stderr.strip()}",
+    )
+    return True
+
+
+def project_deployment_values(
+    canonical: dict[str, Any], layer: dict[str, Any], slug: str
+) -> dict[str, Any]:
+    """Base values plus the project layer, with the image tag deploy.sh selects in Azure."""
+
+    result = cast(dict[str, Any], merge_values(canonical, layer))
+    for component in ("backend", "frontend"):
+        result[component]["image"] = {
+            "repository": result[component]["image"]["repository"],
+            "tag": "1" * 40,
+            "digest": "",
+        }
+    return result
 
 
 def merge_values(base: object, override: object) -> Any:
@@ -370,11 +472,18 @@ def database_deployment_values(values: dict[str, Any], slug: str) -> dict[str, A
 
     result = deployment_values(values, slug)
     result["postgres"]["enabled"] = True
-    result["postgres"]["existingSecret"] = "synthetic-database"
     result["postgres"]["persistence"]["storageClassName"] = "synthetic-storage"
     result["migration"]["enabled"] = True
-    result["migration"]["existingSecret"] = "synthetic-migration"
     return result
+
+
+def release_secrets(release_name: str) -> dict[str, str]:
+    """Mirror the Secret names the chart derives for the in-chart database."""
+
+    return {
+        component: f"{release_name}-{component}"
+        for component in ("postgres", "migration", "database")
+    }
 
 
 def helm(command: list[str]) -> str:
@@ -438,9 +547,12 @@ def validate_policy_rules(rules: object, peer_key: str, name: str) -> None:
         for peer in peers:
             if not isinstance(peer, dict) or not peer:
                 raise PolicyError(f"{name}: empty policy peer is forbidden")
+            if "ipBlock" in peer:
+                validate_ip_block(peer, name)
+                continue
             require(
                 any(key in peer for key in ("podSelector", "namespaceSelector")),
-                f"{name}: peer must use podSelector or namespaceSelector",
+                f"{name}: peer must use podSelector, namespaceSelector or a bounded ipBlock",
             )
             for selector in (peer.get("podSelector"), peer.get("namespaceSelector")):
                 if selector is not None:
@@ -452,6 +564,24 @@ def validate_policy_rules(rules: object, peer_key: str, name: str) -> None:
             isinstance(rule.get("ports"), list) and bool(rule["ports"]),
             f"{name}: peer ports required",
         )
+
+
+def validate_ip_block(peer: dict[str, Any], name: str) -> None:
+    """An address peer names one bounded block and never opens egress to every address."""
+
+    block = peer.get("ipBlock")
+    require(
+        set(peer) == {"ipBlock"} and isinstance(block, dict) and set(block) <= {"cidr", "except"},
+        f"{name}: an ipBlock peer carries only cidr and except",
+    )
+    try:
+        network = ipaddress.ip_network(str(cast(dict[str, Any], block).get("cidr", "")))
+    except ValueError as exc:
+        raise PolicyError(f"{name}: ipBlock cidr must be a network address") from exc
+    require(
+        network.prefixlen >= MINIMUM_IP_PREFIX[network.version],
+        f"{name}: ipBlock {network} is too wide; name the admitted address block",
+    )
 
 
 def expected_resources(values: dict[str, Any]) -> set[tuple[str, str]]:
@@ -648,7 +778,7 @@ def validate_pod_hardening(
 
 
 def validate_database(
-    document: dict[str, Any], values: dict[str, Any], service_name: str
+    document: dict[str, Any], values: dict[str, Any], service_name: str, secret: str
 ) -> None:
     name = str(document["metadata"]["name"])
     require(
@@ -684,8 +814,8 @@ def validate_database(
         f"{name}: image identity drift",
     )
     require(
-        container.get("envFrom") == [{"secretRef": {"name": postgres["existingSecret"]}}],
-        f"{name}: database must consume one pre-created Secret",
+        container.get("envFrom") == [{"secretRef": {"name": secret}}],
+        f"{name}: database must consume only its generated owner Secret",
     )
     environment = container.get("env", [])
     require(
@@ -746,6 +876,7 @@ def validate_migration(
     values: dict[str, Any],
     workloads: dict[str, str],
     mode: str,
+    secret: str,
 ) -> None:
     name = str(document["metadata"]["name"])
     require(document.get("apiVersion") == "batch/v1", f"{name}: unsupported migration workload")
@@ -765,7 +896,7 @@ def validate_migration(
         spec.get("restartPolicy") == "Never",
         f"{name}: migration Job must not restart (restartPolicy Never)",
     )
-    container = validate_pod_hardening(spec, name, init_containers=1)
+    container = validate_pod_hardening(spec, name, init_containers=2)
     backend_image = image_reference(values["backend"]["image"], name)
     require(
         container.get("image") == backend_image,
@@ -776,12 +907,11 @@ def validate_migration(
         f"{name}: migration must run alembic upgrade head",
     )
     require(
-        container.get("envFrom")
-        == [{"secretRef": {"name": values["migration"]["existingSecret"]}}],
-        f"{name}: migration must consume one pre-created Secret",
+        container.get("envFrom") == [{"secretRef": {"name": secret}}],
+        f"{name}: migration must consume only its generated Secret",
     )
     require("env" not in container, f"{name}: per-key environment values are forbidden")
-    wait = spec["initContainers"][0]
+    wait, role = spec["initContainers"]
     script = "".join(str(item) for item in wait.get("args", []))
     require(
         wait.get("image") == backend_image
@@ -792,6 +922,19 @@ def validate_migration(
     require(
         "env" not in wait and "envFrom" not in wait,
         f"{name}: the database wait carries no credential",
+    )
+    postgres_image = values["postgres"]["image"]
+    role_script = "".join(str(item) for item in role.get("args", []))
+    require(
+        role.get("name") == "runtime-role"
+        and role.get("image") == f"{postgres_image['repository']}@{postgres_image['digest']}"
+        and role.get("command") == ["/bin/sh", "-c"]
+        and all(term in role_script for term in RUNTIME_ROLE_TERMS),
+        f"{name}: migration must keep the runtime database role DML-only before Alembic",
+    )
+    require(
+        role.get("envFrom") == [{"secretRef": {"name": secret}}] and "env" not in role,
+        f"{name}: the runtime role step must read only the generated migration Secret",
     )
 
 
@@ -814,6 +957,7 @@ def validate_documents(
         component: resource_name(release_name, namespace, slug, component)
         for component in ("backend", "frontend", "database", "migration", "migration-init")
     }
+    secrets = release_secrets(release_name)
     for document in documents:
         kind = str(document.get("kind", ""))
         metadata = document.get("metadata", {})
@@ -910,11 +1054,11 @@ def validate_documents(
             continue
 
         if kind == "StatefulSet":
-            validate_database(document, values, workloads["database"])
+            validate_database(document, values, workloads["database"], secrets["postgres"])
             continue
 
         if kind == "Job":
-            validate_migration(document, values, workloads, migration_mode)
+            validate_migration(document, values, workloads, migration_mode, secrets["migration"])
             continue
 
         require(
@@ -935,12 +1079,15 @@ def validate_documents(
             f"{name}: probes incomplete",
         )
         if component == "backend":
+            references = [{"secretRef": {"name": values["backend"]["existingSecret"]}}]
+            if values["postgres"]["enabled"] is True:
+                references.append({"secretRef": {"name": secrets["database"]}})
             require(
-                container.get("envFrom")
-                == [{"secretRef": {"name": values["backend"]["existingSecret"]}}],
-                f"{name}: backend must consume one pre-created Secret",
+                container.get("envFrom") == references,
+                f"{name}: backend must consume the project Secret and, with the in-chart "
+                "database, only the generated runtime connection",
             )
-            require("env" not in container, f"{name}: per-key environment values are forbidden")
+            validate_backend_config(container, values["backend"].get("config") or {}, name)
         else:
             require(
                 "env" not in container and "envFrom" not in container,
@@ -950,6 +1097,38 @@ def validate_documents(
     require(
         observed == expected,
         f"rendered resources must match the enabled components: {observed_summary}",
+    )
+
+
+def config_text(value: object) -> str:
+    """Mirror Helm's toString for the scalar settings backend.config admits."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    require(
+        isinstance(value, (str, int)),
+        "backend.config values must be strings, integers or booleans",
+    )
+    return str(value)
+
+
+def validate_backend_config(container: dict[str, Any], config: object, name: str) -> None:
+    """Non-secret prefixed settings become plain env entries; nothing else may use env."""
+
+    require(isinstance(config, dict), f"{name}: backend.config must be a mapping")
+    settings = cast(dict[str, Any], config)
+    for key in settings:
+        require(
+            CONFIG_KEY.fullmatch(str(key)) is not None and not secret_looking_key(str(key)),
+            f"{name}: backend.config key {key} must be a non-secret DWHCODEREVIEW_ setting",
+        )
+    expected = [{"name": key, "value": config_text(settings[key])} for key in sorted(settings)]
+    if not expected:
+        require("env" not in container, f"{name}: per-key environment values are forbidden")
+        return
+    require(
+        container.get("env") == expected,
+        f"{name}: backend env must carry only the backend.config settings",
     )
 
 
@@ -998,12 +1177,25 @@ def main() -> int:
     try:
         chart, canonical = validate_chart_layout()
         if args.values is None:
-            values = deployment_values(canonical, str(chart["name"]))
+            slug = str(chart["name"])
+            values = deployment_values(canonical, slug)
             count, database_count = self_test(values, chart)
-            print(
+            summary = (
                 f"chart contract passed: {count} resources, {database_count} with the optional "
                 "database and migration, one chart, one values file"
             )
+            layer = load_project_layer()
+            if layer is not None:
+                # deploy.sh uses the product slug as release and namespace unless told otherwise.
+                project_values = project_deployment_values(canonical, layer, slug)
+                documents = render_chart(project_values, release_name=slug, namespace=slug)
+                validate_documents(
+                    documents, project_values, chart, release_name=slug, namespace=slug
+                )
+                summary += f"; {PROJECT_VALUES}: {len(documents)} resources"
+            if validate_project_hook():
+                summary += f"; {PROJECT_HOOK} parses"
+            print(summary)
             return 0
         supplied = load_yaml(args.values.resolve(strict=True))
         require(

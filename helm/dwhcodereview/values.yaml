@@ -1,51 +1,15 @@
-# Tek değer kaynağı bu dosyadır; ortam dosyası (values-test/prod) yoktur.
-# Azure'da deploy.sh imaj etiketini ve çalışma zamanı Secret adını ayrıca verir.
-# Değer sözleşmesi values.schema.json, çapraz kontroller templates/_validation.tpl.
-
+# Factory-managed defaults. Project environment addressing (ingress host and TLS Secret name,
+# backend Secret name and egress peers, storage class, database toggles) belongs in the
+# project-owned values-project.yaml beside this file, which deploy.sh layers on top.
 backend:
   replicaCount: 1
   image:
-    # İç registry (GHCR proxy-cache) yolu; doğrudan ghcr.io node'da çözülemez.
     repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-backend
     tag: latest
     digest: ""
-  # Sırları taşıyan, chart dışında yönetilen Secret (MSSQL_CONNECTION_STRING,
-  # MSSQL_PASSWORD, API_ACCESS_TOKEN, API_ADMIN_TOKEN, LLM_API_KEY).
-  # deploy.sh yoksa oluşturur; pipeline'da dolu verilen anahtarları günceller.
-  existingSecret: dwhcodereview-runtime
-  # Sır olmayan ayarlar (backend/config.py alanlarının env adları); ConfigMap
-  # olarak aktarılır. CORS_ORIGINS boşsa https://<frontend.ingress.host> olur.
-  # MSSQL_SERVER, MSSQL_PORT, MSSQL_USER, MSSQL_ENCRYPT gibi alanlar da eklenebilir.
-  config:
-    # KT Verim ile aynı kurum içi vLLM ucu (OpenAI uyumlu, anahtar gerektirmez).
-    # Kök CA backend imajında; uç 10.14.3.99:443, aşağıdaki 10.0.0.0/8 egress kuralı kapsar.
-    LLM_BASE_URL: "https://runai.gpudtx.kuveytturk.com.tr/inference/qwen36-35b-a3b-fp8/v1"
-    LLM_CHAT_API: openai
-    LLM_CHAT_URL: ""
-    LLM_MODEL: /data/models--Qwen--Qwen36-35B-A3B-FP8
-    SQL_REVIEW_LLM_MODEL: ""
-    LLM_HTTP_TRUST_ENV: "false"
-    LLM_HTTP_USER_AGENT: "DWHCodeReview-Backend/1.0 (internal SQL review; httpx)"
-    LLM_ENFORCE_PRIVATE_NETWORK: "true"
-    LLM_ALLOW_PUBLIC_HOSTS: ""
-    LLM_LOG_FULL_PAYLOADS: "false"
-    SQL_REVIEW_MAX_CONCURRENT_RULES: "6"
-    LLM_READ_TIMEOUT_SECONDS: "900"
-    LLM_REQUEST_RETRIES: "2"
-    SQL_REVIEW_TWO_PART_THRESHOLD_CHARS: "45000"
-    CORS_ORIGINS: ""
-    API_RATE_LIMIT_ENABLED: "true"
-    API_RATE_LIMIT_WINDOW_SECONDS: "60"
-    API_RATE_LIMIT_REVIEW_MAX: "60"
-  # review_rules.json ve LLM logları (/app/data). ReadWriteOnce iken tek replika
-  # ve Recreate stratejisi kullanılır. PVC adı eski chart ile aynıdır; veri korunur.
-  persistence:
-    enabled: true
-    accessMode: ReadWriteOnce
-    size: 5Gi
-    storageClass: ""
-  # Uzun LLM çağrılarının (LLM_READ_TIMEOUT_SECONDS) kapanırken tamamlanması için.
-  terminationGracePeriodSeconds: 60
+  existingSecret: ""
+  # Non-secret settings as prefixed environment variables, for example DWHCODEREVIEW_LOG_LEVEL.
+  config: {}
   networkPolicy:
     ingress:
       - from:
@@ -54,30 +18,12 @@ backend:
                 kubernetes.io/metadata.name: kube-system
         ports:
           - {protocol: TCP, port: 8000}
-    egress:
-      - to:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: kube-system
-        ports:
-          - {protocol: UDP, port: 53}
-          - {protocol: TCP, port: 53}
-      # SQL Server ve LLM uç noktası yalnız kurum içi (private) ağda olabilir;
-      # LLM_ENFORCE_PRIVATE_NETWORK ile aynı sınır. Hedefler netleşince CIDR'leri
-      # daraltın; LLM farklı bir portta dinliyorsa portu buraya ekleyin.
-      - to:
-          - ipBlock: {cidr: 10.0.0.0/8}
-          - ipBlock: {cidr: 172.16.0.0/12}
-          - ipBlock: {cidr: 192.168.0.0/16}
-        ports:
-          - {protocol: TCP, port: 1433}
-          - {protocol: TCP, port: 80}
-          - {protocol: TCP, port: 443}
+    egress: []
   service:
     port: 8000
   resources:
-    requests: {cpu: 250m, memory: 512Mi}
-    limits: {cpu: 1000m, memory: 1Gi}
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 1000m, memory: 512Mi}
 
 frontend:
   replicaCount: 1
@@ -85,13 +31,10 @@ frontend:
     repository: cr-test.kuveytturk.com.tr/ghcr.io.vc/kt-vibecoding/dwhcodereview-frontend
     tag: latest
     digest: ""
-  # Host, certs/ailab-test.crt wildcard sertifikasının (*.ailab-test.kuveytturk.com.tr)
-  # kapsamında olmalıdır. ailab-tls Secret'ı namespace-scoped'tır; eksikse deploy.sh
-  # kt-verim/ailab-tls anahtarını repodaki zincirle doğrulayıp oluşturur.
   ingress:
-    className: nginx
-    host: dwhcodereview.ailab-test.kuveytturk.com.tr
-    tlsSecretName: ailab-tls
+    className: ""
+    host: ""
+    tlsSecretName: ""
   networkPolicy:
     ingress:
       - from:
@@ -100,10 +43,43 @@ frontend:
                 kubernetes.io/metadata.name: kube-system
         ports:
           - {protocol: TCP, port: 8080}
-    # Frontend yalnız statik dosya sunar; /api Ingress'ten doğrudan backend'e gider.
     egress: []
   service:
     port: 8080
   resources:
     requests: {cpu: 50m, memory: 64Mi}
-    limits: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+# Optional in-chart PostgreSQL 17. It stays off until the project's accepted PRD declares it and is
+# enabled together with the migration. deploy.sh generates its Secrets once and reuses them.
+postgres:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "17.10"
+    digest: "sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317"
+  port: 5432
+  database: "dwhcodereview_db"
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 1000m, memory: 1Gi}
+
+# Optional Alembic schema migration Job; it runs the backend image and needs postgres.enabled.
+migration:
+  enabled: false
+  activeDeadlineSeconds: 600
+  networkPolicy:
+    dns:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}

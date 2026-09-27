@@ -1,0 +1,65 @@
+# Project-owned deployment layer for the nonprod KT Rancher cluster (rules/45-dagitim-hedefi.md).
+# deploy.sh layers it over the factory-managed values.yaml in render and apply; the scaffold never
+# writes it. Addressing and non-secret settings only: secrets live in the Secrets that
+# deploy-hooks.sh and deploy.sh prepare in the cluster.
+# Contract: specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md (Requirement 5, 8, 10).
+backend:
+  # Prepared by deploy-hooks.sh: session signing key and the optional SQL Server and LLM credentials.
+  existingSecret: dwhcodereview-runtime
+  config:
+    # staging is the nonprod environment of application-foundation/DOMAIN.md.
+    DWHCODEREVIEW_ENVIRONMENT: staging
+    DWHCODEREVIEW_PUBLIC_ORIGIN: https://dwhcodereview.ailab-test.kuveytturk.com.tr
+    DWHCODEREVIEW_CORS_ALLOW_ORIGINS: https://dwhcodereview.ailab-test.kuveytturk.com.tr
+    # Pod network of the kube-system ingress controller; X-Forwarded-For is trusted only from it.
+    DWHCODEREVIEW_TRUSTED_PROXY_CIDRS: 10.42.0.0/16
+    # Login-only LDAPS directory (application-foundation/PRDs/001-directory-login); the CA bundle
+    # is the public certificate the backend image carries.
+    DWHCODEREVIEW_DIRECTORY_ENABLED: true
+    DWHCODEREVIEW_DIRECTORY_HOST: srvbudc4.kuveytturk.local
+    DWHCODEREVIEW_DIRECTORY_PORT: 636
+    DWHCODEREVIEW_DIRECTORY_BASE_DN: DC=kuveytturk,DC=local
+    DWHCODEREVIEW_DIRECTORY_UPN_SUFFIX: kuveytturk.local
+    DWHCODEREVIEW_DIRECTORY_CA_BUNDLE_PATH: /workspace/app/backend/certs/nonprod-directory-ca.crt
+    DWHCODEREVIEW_DIRECTORY_TLS_LEGACY_COMPATIBILITY: true
+    # Internal RunAI endpoint (sql-review/PRDs/006-llm-connection Decision 3); it needs no key.
+    DWHCODEREVIEW_LLM_CHAT_API: openai
+    DWHCODEREVIEW_LLM_BASE_URL: https://runai.gpudtx.kuveytturk.com.tr/inference/qwen36-35b-a3b-fp8/v1
+    DWHCODEREVIEW_LLM_MODEL: /data/models--Qwen--Qwen36-35B-A3B-FP8
+    DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    # The SQL Server address and allowed databases are not known yet, so the SQL Server area stays
+    # "not configured" (sql-review/PRDs/002-sql-server-connection Requirement 1).
+  networkPolicy:
+    egress:
+      - to:
+          - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+            podSelector: {matchLabels: {k8s-app: kube-dns}}
+        ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+      - to:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/instance: dwhcodereview
+                app.kubernetes.io/part-of: dwhcodereview
+                app.kubernetes.io/component: database
+        ports: [{protocol: TCP, port: 5432}]
+      # LLM (RunAI)
+      - to: [{ipBlock: {cidr: 10.14.3.99/32}}]
+        ports: [{protocol: TCP, port: 443}]
+      # LDAPS directory
+      - to: [{ipBlock: {cidr: 10.13.9.1/32}}]
+        ports: [{protocol: TCP, port: 636}]
+      # SQL Server; its single address is not known yet, so the widest block rules/45 admits.
+      - to: [{ipBlock: {cidr: 10.0.0.0/8}}]
+        ports: [{protocol: TCP, port: 1433}]
+frontend:
+  ingress:
+    className: nginx
+    host: dwhcodereview.ailab-test.kuveytturk.com.tr
+    tlsSecretName: ailab-tls
+postgres:
+  enabled: true
+  persistence:
+    size: 10Gi
+    storageClassName: nfs-sc
+migration:
+  enabled: true

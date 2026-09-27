@@ -1,0 +1,27 @@
+{
+  "corpus_digest": "8e36c67f3a93cab9edc8b6d1777f2791d2ecb3b22b736afaa8668f2e9ff927fd",
+  "files": {
+    ".agents/skills/governed-review/SKILL.md": "45fea69c3c4b060f8a69b2dd082b66c8d40d7f2602bd9ac0ba028bc555c1739a",
+    ".agents/skills/kt-alan/SKILL.md": "11016f2dae2bf4c6736c1262ff9a743faff5fce2dbc875eb75d6541aae9820a0",
+    ".agents/skills/kt-baslat/SKILL.md": "062de584aaeb1943c1ba1ac40d4b35ae48d35546992be97add378ce48c61dbd5",
+    ".agents/skills/kt-guncelle/SKILL.md": "b9c03ce76ce437f6dbf3a9f0d7a263af97925defc1f5eb0850cdfdeffc2e1892",
+    ".agents/skills/kt-kalite-kapisi/SKILL.md": "24398606544fa4471e596a9c9bb148d99660509623be19cf285356e0176c95b9",
+    ".agents/skills/kt-kural/SKILL.md": "1abceef0ca3956c11f56f5b11c8f94418d3f5ecd6bf709087903066031c513e3",
+    ".agents/skills/kt-kurallar/SKILL.md": "2795e8ec8626a8404914914bc79b8991d8f68809febdf6448e639ff9d51ccc03",
+    ".agents/skills/kt-sayfa/SKILL.md": "b977ad93a9fe8915884f825fedcf376f189cc2d5d097c3269b33d5643ac8783d",
+    ".agents/skills/kt-sema/SKILL.md": "918689f3c510431d6987051649f2bfb9fd68d83b36c370abdbf205b5ba2640b4",
+    ".agents/skills/kt-senaryo/SKILL.md": "afe67a06ae2fbe2207fc90d27b57fda6dbdaf76af5daf6bcaefa489e962fd1c7",
+    ".agents/skills/kt-spesifikasyon/SKILL.md": "f894282169dacd0475f67355b1fd9091da150da0e48f23bf7f4dce2bb5d629b0",
+    ".agents/skills/kt-tamamla/SKILL.md": "4f6d64bde467deca3089af81b6b99d26e795c19884e1ed9e1cfbd748751ebcaf",
+    ".agents/skills/kt-test-kosumu-raporu/SKILL.md": "b2e287b73b0c995751c6d48196d497620529ac9074c2957c8594f246c25b81da",
+    ".agents/skills/kt-yansit/SKILL.md": "73959cfda88fd791855c47f499f978c8bdf0a4166a9a13d262b3d17acb1b1c79",
+    ".codex/config.toml": "9ce9f2da1323ea6832b58b98e97300f37eb6364bd9c062696eb5ad07cfb2844c",
+    ".codex/hooks.json": "48709671d6c4526167aebd25ff48605525435fa8937b1a97b78d7418833d3135",
+    ".specify/memory/constitution.md": "0f35c9be49fc00103d54e6fc283fdbea73774895dfe62776fe90dde3024d554f",
+    "AGENTS.md": "b79486e40168c8a2013f67311e7e134b5f61b3ff31ffa5ae887c5cafcab35158",
+    "app/backend/AGENTS.md": "482cfe4d24bb3d926244846250e6db28234973b8aa276dda6c4dd9768e532dee",
+    "app/frontend/AGENTS.md": "482cfe4d24bb3d926244846250e6db28234973b8aa276dda6c4dd9768e532dee",
+    "helm/AGENTS.md": "482cfe4d24bb3d926244846250e6db28234973b8aa276dda6c4dd9768e532dee"
+  },
+  "renderer_version": "0.4.0"
+}

@@ -1,8 +1,8 @@
 {{- if not .Values.backend.networkPolicy.ingress -}}
-{{- fail "backend.networkPolicy.ingress dağıtım ortamınca verilmelidir" -}}
+{{- fail "backend.networkPolicy.ingress must be supplied by the deployment environment" -}}
 {{- end -}}
 {{- if not .Values.backend.networkPolicy.egress -}}
-{{- fail "backend.networkPolicy.egress DNS ile SQL Server ve LLM hedeflerini içermelidir" -}}
+{{- fail "backend.networkPolicy.egress must include admitted DNS and database peers" -}}
 {{- end -}}
 {{- $ingress := .Values.backend.networkPolicy.ingress -}}
 {{- $egress := .Values.backend.networkPolicy.egress -}}

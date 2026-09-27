@@ -1,0 +1,232 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from 'react';
+import {describeError, messageForCode} from '@/lib/errorMessages';
+import {applyEvent, createProgress, type LiveProgress} from '@/lib/reviewProgress';
+import {applyFalsePositive, type FalsePositiveTarget} from '@/lib/reviewResults';
+import {ReviewService, type ReviewEventHandler} from '@/services/reviews';
+import type {LiveObjectResult, ObjectSelection, ReviewKind, ReviewStreamEvent} from '@/types/sqlReview';
+
+/**
+ * The one live review of this browser tab (sql-review object-review Requirement 14, 15, 19 and
+ * script-review Requirement 11). It lives above the routes so the progress survives navigation;
+ * results stay in memory only and are stored on the server, never in browser storage.
+ */
+export type ReviewPhase = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type ReviewView = 'none' | 'live' | 'results';
+
+export const STOPPED_MESSAGE = 'İnceleme durduruldu.';
+const DISCONNECTED_MESSAGE = 'Sunucu bağlantısı koptu; inceleme tamamlanamadı.';
+const FAILED_MESSAGE = 'İnceleme hata ile sona erdi.';
+
+export interface ReviewSessionState {
+  phase: ReviewPhase;
+  kind: ReviewKind | null;
+  title: string;
+  subtitle: string;
+  progress: LiveProgress | null;
+  results: LiveObjectResult[];
+  runId: string | null;
+  errorMessage: string | null;
+  view: ReviewView;
+  /** The results window was opened from the finished live window, which it can return to. */
+  resultsFromLive: boolean;
+}
+
+type Action =
+  | {type: 'start'; kind: ReviewKind; title: string; subtitle: string; objectsTotal: number}
+  | {type: 'event'; event: ReviewStreamEvent}
+  | {type: 'complete'; runId: string; results: LiveObjectResult[]}
+  | {type: 'fail'; message: string}
+  | {type: 'cancelled'}
+  | {type: 'show'; view: ReviewView; fromLive?: boolean}
+  | {type: 'clear'}
+  | {type: 'mark'; target: FalsePositiveTarget; value: boolean};
+
+const initialState: ReviewSessionState = {
+  phase: 'idle',
+  kind: null,
+  title: '',
+  subtitle: '',
+  progress: null,
+  results: [],
+  runId: null,
+  errorMessage: null,
+  view: 'none',
+  resultsFromLive: false,
+};
+
+function reducer(state: ReviewSessionState, action: Action): ReviewSessionState {
+  switch (action.type) {
+    case 'start':
+      return {
+        ...initialState,
+        phase: 'running',
+        kind: action.kind,
+        title: action.title,
+        subtitle: action.subtitle,
+        progress: createProgress(action.objectsTotal),
+        view: 'live',
+      };
+    case 'event': {
+      if (state.phase !== 'running' || state.progress === null) return state;
+      const progress = applyEvent(state.progress, action.event);
+      return {...state, progress, runId: progress.runId ?? state.runId};
+    }
+    case 'complete':
+      return {...state, phase: 'completed', runId: action.runId, results: action.results, errorMessage: null};
+    case 'fail':
+      return {...state, phase: 'failed', results: [], errorMessage: action.message};
+    case 'cancelled':
+      // Partial results are neither stored nor shown (object-review Requirement 15).
+      return {...state, phase: 'cancelled', results: [], errorMessage: STOPPED_MESSAGE};
+    case 'show':
+      if (state.phase === 'running' && action.view !== 'live') return state;
+      if (action.view === 'results' && state.results.length === 0) return state;
+      return {...state, view: action.view, resultsFromLive: action.view === 'results' && Boolean(action.fromLive)};
+    case 'clear':
+      return state.phase === 'running' ? state : initialState;
+    case 'mark':
+      return {...state, results: applyFalsePositive(state.results, action.target, action.value)};
+  }
+}
+
+type Executor = (signal: AbortSignal, onEvent: ReviewEventHandler) => Promise<void>;
+
+interface ReviewSessionValue {
+  session: ReviewSessionState;
+  startObjectReview: (selections: ObjectSelection[]) => void;
+  startScriptReview: (sql: string, label: string) => void;
+  /** "Analizi durdur": closes the stream, which stops the run on the server. */
+  stop: () => void;
+  showLive: () => void;
+  showResults: (fromLive?: boolean) => void;
+  closeWindows: () => void;
+  clear: () => void;
+  /** Record a false-positive mark saved on the server in the live results. */
+  applyMark: (target: FalsePositiveTarget, value: boolean) => void;
+}
+
+const Context = createContext<ReviewSessionValue | null>(null);
+
+export const SCRIPT_DEFAULT_LABEL = 'Yapıştırılan SQL';
+
+function objectRunTitle(selections: ObjectSelection[]): {title: string; subtitle: string} {
+  const databases = [...new Set(selections.map((selection) => selection.database))];
+  const database =
+    databases.length === 1 ? databases[0] : `${databases.length} veritabanı (${databases.join(', ')})`;
+  const targets = selections.map(
+    (selection) => `[${selection.database}] ${selection.schema}.${selection.name} (${selection.type_code})`,
+  );
+  const subtitle =
+    targets.length <= 3 ? targets.join(', ') : `${targets.slice(0, 3).join(', ')} +${targets.length - 3}`;
+  return {title: `${database} · ${selections.length} nesne`, subtitle};
+}
+
+export function ReviewSessionProvider({children}: {children: ReactNode}) {
+  const [session, dispatch] = useReducer(reducer, initialState);
+  const controllerRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
+
+  // Leaving the signed-in area (sign-out) closes the stream, which stops the run on the server.
+  useEffect(
+    () => () => {
+      generationRef.current += 1;
+      controllerRef.current?.abort();
+    },
+    [],
+  );
+
+  const run = useCallback(
+    async (kind: ReviewKind, title: string, subtitle: string, objectsTotal: number, execute: Executor) => {
+      controllerRef.current?.abort();
+      const generation = ++generationRef.current;
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      dispatch({type: 'start', kind, title, subtitle, objectsTotal});
+      let finished = false;
+      try {
+        await execute(controller.signal, (event) => {
+          if (generation !== generationRef.current || finished) return;
+          if (event.phase === 'complete') {
+            finished = true;
+            dispatch({type: 'complete', runId: event.run_id, results: event.results});
+          } else if (event.phase === 'error') {
+            finished = true;
+            dispatch({type: 'fail', message: messageForCode(event.code) ?? FAILED_MESSAGE});
+          } else {
+            dispatch({type: 'event', event});
+          }
+        });
+        if (generation === generationRef.current && !finished) dispatch({type: 'fail', message: DISCONNECTED_MESSAGE});
+      } catch (error) {
+        if (generation !== generationRef.current) return;
+        if (controller.signal.aborted) dispatch({type: 'cancelled'});
+        else dispatch({type: 'fail', message: describeError(error)});
+      } finally {
+        if (controllerRef.current === controller) controllerRef.current = null;
+      }
+    },
+    [],
+  );
+
+  const startObjectReview = useCallback(
+    (selections: ObjectSelection[]) => {
+      if (selections.length === 0) return;
+      const {title, subtitle} = objectRunTitle(selections);
+      void run('object', title, subtitle, selections.length, (signal, onEvent) =>
+        ReviewService.streamObjectReview(selections, signal, onEvent),
+      );
+    },
+    [run],
+  );
+
+  const startScriptReview = useCallback(
+    (sql: string, label: string) => {
+      const trimmedLabel = label.trim();
+      void run('script', trimmedLabel || SCRIPT_DEFAULT_LABEL, '', 1, (signal, onEvent) =>
+        ReviewService.streamScriptReview(sql, trimmedLabel, signal, onEvent),
+      );
+    },
+    [run],
+  );
+
+  const stop = useCallback(() => controllerRef.current?.abort(), []);
+  const showLive = useCallback(() => dispatch({type: 'show', view: 'live'}), []);
+  const showResults = useCallback((fromLive = false) => dispatch({type: 'show', view: 'results', fromLive}), []);
+  const closeWindows = useCallback(() => dispatch({type: 'show', view: 'none'}), []);
+  const clear = useCallback(() => dispatch({type: 'clear'}), []);
+  const applyMark = useCallback(
+    (target: FalsePositiveTarget, value: boolean) => dispatch({type: 'mark', target, value}),
+    [],
+  );
+
+  const value = useMemo(
+    () => ({
+      session,
+      startObjectReview,
+      startScriptReview,
+      stop,
+      showLive,
+      showResults,
+      closeWindows,
+      clear,
+      applyMark,
+    }),
+    [session, startObjectReview, startScriptReview, stop, showLive, showResults, closeWindows, clear, applyMark],
+  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+export function useReviewSession(): ReviewSessionValue {
+  const value = useContext(Context);
+  if (!value) throw new Error('useReviewSession must be used inside ReviewSessionProvider');
+  return value;
+}

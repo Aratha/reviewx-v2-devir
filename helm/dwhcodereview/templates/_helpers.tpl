@@ -24,82 +24,93 @@ scaffold.kt.internal/release-namespace: {{ .Release.Namespace | quote }}
 {{- define "generated.image" -}}
 {{- $component := index . 0 -}}
 {{- $image := index . 1 -}}
-{{- $repository := required (printf "%s.image.repository zorunludur" $component) $image.repository -}}
+{{- $repository := required (printf "%s.image.repository is required" $component) $image.repository -}}
 {{- $digest := default "" $image.digest -}}
 {{- if $digest -}}
 {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
-{{- fail (printf "%s.image.digest küçük harfli bir sha256 digest olmalıdır" $component) -}}
+{{- fail (printf "%s.image.digest must be a lowercase sha256 digest" $component) -}}
 {{- end -}}
 {{- printf "%s@%s" $repository $digest -}}
 {{- else -}}
-{{- $tag := required (printf "%s.image.tag digest boşken zorunludur" $component) $image.tag -}}
+{{- $tag := required (printf "%s.image.tag is required when digest is empty" $component) $image.tag -}}
 {{- if not (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$" $tag) -}}
-{{- fail (printf "%s.image.tag geçerli bir OCI etiketi olmalıdır" $component) -}}
+{{- fail (printf "%s.image.tag must be a valid OCI tag" $component) -}}
 {{- end -}}
 {{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
 {{- end }}
 
-{{/* Hareketli latest etiketi her Pod başlangıcında yeniden çekilir; SHA/digest önbellekten. */}}
-{{- define "dwhcodereview.imagePullPolicy" -}}
-{{- if and (not .digest) (eq (toString .tag) "latest") -}}
-Always
-{{- else -}}
-IfNotPresent
+{{- define "generated.postgresImage" -}}
+{{- $image := .Values.postgres.image -}}
+{{- $repository := required "postgres.image.repository is required" $image.repository -}}
+{{- $digest := required "postgres.image.digest must pin the PostgreSQL image when postgres.enabled" $image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail "postgres.image.digest must be a lowercase sha256 digest" -}}
+{{- end -}}
+{{- printf "%s@%s" $repository $digest -}}
+{{- end }}
+
+{{- define "generated.validateMigration" -}}
+{{- if not .Values.postgres.enabled -}}
+{{- fail "migration.enabled requires postgres.enabled; the migration Job reaches only the in-chart PostgreSQL" -}}
 {{- end -}}
 {{- end }}
 
-{{/* Eski chart'taki PVC kimliği korunur; yükseltmede /app/data verisi taşınmaz, yerinde kalır. */}}
-{{- define "dwhcodereview.dataClaimName" -}}
-{{- $fullname := printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
-{{- if contains .Chart.Name .Release.Name -}}
-{{- $fullname = .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- define "generated.validateDatabase" -}}
+{{- if not .Values.migration.enabled -}}
+{{- fail "postgres.enabled requires migration.enabled; the migration Job creates the runtime role the backend connects with" -}}
 {{- end -}}
-{{- printf "%s-data" (printf "%s-backend" $fullname | trunc 63 | trimSuffix "-") -}}
-{{- end }}
-
-{{/* backend/config.py env değerleri; CORS_ORIGINS boşsa Ingress host'undan türetilir. */}}
-{{- define "dwhcodereview.backendConfig" -}}
-{{- $config := deepCopy .Values.backend.config -}}
-{{- if not (get $config "CORS_ORIGINS") -}}
-{{- $_ := set $config "CORS_ORIGINS" (printf "https://%s" .Values.frontend.ingress.host) -}}
-{{- end -}}
-{{- toYaml $config -}}
 {{- end }}
 
 {{/*
-İmajdaki default.conf docker-compose için 80'i dinler ve /api'yi "backend" adına
-iletir. Kümede Nginx non-root 8080'de yalnız SPA sunar; /api Ingress'ten backend'e gider.
+Secrets of the in-chart database. The chart only names them; deploy.sh generates their values once
+and reuses them from the cluster. The database and the migration own the schema owner connection;
+the backend sees only the DML-only runtime connection.
 */}}
-{{- define "dwhcodereview.frontendNginxConfig" -}}
-server {
-  listen 8080;
-  server_name _;
-  root /usr/share/nginx/html;
-  index index.html;
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-}
+{{- define "generated.postgresSecret" -}}
+{{- printf "%s-postgres" .Release.Name -}}
 {{- end }}
 
-{{/* İmajın root varsayan ana yapılandırması (user, pid) yerine; yazılabilir yollar emptyDir. */}}
-{{- define "dwhcodereview.frontendNginxMainConfig" -}}
-worker_processes auto;
-error_log /dev/stderr notice;
-pid /var/run/nginx.pid;
-events {
-  worker_connections 1024;
-}
-http {
-  include /etc/nginx/mime.types;
-  default_type application/octet-stream;
-  log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                  '$status $body_bytes_sent "$http_referer" '
-                  '"$http_user_agent" "$http_x_forwarded_for"';
-  access_log /dev/stdout main;
-  sendfile on;
-  keepalive_timeout 65;
-  include /etc/nginx/conf.d/*.conf;
-}
+{{- define "generated.migrationSecret" -}}
+{{- printf "%s-migration" .Release.Name -}}
+{{- end }}
+
+{{- define "generated.databaseSecret" -}}
+{{- printf "%s-database" .Release.Name -}}
+{{- end }}
+
+{{/*
+Migration mode. "upgrade" when an earlier release already created the migration NetworkPolicy, so
+the database exists and the Job runs as a pre-upgrade hook before any new backend pod. Otherwise
+"bootstrap": the Job is an ordinary release resource created together with the database (fresh
+install, or the first upgrade that adds the database), so nothing waits on backend readiness first.
+helm template sees no cluster and always renders "bootstrap".
+*/}}
+{{- define "generated.migrationMode" -}}
+{{- if lookup "networking.k8s.io/v1" "NetworkPolicy" .Release.Namespace (include "generated.resourceName" (list . "migration")) -}}
+upgrade
+{{- else -}}
+bootstrap
+{{- end -}}
+{{- end }}
+
+{{/*
+backend.config carries only non-secret, prefixed settings; secrets and the database connection
+arrive through envFrom, which an env entry would otherwise override.
+*/}}
+{{- define "generated.validateBackendConfig" -}}
+{{- range $key, $value := .Values.backend.config -}}
+{{- if not (regexMatch "^DWHCODEREVIEW_[A-Z0-9_]+$" $key) -}}
+{{- fail (printf "backend.config key %s must be an upper-case DWHCODEREVIEW_ setting" $key) -}}
+{{- end -}}
+{{- if regexMatch "PASSW|SECRET|CREDENTIAL|PRIVATE_KEY|API_KEY|DATABASE_URL|DSN|(TOKEN|KEY)$" $key -}}
+{{- fail (printf "backend.config key %s looks secret; put it in the project Secret" $key) -}}
+{{- end -}}
+{{- if kindIs "map" $value -}}
+{{- fail (printf "backend.config value of %s must be a scalar" $key) -}}
+{{- end -}}
+{{- if kindIs "slice" $value -}}
+{{- fail (printf "backend.config value of %s must be a scalar" $key) -}}
+{{- end -}}
+{{- end -}}
 {{- end }}

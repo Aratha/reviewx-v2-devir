@@ -1,0 +1,140 @@
+{
+  "$schema": "../../prompt-ingress-policy.schema.json",
+  "schema_version": "2.0",
+  "kind": "PromptIngressPolicy",
+  "metadata": {
+    "id": "policy:prompt-ingress",
+    "version": "1.4.0",
+    "owner": "team:data-protection",
+    "lifecycle": "phase-1-partial"
+  },
+  "scope": {
+    "included_channel": "user-prompt-text",
+    "excluded_channels": [
+      "attachments",
+      "auto-collected-workspace-context",
+      "file-content",
+      "mcp-output",
+      "search-output",
+      "shell-output",
+      "tool-output"
+    ],
+    "gr_f01_coverage": "partial-phase-1"
+  },
+  "limits": {
+    "max_event_bytes": 131072,
+    "max_prompt_bytes": 65536
+  },
+  "persistence": {
+    "capture_scope": "user-prompt-text-only",
+    "clean_prompt": "exact",
+    "sensitive_prompt": "risk-class-aware-redacted",
+    "invalid_prompt": "unavailable",
+    "redaction_strategy": "validated-detector-spans-v1",
+    "redaction_token_template": "[REDACTED:{class}]",
+    "whole_prompt_redaction_classes": ["labelled-secret", "private-key"],
+    "whole_prompt_redaction_strategy": "whole-prompt-redacted-v1",
+    "whole_prompt_redaction_token": "[REDACTED:high-risk-prompt]",
+    "digest_scope": "persisted-prompt-capture-only",
+    "raw_sensitive_digest_allowed": false,
+    "excluded_content_persistence": false
+  },
+  "detectors": [
+    {
+      "id": "detector:bilgi-guvenligi/sec-001",
+      "class": "labelled-secret",
+      "source_ref": "agent-platform/agents/bilgi-guvenligi/detectors.yml#detector:bilgi-guvenligi/sec-001",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "\\b(?:api[_-]?key|apikey|secret|password|passwd|token|access[_-]?token|auth[_-]?key)\\b\\s*[:=]\\s*(?:\\\"(?:\\\\.|[^\\\"\\\\\\r\\n]){8,}\\\"|'(?:\\\\.|[^'\\\\\\r\\n]){8,}'|[^\\s]{8,})",
+        "flags": ["IGNORECASE"],
+        "validator": null
+      }
+    },
+    {
+      "id": "detector:bilgi-guvenligi/sec-002",
+      "class": "cloud-access-key",
+      "source_ref": "agent-platform/agents/bilgi-guvenligi/detectors.yml#detector:bilgi-guvenligi/sec-002",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "\\bAKIA[0-9A-Z]{16}\\b",
+        "flags": [],
+        "validator": null
+      }
+    },
+    {
+      "id": "detector:bilgi-guvenligi/sec-003",
+      "class": "private-key",
+      "source_ref": "agent-platform/agents/bilgi-guvenligi/detectors.yml#detector:bilgi-guvenligi/sec-003",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "-----BEGIN (?:[A-Z0-9]{1,24}(?: [A-Z0-9]{1,24}){0,3} )?PRIVATE KEY-----",
+        "flags": [],
+        "validator": "private-key-pem-block"
+      }
+    },
+    {
+      "id": "detector:bilgi-guvenligi/sec-005",
+      "class": "email",
+      "source_ref": "agent-platform/agents/bilgi-guvenligi/detectors.yml#detector:bilgi-guvenligi/sec-005",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![A-Za-z0-9.-])",
+        "flags": [],
+        "validator": null
+      }
+    },
+    {
+      "id": "detector:gizlilik-kvkk/priv-001",
+      "class": "tckn",
+      "source_ref": "agent-platform/agents/gizlilik-kvkk/detectors.yml#detector:gizlilik-kvkk/priv-001",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "(?<!\\d)[1-9]\\d{10}(?!\\d)",
+        "flags": [],
+        "validator": "tckn-checksum"
+      }
+    },
+    {
+      "id": "detector:gizlilik-kvkk/priv-002",
+      "class": "iban",
+      "source_ref": "agent-platform/agents/gizlilik-kvkk/detectors.yml#detector:gizlilik-kvkk/priv-002",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "\\bTR\\d{2}(?:[ ]?\\d{4}){5}[ ]?\\d{2}\\b",
+        "flags": ["IGNORECASE"],
+        "validator": "iban-mod97"
+      }
+    },
+    {
+      "id": "detector:gizlilik-kvkk/priv-003",
+      "class": "payment-card",
+      "source_ref": "agent-platform/agents/gizlilik-kvkk/detectors.yml#detector:gizlilik-kvkk/priv-003",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "(?<!\\d)(?:\\d[ -]?){12,18}\\d(?!\\d)",
+        "flags": [],
+        "validator": "luhn-checksum"
+      }
+    },
+    {
+      "id": "detector:gizlilik-kvkk/priv-004",
+      "class": "phone-number",
+      "source_ref": "agent-platform/agents/gizlilik-kvkk/detectors.yml#detector:gizlilik-kvkk/priv-004",
+      "implementation": {
+        "kind": "regex",
+        "engine": "python-re",
+        "pattern": "(?<![\\d+])(?:\\+?90[ .-]?)?0?5\\d{2}[ .-]?\\d{3}[ .-]?\\d{2}[ .-]?\\d{2}(?!\\d)",
+        "flags": [],
+        "validator": null
+      }
+    }
+  ]
+}

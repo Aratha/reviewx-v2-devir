@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kt:agent-platform:governance-source-manifest:1.0",
+  "title": "Yetkin Yönetişim Kaynağı Manifesti",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "metadata", "claim_boundary", "roles", "artifacts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "kind": {"const": "GovernanceSourceManifest"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "as_of", "owner"],
+      "properties": {
+        "id": {"const": "governance-source-manifest:desktop-agents-v1"},
+        "version": {"const": "1.0.0"},
+        "as_of": {"const": "2026-08-25"},
+        "owner": {"const": "team:ai-governance"}
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_authority",
+        "implementation_inferred",
+        "projection_inferred",
+        "runtime_admission"
+      ],
+      "properties": {
+        "source_authority": {"const": "governance-authoritative"},
+        "implementation_inferred": {"const": false},
+        "projection_inferred": {"const": false},
+        "runtime_admission": {"const": "not-admitted"}
+      }
+    },
+    "roles": {
+      "const": [
+        "application-security",
+        "autofix",
+        "code-quality",
+        "code-review",
+        "devops",
+        "documentation",
+        "enterprise-architecture",
+        "information-security",
+        "observability",
+        "oss-license",
+        "privacy-kvkk",
+        "requirements-scope",
+        "supervisor",
+        "test-automation"
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 29,
+      "maxItems": 29,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/artifact"}
+    }
+  },
+  "$defs": {
+    "roleId": {
+      "type": "string",
+      "enum": [
+        "application-security",
+        "autofix",
+        "code-quality",
+        "code-review",
+        "devops",
+        "documentation",
+        "enterprise-architecture",
+        "information-security",
+        "observability",
+        "oss-license",
+        "privacy-kvkk",
+        "requirements-scope",
+        "supervisor",
+        "test-automation"
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role_id",
+        "artifact_type",
+        "source_locator",
+        "snapshot_path",
+        "snapshot_encoding",
+        "sha256",
+        "snapshot_sha256",
+        "source_authority",
+        "implementation_status",
+        "projection_status",
+        "runtime_admission"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^governance-source:[a-z][a-z0-9]*(?:-[a-z0-9]+)*:(?:instructions|policy|aggregation-policy|allowlist)$"
+        },
+        "role_id": {"$ref": "#/$defs/roleId"},
+        "artifact_type": {
+          "enum": ["instructions", "policy", "aggregation-policy", "allowlist"]
+        },
+        "source_locator": {
+          "type": "string",
+          "pattern": "^governance-source:desktop-agents/[a-z][a-z0-9]*(?:-[a-z0-9]+)*/(?:agent\\.md|policy\\.yaml|aggregation_policy\\.yaml|allowlist\\.yaml)$"
+        },
+        "snapshot_path": {
+          "type": "string",
+          "pattern": "^governance-sources/desktop-agents/[a-z][a-z0-9]*(?:-[a-z0-9]+)*/(?:agent\\.md|policy\\.yaml|aggregation_policy\\.yaml|allowlist\\.yaml)(?:\\.b64)?$"
+        },
+        "snapshot_encoding": {"enum": ["raw-utf8", "base64"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "source_authority": {"const": "governance-authoritative"},
+        "implementation_status": {"const": "not-evaluated"},
+        "projection_status": {"const": "not-evaluated"},
+        "runtime_admission": {"const": "not-admitted"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"snapshot_encoding": {"const": "base64"}}},
+          "then": {"properties": {"snapshot_path": {"pattern": "\\.b64$"}}},
+          "else": {"properties": {"snapshot_path": {"not": {"pattern": "\\.b64$"}}}}
+        }
+      ]
+    }
+  }
+}

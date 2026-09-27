@@ -1,0 +1,9 @@
+# Gitleaks configuration for the generated application repository.
+# The offline security gate invokes this configuration; no finding leaves the bank network.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Governance prose names the fixed stack; documentation text, not credentials"
+paths = ['''rules/00-proje-genel-bakisi\.md''']

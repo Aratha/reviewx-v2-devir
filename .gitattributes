@@ -1,3 +1,8 @@
-# Shell script'leri Windows checkout'unda da LF kalmali; CRLF ile Git Bash
-# "$'\r': command not found" hatasi verir.
+# Governance instruction snapshots preserve the authoritative source bytes exactly.
+agent-platform/governance-sources/desktop-agents/**/agent.md -whitespace
+* text=auto eol=lf
 *.sh text eol=lf
+*.sql text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+package-lock.json text eol=lf

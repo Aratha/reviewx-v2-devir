@@ -1,7 +1,0 @@
-# Sabit sürümler: venv içinde pip install + `from main import app` ile doğrulandı (Python 3.12).
-fastapi==0.135.2
-uvicorn[standard]==0.42.0
-pyodbc==5.3.0
-python-dotenv==1.2.2
-httpx==0.28.1
-pydantic-settings==2.14.2

@@ -1,18 +1,9 @@
 apiVersion: v2
 name: dwhcodereview
-description: |
-  DWH Code Review — SQL nesnelerini LLM ile inceleyen FastAPI backend ve
-  Nginx ile servis edilen React (Vite) frontend; tek deployable chart.
+description: "DWH Code Review"
 type: application
-version: 0.2.0
-appVersion: "1.0.0"
-kubeVersion: ">=1.23.0-0"
+version: 0.1.0
+appVersion: "0.1.0"
 annotations:
   scaffold.kt.internal/product-slug: "dwhcodereview"
   scaffold.kt.internal/product-name: "DWH Code Review"
-maintainers:
-  - name: KT Vibecoding
-keywords:
-  - dwhcodereview
-  - code-review
-  - rancher

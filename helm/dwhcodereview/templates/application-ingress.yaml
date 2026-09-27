@@ -1,6 +1,6 @@
-{{- $className := required "frontend.ingress.className dağıtım ortamınca verilmelidir" .Values.frontend.ingress.className -}}
-{{- $host := required "frontend.ingress.host dağıtım ortamınca verilmelidir" .Values.frontend.ingress.host -}}
-{{- $tlsSecret := required "frontend.ingress.tlsSecretName dağıtım ortamınca verilmelidir" .Values.frontend.ingress.tlsSecretName -}}
+{{- $className := required "frontend.ingress.className must be supplied by the deployment environment" .Values.frontend.ingress.className -}}
+{{- $host := required "frontend.ingress.host must be supplied by the deployment environment" .Values.frontend.ingress.host -}}
+{{- $tlsSecret := required "frontend.ingress.tlsSecretName must be supplied by the deployment environment" .Values.frontend.ingress.tlsSecretName -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -9,10 +9,6 @@ metadata:
     {{- include "generated.workloadLabels" (dict "root" . "component" "frontend") | nindent 4 }}
   annotations:
     {{- include "generated.annotations" . | nindent 4 }}
-    # Canlı inceleme akışı (SSE) için yanıt tamponlama kapalı ve zaman aşımı uzun.
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: {{ $className | quote }}
   tls:
@@ -22,7 +18,7 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
-          - path: /api
+          - path: "/api/dwhcodereview/v1"
             pathType: Prefix
             backend:
               service:

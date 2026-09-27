@@ -1,0 +1,17 @@
+name: charts-render
+on:
+  pull_request:
+    paths: ["helm/**", "scripts/render-charts*"]
+permissions:
+  contents: read
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INDEX: "1"
+jobs:
+  render:
+    runs-on: [self-hosted, linux, bank-offline]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {persist-credentials: false}
+      - run: scripts/render-charts.sh --self-test

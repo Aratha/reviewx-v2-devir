@@ -1,6 +1,3 @@
-{{- include "dwhcodereview.validate" . -}}
-{{- $image := include "generated.image" (list "backend" .Values.backend.image) }}
-{{- $persistence := .Values.backend.persistence }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,12 +8,6 @@ metadata:
     {{- include "generated.annotations" . | nindent 4 }}
 spec:
   replicas: {{ .Values.backend.replicaCount }}
-  {{- if and $persistence.enabled (has $persistence.accessMode (list "ReadWriteOnce" "ReadWriteOncePod")) }}
-  # Tek node'a bağlanan veri hacmi yeni Pod'dan önce eski Pod'un kapanmasını gerektirir.
-  strategy:
-    type: Recreate
-    rollingUpdate: null
-  {{- end }}
   selector:
     matchLabels:
       scaffold.kt.internal/workload: {{ include "generated.resourceName" (list . "backend") | quote }}
@@ -26,10 +17,8 @@ spec:
         {{- include "generated.workloadLabels" (dict "root" . "component" "backend") | nindent 8 }}
       annotations:
         {{- include "generated.annotations" . | nindent 8 }}
-        checksum/config: {{ include "dwhcodereview.backendConfig" . | sha256sum }}
     spec:
       automountServiceAccountToken: false
-      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -39,45 +28,43 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: backend
-          image: {{ $image | quote }}
-          imagePullPolicy: {{ include "dwhcodereview.imagePullPolicy" .Values.backend.image }}
+          image: {{ include "generated.image" (list "backend" .Values.backend.image) | quote }}
+          imagePullPolicy: IfNotPresent
           ports:
             - {name: http, containerPort: 8000}
+          {{- include "generated.validateBackendConfig" . }}
+          {{- with .Values.backend.config }}
+          # Non-secret project settings from values-project.yaml; secrets arrive only through envFrom.
+          env:
+            {{- range $key, $value := . }}
+            - {name: {{ $key | quote }}, value: {{ $value | toString | quote }}}
+            {{- end }}
+          {{- end }}
           envFrom:
-            - configMapRef: {name: {{ include "generated.resourceName" (list . "backend") | quote }}}
-            - secretRef: {name: "{{ required "backend.existingSecret önceden oluşturulmuş bir Secret'ı adlandırmalıdır" .Values.backend.existingSecret }}"}
+            - secretRef: {name: "{{ required "backend.existingSecret must name the Secret the project deploy hook prepares" .Values.backend.existingSecret }}"}
+            {{- if .Values.postgres.enabled }}
+            # Listed last so the DML-only runtime connection deploy.sh generates wins.
+            - secretRef: {name: {{ include "generated.databaseSecret" . | quote }}}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
-            - {name: data, mountPath: /app/data}
-          # SQL ve LLM çağrıları uzun sürebildiği için canlılık toleransı geniştir.
           startupProbe:
-            httpGet: {path: /api/health, port: http}
+            httpGet: {path: "/api/dwhcodereview/v1/liveness", port: http}
             periodSeconds: 2
-            timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /api/health, port: http}
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            httpGet: {path: "/api/dwhcodereview/v1/readiness", port: http}
+            periodSeconds: 5
           livenessProbe:
-            httpGet: {path: /api/health, port: http}
-            periodSeconds: 30
-            timeoutSeconds: 5
+            httpGet: {path: "/api/dwhcodereview/v1/liveness", port: http}
+            periodSeconds: 10
             failureThreshold: 3
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 64Mi}
-        - name: data
-          {{- if $persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "dwhcodereview.dataClaimName" . | quote }}
-          {{- else }}
-          emptyDir: {sizeLimit: 1Gi}
-          {{- end }}

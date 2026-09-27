@@ -1,17 +1,19 @@
-# Python
-backend/.venv/
-backend/__pycache__/
-**/__pycache__/
-*.py[cod]
-backend/.env
-backend/data/llm_logs/
-
-# Node
-frontend/node_modules/
-frontend/dist/
-
-# OS / IDE
 .DS_Store
-Thumbs.db
-.cursor/
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+*.tsbuildinfo
+.DS_Store
+dist/
+coverage/
+playwright-report/
+test-results/
 *.log
+app/infra/.data/
+.kt-scaffold/evidence.json

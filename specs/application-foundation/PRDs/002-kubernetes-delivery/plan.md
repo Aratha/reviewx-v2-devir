@@ -1,6 +1,6 @@
 # Plan — kubernetes-delivery
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.3.1). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.4.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Katmanlar ve dosyalar
@@ -60,7 +60,8 @@ ve PR #14'ün `main`'e birleşmesine bağlıdır; Azure işini kullanıcı tetik
 | Requirement 1 (chart sürümü) | Acceptance 1 | Task 8 |
 | Requirement 4 | Acceptance 1, Acceptance 3 | Task 1, Task 7 |
 | Requirement 5 | Acceptance 1, Acceptance 3 | Task 2, Task 3, Task 5 |
-| Requirement 7, 13 | Acceptance 3, Acceptance 4 | Task 11, Task 12 |
+| Requirement 7, 13 | Acceptance 3 | Task 12 |
+| Decision 18 | — | — |
 | Requirement 9 | Acceptance 3 | Task 4 |
 | Requirement 11, 12 | Acceptance 2 | Task 6, Task 9 |
 | Decision 7 | — | Task 1 |

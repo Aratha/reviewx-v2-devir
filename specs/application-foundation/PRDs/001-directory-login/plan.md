@@ -1,6 +1,6 @@
 # Plan — directory-login
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.2). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.2.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Kiracı kapsamı kararı
@@ -37,6 +37,7 @@ kiracı mekanizması eklenmez:
 | Çekirdek | `app/backend/app/core/errors.py`, `login_throttle.py`, `client_address.py`, `security.py`, `logging.py` | Requirement 6, 7, 9; Gözlemlenebilirlik |
 | API | `app/backend/app/api/auth/`, `app/backend/app/api/admin/router.py`, `app/backend/app/schemas/auth/`, `app/backend/app/schemas/admin/users.py` | API sözleşmesi, Requirement 5, 6, 7, 8, 12 |
 | Betik | `scripts/create-local-user.sh`, `app/backend/app/scripts/create_local_user.py` | Requirement 11, Decision 9 |
+| Süper yönetici açılışı | `app/backend/app/services/super_admin_service.py` (komutla ortak açma yolu ve açılış görevi), `app/backend/app/scripts/create_super_admin.py`, `app/backend/app/main.py`, `app/backend/app/infrastructure/repositories/user_repository.py` (danışma kilidi), `app/backend/app/core/config.py`, `app/backend/.env.example`, `helm/dwhcodereview/values-project.yaml` (hesap adı) | Requirement 14, Decision 13 |
 | Bağımlılık | `app/backend/requirements.in` (`ldap3==2.9.1`), kilitli `requirements*.txt`, `dependency-admission.json` | Requirement 2 |
 | Telemetri | `app/backend/app/core/telemetry.py`, `app/backend/app/core/config.py` (`DWHCODEREVIEW_OTEL_*`), `app/backend/app/services/startup_checks.py`, `app/backend/app/middleware/request_logging.py`, `app/backend/app/core/logging.py`, `app/backend/app/main.py`, `app/infra/docker-compose.local.yml`, `app/infra/docker-compose.observability.yml`, OpenTelemetry sabitlemeleri `app/backend/requirements.in`, `dependency-admission.json` | Gözlemlenebilirlik; ortak kurallar [alan belgesinde](../../DOMAIN.md) |
 | Sözleşme | `specs/openapi/dwhcodereview-api.yaml`, üretilmiş `app/frontend/src/types/api.d.ts` | API sözleşmesi |
@@ -72,6 +73,14 @@ kiracı mekanizması eklenmez:
   sayede 401 ile reddedilir. Yönlendirme izlenmez; bağlantı süresi 5, okuma süresi 10 saniyedir.
 - Hata gövdesi her yeni uçta `{"detail":{"code":"...","message":"..."}}` biçimindedir; iskeletin
   kimlik ve kiracı hataları da aynı zarfa taşındı.
+- Süper yönetici açılışı (Requirement 14): `ensure_super_admin` hizmete taşındı; komut onu
+  sıfırlama kipinde, backend açılışı `reset_existing=False` ile çağırır. İki yol da aynı işlemde
+  PostgreSQL danışma kilidini (`pg_advisory_xact_lock`, sabit uygulama anahtarı) alır, sonra adı
+  arar; ad varsa açılış hiçbir şeyi değiştirmeden işlemi geri alır. Hesap açıldığında değişiklik
+  kaydı satırı aynı işlemde yazılır. Açılış görevi `lifespan` içinde arka planda koşar;
+  `SuperAdminRejected` (ad, e-posta, parola politikası, e-posta çakışması) kesin sonuçtur, diğer her
+  hata 2, 4, 8 … en çok 60 saniye arayla yeniden denenir ve yalnız hata sınıfının adı loglanır.
+  Komut parolayı yalnız istemden veya standart girdiden okur.
 
 ## Göç ve dağıtım bağımlılığı
 
@@ -104,3 +113,4 @@ kiracı mekanizması eklenmez:
 | Requirement 13 | Acceptance 2 | Task 10, Task 11 |
 | Dağıtım etkisi (ayarlar, bağımlılık) | Acceptance 1 | Task 1, Task 8, Task 9 |
 | Gözlemlenebilirlik (ölçüm, iz, ortak telemetri) | — | Task 13 |
+| Requirement 14, Decision 13 | Acceptance 1, Acceptance 4 | Task 15, Task 16 |

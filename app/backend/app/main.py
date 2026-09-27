@@ -22,6 +22,7 @@ from app.services.llm_call_summary_service import run_llm_call_retention
 from app.services.review_history_service import run_review_history_retention
 from app.services.review_run_service import interrupt_stale_runs
 from app.services.startup_checks import integration_setting_errors
+from app.services.super_admin_service import run_super_admin_bootstrap
 
 logger = logging.getLogger("app.startup")
 
@@ -49,6 +50,9 @@ def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextMan
                     retention_days=settings.review_history_retention_days,
                 )
             ),
+            # application-foundation 001 Requirement 14: creates the configured super admin once;
+            # it retries in the background while a first installation is still migrating.
+            asyncio.create_task(run_super_admin_bootstrap(async_session_factory, settings)),
         ]
         try:
             yield

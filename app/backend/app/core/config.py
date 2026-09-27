@@ -174,6 +174,10 @@ class Settings(BaseSettings):
     otel_traces_sample_ratio: Annotated[float, Field(ge=0.0, le=1.0)] = 1.0
     otel_metric_export_interval_seconds: Annotated[int, Field(ge=5, le=300)] = 60
 
+    # The local super admin (application-foundation 001 Requirement 14). The operator command
+    # creates or resets this account; when the deployment Secret carries the start-up password
+    # the backend start creates it once and never changes an existing account. The command reads
+    # its own password only from its prompt or standard input.
     bootstrap_super_admin_email: str = "admin@example.invalid"
     bootstrap_super_admin_username: str = "super-admin"
     bootstrap_super_admin_password: SecretStr | None = None
@@ -232,7 +236,9 @@ class Settings(BaseSettings):
             raise ValueError("trusted_proxy_cidrs must list IP addresses or networks") from None
         return value
 
-    @field_validator("mssql_password", "llm_api_key", mode="before")
+    @field_validator(
+        "mssql_password", "llm_api_key", "bootstrap_super_admin_password", mode="before"
+    )
     @classmethod
     def empty_optional_secret_is_absent(cls, value: object) -> object:
         return None if value == "" else value

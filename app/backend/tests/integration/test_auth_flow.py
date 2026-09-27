@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.db.session import async_session_factory
 from app.domain.models.tenant import Tenant
 from app.main import app
-from app.scripts.create_super_admin import ensure_super_admin
+from app.services.super_admin_service import ensure_super_admin
 
 pytestmark = pytest.mark.integration
 

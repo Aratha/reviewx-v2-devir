@@ -4,7 +4,8 @@
 # deploy-hooks.sh and deploy.sh prepare in the cluster.
 # Contract: specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md (Requirement 5, 8, 10).
 backend:
-  # Prepared by deploy-hooks.sh: session signing key and the optional SQL Server and LLM credentials.
+  # Prepared by deploy-hooks.sh: session signing key, the optional SQL Server and LLM credentials
+  # and the optional super admin start-up password.
   existingSecret: dwhcodereview-runtime
   config:
     # staging is the nonprod environment of application-foundation/DOMAIN.md.
@@ -22,6 +23,9 @@ backend:
     DWHCODEREVIEW_DIRECTORY_UPN_SUFFIX: kuveytturk.local
     DWHCODEREVIEW_DIRECTORY_CA_BUNDLE_PATH: /workspace/app/backend/certs/nonprod-directory-ca.crt
     DWHCODEREVIEW_DIRECTORY_TLS_LEGACY_COMPATIBILITY: true
+    # Local super admin the backend creates once when the runtime Secret carries its start-up
+    # password (application-foundation/PRDs/001-directory-login Requirement 14, Decision 13).
+    DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME: admin
     # Internal RunAI endpoint (sql-review/PRDs/006-llm-connection Decision 3); it needs no key.
     DWHCODEREVIEW_LLM_CHAT_API: openai
     DWHCODEREVIEW_LLM_BASE_URL: https://runai.gpudtx.kuveytturk.com.tr/inference/qwen36-35b-a3b-fp8/v1

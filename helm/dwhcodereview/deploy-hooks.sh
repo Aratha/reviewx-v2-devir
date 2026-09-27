@@ -8,6 +8,12 @@
 #   DWHCODEREVIEW_MSSQL_USER       pipeline MSSQL_USER, else the cluster value, else absent
 #   DWHCODEREVIEW_MSSQL_PASSWORD   pipeline MSSQL_PASSWORD, else the cluster value, else absent
 #   DWHCODEREVIEW_LLM_API_KEY      pipeline LLM_API_KEY, else the cluster value, else absent
+#   DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD
+#                                  pipeline DWHCODEREVIEW_ADMIN_PASSWORD, else the cluster value,
+#                                  else absent; the backend creates the super admin with it once
+#                                  and never resets an existing account
+#                                  (specs/application-foundation/PRDs/001-directory-login
+#                                  Requirement 14)
 # An empty variable or an unresolved Azure macro such as $(MSSQL_USER) counts as not provided.
 # Other keys already in the Secret are left untouched. Values reach kubectl only through files in
 # an owner-only temporary directory; the log names keys, never values.
@@ -94,6 +100,7 @@ settle DWHCODEREVIEW_JWT_PRIVATE_KEY JWT_PRIVATE_KEY generate
 settle DWHCODEREVIEW_MSSQL_USER MSSQL_USER optional
 settle DWHCODEREVIEW_MSSQL_PASSWORD MSSQL_PASSWORD optional
 settle DWHCODEREVIEW_LLM_API_KEY LLM_API_KEY optional
+settle DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD DWHCODEREVIEW_ADMIN_PASSWORD optional
 if [[ -s "$work/keys/DWHCODEREVIEW_MSSQL_USER" ]] \
   && LC_ALL=C grep -q '[[:cntrl:]]' "$work/keys/DWHCODEREVIEW_MSSQL_USER"; then
   fail 'MSSQL_USER must not contain control characters'

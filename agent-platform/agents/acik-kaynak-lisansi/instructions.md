@@ -101,12 +101,12 @@ Listede bulunan paket de güvenlik açığı, bakım, lisans veya zararlı içer
   `pytest-asyncio==1.4.0 / Apache-2.0`,
   `pytest-cov==7.1.0 / MIT`,
   `black==26.5.1 / MIT`,
-  `isort==8.0.1 / MIT`,
+  `isort==9.0.1 / MIT`,
   `mypy==2.3.1 / MIT`,
   `pip-tools==7.6.1 / BSD-3-Clause`,
   `pip==26.2.1 / MIT`,
-  `setuptools==83.0.0 / MIT`,
-  `ruff==0.16.4 / MIT`,
+  `setuptools==84.0.0 / MIT`,
+  `ruff==0.16.5 / MIT`,
 - Aynı adayın `requirements-dev.in` / `requirements-dev.txt` sabitlemesi, paket
   kimliği, lisans kanıtı ve kanonik karar/otorite bağı eşleşirse yalnız tarihsel
   `approved_packages` yokluğu bulgusunu kapat. Eksik veya farklı bağ

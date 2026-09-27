@@ -38,10 +38,10 @@
           "const": "governance-crosswalk:desktop-agents-v1"
         },
         "version": {
-          "const": "1.15.0"
+          "const": "1.16.0"
         },
         "as_of": {
-          "const": "2026-09-25"
+          "const": "2026-09-27"
         },
         "owner": {
           "const": "team:ai-governance"
@@ -307,7 +307,7 @@
                 },
                 {
                   "name": "isort",
-                  "version": "8.0.1",
+                  "version": "9.0.1",
                   "license": "MIT"
                 },
                 {
@@ -327,12 +327,12 @@
                 },
                 {
                   "name": "setuptools",
-                  "version": "83.0.0",
+                  "version": "84.0.0",
                   "license": "MIT"
                 },
                 {
                   "name": "ruff",
-                  "version": "0.16.4",
+                  "version": "0.16.5",
                   "license": "MIT"
                 }
               ]

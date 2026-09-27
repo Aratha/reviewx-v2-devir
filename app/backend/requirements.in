@@ -2,7 +2,7 @@
 cffi==2.1.1
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
-pydantic==2.13.4
+pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv==1.2.3
 sqlalchemy[asyncio]==2.0.52
@@ -28,6 +28,6 @@ opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp-proto-grpc==1.44.0
 # Transitive dependencies of the OTLP/gRPC exporter held at their newest release that is at least
 # 30 days old (rules/54); remove a line once the resolver's own choice is past that window.
-grpcio==1.83.0
+grpcio==1.83.1
 protobuf==7.36.0
 googleapis-common-protos==1.75.2

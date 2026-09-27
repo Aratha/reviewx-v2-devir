@@ -2,8 +2,8 @@ schema_version: "1.11"
 kind: GovernanceNormalizationCrosswalk
 metadata:
   id: governance-crosswalk:desktop-agents-v1
-  version: 1.15.0
-  as_of: "2026-09-25"
+  version: 1.16.0
+  as_of: "2026-09-27"
   owner: team:ai-governance
   lifecycle: draft
 claim_boundary:
@@ -2482,7 +2482,7 @@ package_acceptances:
     version: 26.5.1
     license: MIT
   - name: isort
-    version: 8.0.1
+    version: 9.0.1
     license: MIT
   - name: mypy
     version: 2.3.1
@@ -2494,10 +2494,10 @@ package_acceptances:
     version: 26.2.1
     license: MIT
   - name: setuptools
-    version: 83.0.0
+    version: 84.0.0
     license: MIT
   - name: ruff
-    version: 0.16.4
+    version: 0.16.5
     license: MIT
 
 dependency_acceptance_inheritance:

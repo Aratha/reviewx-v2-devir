@@ -359,12 +359,12 @@
       "version": "0.4.0"
     }
   ],
-  "authority_generation": 42,
+  "authority_generation": 43,
   "backend_profile": "python-fastapi",
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "22d7d6c93d16d442c8c14b80b142c4c257bb3b146d31a0e8a2ed0a4caa313a2a",
+  "governance_digest": "71d1aac656d8da276924204fbd059e4008c1cf26454572402adf8a9ce3d374f2",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

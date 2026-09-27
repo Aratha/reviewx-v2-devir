@@ -9,6 +9,15 @@ kanıtı. Bilinçli olarak örnek iş varlığı içermez.
 Birincil alan bağlamı: `specs/sql-review/`. Arka uç profili: `python-fastapi`.
 Kalıcılık otoritesi: `sqlalchemy-alembic`.
 
+## Kılavuzlar
+
+- [Kullanım kılavuzu](docs/tr/kullanim-kilavuzu.md): giriş, roller, nesne ve SQL betiği incelemesi,
+  geçmiş, CSV ve SQL dışa aktarma, yanlış pozitif ve 90 günlük saklama.
+- [Yönetici kılavuzu](docs/tr/yonetici-kilavuzu.md): süper yönetici, rol ve hesap yönetimi, kuralları
+  yayımlama, SQL Server ve LLM ayarları, isteğe bağlı Azure gizli değişkenleri, günlükler.
+- [Yerel kurulum](docs/tr/yerel-kurulum.md): uygulamayı macOS'ta VS Code görevleriyle başlatma ve
+  durdurma, yerel hesap açma; Windows'un bugünkü durumu.
+
 ## Üretilen sınırlar
 
 İlk oluşturma işlemi tam proje ağacını kurar. Bundan sonra `app/**` uygulama ekibine aittir; merkezi

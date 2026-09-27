@@ -57,7 +57,7 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   kez `POST /auth/refresh` (200) yapıp isteği yineledi (200) ve giriş ekranına dönmedi (tek seferlik
   yerel tarayıcı betiği; kalıcı senaryoda değil).
 - [ ] Task 12 — Requirement 1–4, 9, 10 / Acceptance 3: `nonprod` kümede gerçek Active Directory ile
-  L2 doğrulaması; CA bundle'ının imaja, dizin ayarlarının runtime Secret'a girmesi ve LDAPS çıkış
+  L2 doğrulaması; CA bundle'ının imaja, dizin ayarlarının değer katmanına girmesi ve LDAPS çıkış
   kuralı [kubernetes-delivery](../002-kubernetes-delivery/PRD.md) görevleriyle birlikte.
 
 - [x] Task 13 — Gözlemlenebilirlik: OpenTelemetry altyapısı (tipli `DWHCODEREVIEW_OTEL_*`

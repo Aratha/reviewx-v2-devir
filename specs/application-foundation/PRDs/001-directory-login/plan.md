@@ -1,6 +1,6 @@
 # Plan — directory-login
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.1). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.1.2). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Kiracı kapsamı kararı
@@ -78,8 +78,9 @@ kiracı mekanizması eklenmez:
 - Göç `202609260001` yalnız genişleticidir: `app_user.username` 320 karaktere genişler,
   `password_hash` boş olabilir ve hesap türüyle eşleşme kısıtı eklenir; yeni tablolar eklenir.
   Geri alma, dizin hesabı varken yerel hesap kısıtı nedeniyle durur.
-- CA bundle'ının imaja girmesi, dizin ayarlarının runtime Secret'a yazılması ve LDAPS çıkış kuralı
-  [kubernetes-delivery](../002-kubernetes-delivery/PRD.md) PRD'sinindir.
+- CA bundle'ının imaja girmesi, dizin ayarlarının değer katmanına (`values-project.yaml`)
+  yazılması ve LDAPS çıkış kuralı [kubernetes-delivery](../002-kubernetes-delivery/PRD.md)
+  PRD'sinindir.
 
 ## Doğrulama komutları
 

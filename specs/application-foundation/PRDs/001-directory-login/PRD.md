@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.1
+Version: 1.1.2
 
 Acceptance date: 2026-09-27
 
@@ -220,8 +220,9 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
   yöneticiye açık olması, oturum süreleri. Hiçbiri sır değildir; login-only kipte servis hesabı
   olmadığından LDAP parolası da yoktur.
 - Nonprod değerleri KT Verim `helm/kt-verim/deploy.sh` nonprod varsayılanlarıdır (sunucu, temel DN,
-  UPN soneki, CA dosyası, eski TLS `true`, keşif kapalı). Bunların Secret'a yazılması, CA dosyasının
-  backend'e ulaştırılması ve LDAPS çıkış kuralı kubernetes-delivery PRD'sine aittir.
+  UPN soneki, CA dosyası, eski TLS `true`, keşif kapalı). Bunların değer katmanına
+  (`values-project.yaml`) yazılması, CA dosyasının backend'e ulaştırılması ve LDAPS çıkış kuralı
+  kubernetes-delivery PRD'sine aittir.
 - Kaldırılanlar: `API_ACCESS_TOKEN`, `API_ADMIN_TOKEN` ayarları ve pipeline değişkenleri.
 
 ## Test stratejisi

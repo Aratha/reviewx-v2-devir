@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.1.1
 
 Acceptance date: 2026-09-27
 
@@ -120,7 +120,7 @@ Kaynaktaki `DELETE /api/llm-logs` karşılığı yoktur (Decision 6). İnceleme 
 
 ## Dağıtım etkisi
 
-- **Ayarlar:** Requirement 1 anahtarları `app/backend/.env.example` (yer tutucuyla), yerel Compose ortam bloğu ve Runtime Secret'a eklenir; `python3 scripts/check-config-sync.py` geçer. `nonprod` değerleri Decision 3'tür; sır olmayan değerlerin dağıtım yolu [Kubernetes teslim PRD'si](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) sahipliğindedir.
+- **Ayarlar:** Requirement 1 anahtarları `app/backend/.env.example` (yer tutucuyla), yerel Compose ortam bloğu ve dağıtıma eklenir (anahtar Runtime Secret'a, sır olmayan değerler `helm/dwhcodereview/values-project.yaml`'a); `python3 scripts/check-config-sync.py` geçer. `nonprod` değerleri Decision 3'tür; dağıtım yolu [Kubernetes teslim PRD'si](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md) sahipliğindedir.
 - **Secret:** `DWHCODEREVIEW_LLM_API_KEY` yalnız anahtar isteyen bir uç için Runtime Secret'a yazılır; RunAI ucu anahtar istemez, bu nedenle `nonprod`'da boştur.
 - **İmaj:** `corporate-inference-root.crt` (kaynak `backend/certs/`) backend imajının sistem güven deposuna eklenir; aynı kök CA dizin girişinin LDAPS doğrulamasında da gerekiyorsa imaja bir kez eklenir.
 - **Bağımlılık:** Uyarlayıcı HTTP istemcisi doğrudan `httpx` kullanır; `httpx` bugün yalnız geliştirme bağımlılığıdır (`app/backend/requirements-dev.in`) ve çalışma zamanı bağımlılığı olarak diğer bağımlılıklar gibi `dependency-admission.json` kabul kaydına alınır. `requirements-llm.in` (LangChain) etkinleştirilmez (Decision 5).

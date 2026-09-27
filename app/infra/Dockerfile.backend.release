@@ -45,6 +45,9 @@ RUN --mount=type=bind,from=python_wheelhouse,source=/,target=/opt/wheelhouse \
 COPY --chown=${APP_UID}:${APP_GID} app/backend/app ./app
 COPY --chown=${APP_UID}:${APP_GID} app/backend/alembic.ini ./alembic.ini
 COPY --chown=${APP_UID}:${APP_GID} schema /workspace/schema
+# Public CA bundle of the nonprod LDAPS directory (application-foundation/PRDs/001-directory-login
+# Requirement 10); the deployment names it in DWHCODEREVIEW_DIRECTORY_CA_BUNDLE_PATH.
+COPY app/backend/certs/nonprod-directory-ca.crt ./certs/nonprod-directory-ca.crt
 
 USER ${APP_UID}:${APP_GID}
 EXPOSE 8000

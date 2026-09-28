@@ -1,7 +1,7 @@
 {
   "corpus_digest": "aaa127e26e35b2fff5831190ffd5820ff60f347ed1b8b81ee4b46ca8aafe8a32",
   "files": {
-    ".agents/skills/governed-review/SKILL.md": "45fea69c3c4b060f8a69b2dd082b66c8d40d7f2602bd9ac0ba028bc555c1739a",
+    ".agents/skills/governed-review/SKILL.md": "141b3915d0aecef126638a9db0fcf964795c4a01f599fa79a5e87df6dd6f70a7",
     ".agents/skills/kt-alan/SKILL.md": "11016f2dae2bf4c6736c1262ff9a743faff5fce2dbc875eb75d6541aae9820a0",
     ".agents/skills/kt-baslat/SKILL.md": "062de584aaeb1943c1ba1ac40d4b35ae48d35546992be97add378ce48c61dbd5",
     ".agents/skills/kt-guncelle/SKILL.md": "b9c03ce76ce437f6dbf3a9f0d7a263af97925defc1f5eb0850cdfdeffc2e1892",

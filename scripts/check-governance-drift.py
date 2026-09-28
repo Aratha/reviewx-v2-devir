@@ -32,6 +32,7 @@ PROMPT_INGRESS_ASSETS = {
 LOCAL_GOVERNANCE_GUARD_ASSETS = {
     ".github/workflows/governance-drift.yml",
     ".kt-scaffold/hooks/agentic_review_receipt_guard.py",
+    ".kt-scaffold/hooks/codex_hook_trust.py",
     ".kt-scaffold/hooks/commit_governance_guard.py",
     ".kt-scaffold/hooks/initial_scaffold_commit.py",
     ".kt-scaffold/hooks/governance_drift_feedback.py",

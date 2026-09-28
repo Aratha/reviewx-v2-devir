@@ -510,8 +510,19 @@ oturumla aşma, yönetici kurulumunu bekle.
 `scripts/git-gate.sh` Git deposunda `core.hooksPath` değerini `.kt-scaffold/hooks/git` yapar; oradaki
 `pre-commit` kancası oturum kökünden ve istemciden bağımsız olarak commit öncesi yönetişim tutarlılığını
 denetler ve sapmada commit'i reddeder. Kapıyı `--no-verify`, `core.hooksPath` değişikliği veya kancayı
-düzenleyerek atlatma. Kabuk komutundan sonra `GOVERNANCE_DRIFT_DETECTED` geri bildirimi alırsan
-değişikliği git ile geri al, işe devam etme ve kullanıcıya bildir.
+düzenleyerek atlatma.
+
+Kabuk komutundan sonra `GOVERNANCE_DRIFT_DETECTED` geri bildirimi alırsan ya da sapma denetimi veya
+commit kapısı sapma bildirirse işe devam etme. Sapan yönetilen dosyayı
+`python3 .kt-scaffold/hooks/governance_client.py restore <yol>` ile (Windows'ta `python3` yerine
+`.venv\Scripts\python.exe`) kaydedilmiş doğru hâline geri al ve kullanıcıya bildir. Komut
+`.kt-scaffold/manifest.json` kaydındaki parmak izine uyan içeriği yalnız projenin commit geçmişinde
+arar, `.git` klasörüne yazmaz ve yalnız adı verilen dosyayı değiştirir. `git show :<yol>` gibi
+index'ten (kayda alınmak üzere seçilmiş değişikliklerden) okuyan geri alma, sapmış içeriği geri
+getirebileceği için kullanılmaz. Komut yüzeye yeni içerik yazmaz, yalnız kaydedilmiş hâli geri
+getirir; bu yüzden yukarıdaki sınırla çelişmez. Doğru içerik commit geçmişinde yoksa dosyayı elle
+yazma; proje kullanıcının başlattığı MCP proje iskeleti eşitlemesi veya `kt-iskelet guncelle` ile
+güncellenir.
 
 ## Yalnızca gerçekten ulaşılan kanıt seviyesini iddia et
 
@@ -761,7 +772,9 @@ oturumun geçmişini ve başka uzmanların raporlarını görmez; Codex'te `spaw
 `fork_turns: "none"` taşır, varsayılan `all` geçmişi aktarır. Geçmiş aktarılan çağrının raporu
 yalıtılmış sayılmaz. Ana Agent uzmanın yanıtını değiştirmeden `work/<agent-slug>-evaluation.json`
 dosyasına yazar ve `governance_client.py observation --run-id <run_id> --agent <agent-slug>`
-komutunu çalıştırır. Komut değerlendirmeyi bağlama dosyasıyla bayt bayt birleştirir, gözlem
+komutunu çalıştırır. Uzman bulguya kontrol kimliği (`controls`) yazmaz; talimatında geçen kaynak
+kural kimlikleri bulgu alanı değildir. Komut değerlendirmeyi bağlama dosyasıyla bayt bayt
+birleştirir, Agent politikasındaki `standard_refs` üçlülerini her bulguya kendisi ekler, gözlem
 şemasıyla denetler ve raporu kanonik baytlarla bir kez yazar. Sözleşmeye uymayan yanıtı ana Agent
 onarmaz. Komut yanıtı uzmanın düzeltebileceği bir red koduyla reddederse, kimliği yanlış yanıt
 dahil, yanıt bu kod ve ihlal yeriyle yalnız o uzmana bir kez geri verilir; ikinci red veya başka

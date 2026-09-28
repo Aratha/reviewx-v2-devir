@@ -31,6 +31,12 @@ DENIAL_MARKER = "GOVERNANCE_SURFACE_PROTECTED"
 PLAIN_LANGUAGE_RELAY = (
     "Durumu kullanıcıya rules/02-iletisim-tarzi.md içindeki sade dil sözleşmesiyle anlat."
 )
+# A drifted managed file goes back to its recorded bytes through the governance runtime.
+RESTORE_ROUTE = (
+    "Sapan yönetilen dosyayı kaydedilmiş doğru hâline geri almak için dosya aracını kullanma; "
+    "python3 .kt-scaffold/hooks/governance_client.py restore <yol> çalıştır (Windows'ta python3 "
+    "yerine .venv\\Scripts\\python.exe)."
+)
 CLIENTS = ("claude-code", "codex", "cursor", "github-copilot-vscode")
 WHOLE = "whole"
 PARTIAL = "partial"
@@ -484,7 +490,8 @@ def _message(code: str, relative: str | None, client: str) -> str:
         f"{DENIAL_MARKER}: {code}; {subject}. rules/04-politika-catismasi.md içindeki "
         "yönetişim yüzeyi bütünlüğü sınırı geçerlidir: ürün işinde veya bulgu düzeltmesinde "
         "POLICY_CONFLICT ile yanıt ver. Kontrol, bulgu veya kanıtı bu yüzeyi değiştirerek çözme; "
-        f"kabuk, yorumlayıcı, bağlantı veya başka yolla atlatma. {delivery} {PLAIN_LANGUAGE_RELAY}"
+        f"kabuk, yorumlayıcı, bağlantı veya başka yolla atlatma. {delivery} {RESTORE_ROUTE} "
+        f"{PLAIN_LANGUAGE_RELAY}"
     )
 
 

@@ -66,7 +66,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             DEPENDENCY_MODE=connected
-            PYTHON_BASE_IMAGE=python:3.13-alpine3.23@sha256:7ea3f82de8ea6d4fb7e5d2bbe3fe3c9d931700b7a529f1fe5769e42abe514ca1
+            PYTHON_BASE_IMAGE=python:3.14-alpine3.23@sha256:218761489de417a6eb0808e264cbdd7043ec6659fe5a61898815e9848536541d
             FRONTEND_NODE_BASE_IMAGE=node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6
             NGINX_BASE_IMAGE=nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
           tags: |

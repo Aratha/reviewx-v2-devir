@@ -177,7 +177,16 @@ trap 'exit 143' TERM
 run_step configuration validate_configuration
 run_step dependency-admission python3 "$root/scripts/check-dependency-admission.py"
 if [ "$scope" != "frontend" ]; then
-  run_step configuration-sync python3 "$root/scripts/check-config-sync.py"
+  # The check parses application code, so it runs on the project's own Python when `.venv`
+  # exists; a host python3 of an older minor cannot parse the profile's syntax.
+  config_python=python3
+  for candidate in "$root/.venv/bin/python" "$root/.venv/Scripts/python.exe"; do
+    if [ -x "$candidate" ]; then
+      config_python="$candidate"
+      break
+    fi
+  done
+  run_step configuration-sync "$config_python" "$root/scripts/check-config-sync.py"
 fi
 
 case "$scope" in

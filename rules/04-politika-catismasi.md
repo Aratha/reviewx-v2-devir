@@ -145,5 +145,16 @@ oturumla aşma, yönetici kurulumunu bekle.
 `scripts/git-gate.sh` Git deposunda `core.hooksPath` değerini `.kt-scaffold/hooks/git` yapar; oradaki
 `pre-commit` kancası oturum kökünden ve istemciden bağımsız olarak commit öncesi yönetişim tutarlılığını
 denetler ve sapmada commit'i reddeder. Kapıyı `--no-verify`, `core.hooksPath` değişikliği veya kancayı
-düzenleyerek atlatma. Kabuk komutundan sonra `GOVERNANCE_DRIFT_DETECTED` geri bildirimi alırsan
-değişikliği git ile geri al, işe devam etme ve kullanıcıya bildir.
+düzenleyerek atlatma.
+
+Kabuk komutundan sonra `GOVERNANCE_DRIFT_DETECTED` geri bildirimi alırsan ya da sapma denetimi veya
+commit kapısı sapma bildirirse işe devam etme. Sapan yönetilen dosyayı
+`python3 .kt-scaffold/hooks/governance_client.py restore <yol>` ile (Windows'ta `python3` yerine
+`.venv\Scripts\python.exe`) kaydedilmiş doğru hâline geri al ve kullanıcıya bildir. Komut
+`.kt-scaffold/manifest.json` kaydındaki parmak izine uyan içeriği yalnız projenin commit geçmişinde
+arar, `.git` klasörüne yazmaz ve yalnız adı verilen dosyayı değiştirir. `git show :<yol>` gibi
+index'ten (kayda alınmak üzere seçilmiş değişikliklerden) okuyan geri alma, sapmış içeriği geri
+getirebileceği için kullanılmaz. Komut yüzeye yeni içerik yazmaz, yalnız kaydedilmiş hâli geri
+getirir; bu yüzden yukarıdaki sınırla çelişmez. Doğru içerik commit geçmişinde yoksa dosyayı elle
+yazma; proje kullanıcının başlattığı MCP proje iskeleti eşitlemesi veya `kt-iskelet guncelle` ile
+güncellenir.

@@ -22,7 +22,7 @@ gizli bilgi referansı, ağ eşleri ve giriş değerleriyle ayrı işler.
 `compile-dependency-locks.sh`, arka uç kilitlerini (`requirements.txt`, `requirements-dev.txt` ve
 `requirements-llm.txt`) `app/backend/*.in` dosyalarından yeniden üretir. Önce aday envanteri kabul
 etmeden kontrol edip yazdırır. Sonra `stack.sh build backend` ile yerel yığının kullandığı arka uç
-geliştirme imajını derler; kilitler böylece uygulamanın çalıştığı Python 3.13 sürümüyle üretilir.
+geliştirme imajını derler; kilitler böylece uygulamanın çalıştığı Python 3.14 sürümüyle üretilir.
 Sabitlenmiş `pip-tools` aracını bu imajdan açılan ve iş bitince silinen ayrı bir kapsayıcıda
 (`docker run --rm`) çalıştırır. Bu kapsayıcı komutu çalıştıran kullanıcının kimliğiyle çalışır, böylece
 kilit dosyaları o kullanıcıya ait kalır; `app/backend` dizinini bağlar ve paket deposuna Docker'ın

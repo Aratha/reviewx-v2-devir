@@ -84,7 +84,7 @@ class ScriptedLlm:
         return self._process_slots
 
     @asynccontextmanager
-    async def open_run(self) -> AsyncIterator["_Run"]:
+    async def open_run(self) -> AsyncIterator[_Run]:
         self.runs_opened += 1
         yield _Run(self, asyncio.Semaphore(self.run_limit))
 
@@ -123,7 +123,7 @@ class _Run:
         self._slots = slots
 
     @asynccontextmanager
-    async def slot(self) -> AsyncIterator["_Slot"]:
+    async def slot(self) -> AsyncIterator[_Slot]:
         async with self._slots, self._llm._process():
             yield _Slot(self._llm)
 

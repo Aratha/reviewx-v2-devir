@@ -3,7 +3,8 @@
 
 This dependency-free post-tool hook is feedback, not a guard: a shell command has already run
 and cannot be undone here.  It runs the generated drift check and, on drift, returns the client's
-documented feedback shape so the Agent is told to restore the change and stop.  It never reads
+documented feedback shape so the Agent is told to restore the drifted file with the generated
+governance runtime's restore command and stop.  It never reads
 the command output or file contents and names only the paths the drift check reports.  Hook
 failures stay silent; the pre-commit gate, the commit guard and CI remain the enforcing layers.
 """
@@ -20,6 +21,7 @@ from pathlib import Path
 CLIENTS = ("claude-code", "codex", "cursor")
 DRIFT_MARKER = "GOVERNANCE_DRIFT_DETECTED"
 DRIFT_CHECK = "scripts/check-governance-drift.py"
+RESTORE_COMMAND = ".kt-scaffold/hooks/governance_client.py restore"
 MAX_EVENT_BYTES = 262_144
 MAX_DETAIL_LINES = 3
 MAX_DETAIL_CHARACTERS = 400
@@ -57,11 +59,14 @@ def _drift_detail(root: Path) -> str | None:
 def _message(detail: str) -> str:
     return (
         f"{DRIFT_MARKER}: son kabuk komutundan sonra yönetişim yüzeyi kanonik özetten saptı "
-        f"({detail}). rules/04-politika-catismasi.md geçerlidir: bu değişikliği git ile geri al "
-        "(kum havuzu .git yazımını engelliyorsa git show :<yol> > <yol>), kontrolü veya bulguyu "
-        "yüzeyi değiştirerek kapatma ve işe devam etmeden kullanıcıya "
-        "rules/02-iletisim-tarzi.md içindeki sade dil sözleşmesiyle bildir. Kullanıcının "
-        "başlattığı kanonik güncellemeyse kt-iskelet guncelle ile tamamlanır."
+        f"({detail}). rules/04-politika-catismasi.md geçerlidir: sapan dosyayı "
+        f"python3 {RESTORE_COMMAND} <yol> ile kaydedilmiş doğru hâline geri al (Windows'ta "
+        "python3 yerine .venv\\Scripts\\python.exe; komut doğru içeriği projenin commit "
+        "geçmişinden alır ve .git klasörüne yazmaz), kontrolü veya bulguyu yüzeyi "
+        "değiştirerek kapatma ve işe devam etmeden kullanıcıya rules/02-iletisim-tarzi.md "
+        "içindeki sade dil sözleşmesiyle bildir. Doğru içerik git geçmişinde yoksa dosyayı elle "
+        "yazma; proje fabrika güncellemesiyle güncellenir: proje fabrikası bağlantısındaki (MCP) "
+        "proje_iskelesini_esitle aracı veya kt-iskelet guncelle komutu."
     )
 
 

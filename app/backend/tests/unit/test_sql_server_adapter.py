@@ -184,9 +184,7 @@ class FakeServer:
     error: pyodbc.Error | None = None
     query_error: pyodbc.Error | None = None
 
-    def connect(
-        self, connection_string: str, *, timeout: int, autocommit: bool
-    ) -> "FakeConnection":
+    def connect(self, connection_string: str, *, timeout: int, autocommit: bool) -> FakeConnection:
         assert autocommit is True and timeout > 0
         database = parse_connection_string(connection_string)["Database"]
         self.connection_strings.append(connection_string)
@@ -202,7 +200,7 @@ class FakeConnection:
         self.database = database
         self.timeout = 0
 
-    def cursor(self) -> "FakeCursor":
+    def cursor(self) -> FakeCursor:
         return FakeCursor(self)
 
     def close(self) -> None:

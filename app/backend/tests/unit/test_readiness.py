@@ -48,7 +48,7 @@ class _Database:
         self.statements: list[str] = []
 
     @asynccontextmanager
-    async def connect(self) -> AsyncIterator["_Database"]:
+    async def connect(self) -> AsyncIterator[_Database]:
         if self.error is not None:
             raise self.error
         yield self

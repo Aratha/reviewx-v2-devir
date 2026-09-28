@@ -4,21 +4,21 @@ Bu profil sağlayıcıdan bağımsız FastAPI platform temel çizgisidir. Kirac�
 `/auth/me`, RBAC koruması, uygulama düzeyi `super_admin`, PostgreSQL hazır olma, Alembic ve OpenAPI
 dışa aktarımı içerir. Bilinçli olarak iş varlığı içermez.
 
-İlk CLI, yerel MCP veya çevrimdışı `paketi-uygula` oluşturması, iskelet kökünde profile uygun
-Python 3.13 ile `.venv` ve pip hazırlar. HTTP MCP akışında bu hazırlığı yerel kodlama istemcisi,
-prompt kancası ayarları gelmeden önce yapar; `.venv` makbuzu olmadan kurulum tamamlanmaz. Makinede
-güvenilen Python 3.13 yoksa açık hata bildirilir; Python indirilmez veya sistem politikası
-değiştirilmez. Uygulama bağımlılıkları otomatik kurulmaz ve çağıran terminal otomatik
+İlk CLI, yerel MCP veya çevrimdışı `paketi-uygula` oluşturması, iskelet kökünde profile uygun Python
+3.14 ile `.venv` ve pip hazırlar. HTTP MCP akışında bu hazırlığı yerel kodlama istemcisi, prompt
+kancası ayarları gelmeden önce yapar; `.venv` makbuzu olmadan kurulum tamamlanmaz. Makinede
+güvenilen, en az 3.14.7 olan Python 3.14 yoksa açık hata bildirilir; Python indirilmez veya sistem
+politikası değiştirilmez. Uygulama bağımlılıkları otomatik kurulmaz ve çağıran terminal otomatik
 etkinleştirilmez.
 
 Hazırlığın tek komutu iskelet kökünde çalışır; `.venv` eksikken prompt kancasının durdurduğu
 oturumu da bu komut açar:
 
 ```sh
-python3.13 .kt-scaffold/hooks/python_environment.py hazirla
+python3.14 .kt-scaffold/hooks/python_environment.py hazirla
 ```
 
-Windows'ta `py -3.13 .kt-scaffold/hooks/python_environment.py hazirla` kullanın. Komut yalnız eksik
+Windows'ta `py -3.14 .kt-scaffold/hooks/python_environment.py hazirla` kullanın. Komut yalnız eksik
 ortamı oluşturur; var olan ortamı önce doğrular, üzerine yazmaz ve bozuk ya da kısmi ortamı silmez.
 `dogrula` yalnız doğrular.
 
@@ -46,8 +46,8 @@ Windows PowerShell etkinleştirme yolu `.\.venv\Scripts\Activate.ps1`, komut ist
 gevşetmeyin; doğrudan `.venv\Scripts\python.exe -m pip` gibi ortam yorumlayıcısını kullanın.
 POSIX'te de `.venv/bin/python -m pip` etkinleştirme gerektirmez.
 
-Doğrulama, gerçek yorumlayıcının Python 3.13.x sürümünü, nihai `.venv` yolundaki `sys.prefix`
-değerini, farklı `sys.base_prefix` değerini, `include-system-site-packages=false` ayarını ve pip
+Doğrulama, gerçek yorumlayıcının en az 3.14.7 olan Python 3.14.x sürümünü, nihai `.venv`
+yolundaki `sys.prefix` değerini, farklı `sys.base_prefix` değerini, `include-system-site-packages=false` ayarını ve pip
 erişimini kapsar. İskelet güncellemesi mevcut ortamı korur; eksik ortam oluşturmaz. `.venv` yerel çalışma zamanı çıktısıdır, güvenlik sandbox'ı değildir.
 
 Oturum açma, `/api/dwhcodereview/v1/auth/login` adresinde JSON `{ "username": "...", "password": "..." }`
@@ -129,7 +129,7 @@ gizli bilgisinde bulunur; derleme argümanında veya imaj katmanında asla bulun
 
 ```sh
 docker buildx build --load \
-  --build-arg PYTHON_BASE_IMAGE='<internal-registry>/platform/python:3.13-alpine3.23@sha256:<digest>' \
+  --build-arg PYTHON_BASE_IMAGE='<internal-registry>/platform/python:3.14-alpine3.23@sha256:<digest>' \
   --secret id=pip_conf,src=/approved/build-secrets/pip.conf \
   -f app/backend/Dockerfile.dev .
 ```
@@ -139,7 +139,7 @@ aktarıp terfi ettirin ve profilin wheel deposunu adlandırılmış derleme bağ
 
 ```sh
 docker buildx build --load --network=none \
-  --build-arg PYTHON_BASE_IMAGE='<internal-registry>/platform/python:3.13-alpine3.23@sha256:<digest>' \
+  --build-arg PYTHON_BASE_IMAGE='<internal-registry>/platform/python:3.14-alpine3.23@sha256:<digest>' \
   --build-arg DEPENDENCY_MODE=offline \
   --build-context python_wheelhouse=/approved/bundle/wheelhouse/python-fastapi \
   -f app/backend/Dockerfile.dev .

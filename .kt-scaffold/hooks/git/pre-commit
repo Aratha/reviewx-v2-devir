@@ -9,7 +9,8 @@ cd "$root" || exit 1
 
 if ! python3 scripts/check-governance-drift.py >/dev/null; then
   echo "kt-scaffold: yönetişim yüzeyi kanonik özetten saptı; commit reddedildi." >&2
-  echo "Değişikliği git ile geri alın veya kanonik güncellemeyi kt-iskelet guncelle ile uygulayın." >&2
+  echo "Sapan dosyayı python3 .kt-scaffold/hooks/governance_client.py restore <yol> ile kaydedilmiş doğru hâline geri alın." >&2
+  echo "Doğru içerik git geçmişinde yoksa projeyi fabrika güncellemesiyle güncelleyin: asistanın proje fabrikası bağlantısındaki (MCP) proje_iskelesini_esitle aracı veya kt-iskelet guncelle komutu." >&2
   echo "Kontrolü silerek bulgu kapatılmaz; kapıyı --no-verify ile atlamayın." >&2
   exit 1
 fi

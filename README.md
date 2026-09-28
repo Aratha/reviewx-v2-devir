@@ -224,7 +224,9 @@ Kodlama istemcisini daima proje kökünde başlat. Prompt, commit ve yönetişim
 kökte başlatılan oturumda yüklenir; üst dizinden, başka depodan veya projeyi başka kökten oluşturan
 oturumdan yapılan değişiklik kancasız kalır. Oturum kökünden bağımsız kalan tek yerel kapı `scripts/git-gate.sh`
 ile etkinleşen Git `pre-commit` tutarlılık denetimidir. Kabuk komutundan sonra sapma olursa ajan
-`GOVERNANCE_DRIFT_DETECTED` geri bildirimi alır.
+`GOVERNANCE_DRIFT_DETECTED` geri bildirimi alır. Sapan yönetilen dosya
+`python3 .kt-scaffold/hooks/governance_client.py restore <yol>` ile kaydedilmiş doğru hâline
+döner; adımın sahibi `rules/04-politika-catismasi.md` kuralıdır.
 
 `agent-platform/`, `rules/`, `.kt-scaffold/` altındaki kanca, manifest ve projeksiyonlar, üretilmiş
 talimat ve istemci yüzeyleri, teknoloji profili, bağımlılık kabul kaydı ve yönetişim CI kapıları

@@ -19,7 +19,7 @@ yoksa kurumsal BT talep kanalına başvurun.
 |---|---|
 | Docker Desktop | Uygulamayı çalıştırır. Uygulamayı kullanırken açık olmalıdır (menü çubuğunda balina simgesi). |
 | Git | Projenin kodunu indirir ve güncel tutar. |
-| Python 3.13 | İlk kurulumdaki denetimleri çalıştırır. |
+| Python 3.14 (en az 3.14.7) | İlk kurulumdaki denetimleri çalıştırır. |
 | VS Code | Görevleri çalıştırdığınız ve kodlama asistanınızla çalıştığınız düzenleyici. |
 
 İlk kurulum görevi eksik aracı iletisiyle söyler; neyin eksik olduğunu önceden bilmeniz gerekmez.
@@ -184,7 +184,7 @@ DWHCODEREVIEW_LLM_MODEL=<Ollama'da yüklü modelin adı>
 | Gördüğünüz | Ne yapmalı |
 |---|---|
 | `Cannot connect to the Docker daemon` ya da ilk kurulum Docker adımında duruyor | Docker Desktop'ı açın, açılmasını bekleyip görevi yeniden çalıştırın. |
-| İlk kurulum `python3` adımında duruyor ya da geliştirici araçlarını kurmayı öneren bir pencere açılıyor | Python 3.13'ü kurumsal uygulama kataloğundan kurun. |
+| İlk kurulum `python3` adımında duruyor ya da geliştirici araçlarını kurmayı öneren bir pencere açılıyor | En az 3.14.7 olan Python 3.14'ü kurumsal uygulama kataloğundan kurun. |
 | `required variable GRAFANA_ADMIN_PASSWORD is missing a value` | **DWH: İlk kurulum** görevini çalıştırın. |
 | `port is already allocated` | 8080 portu dolu. [Yerel ayar dosyasına](#yerel-ayar-dosyası) `APP_HTTP_PORT=8081` ekleyin. |
 | `service "backend" is not running` | Önce **DWH: Uygulamayı başlat** görevini çalıştırın. |

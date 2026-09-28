@@ -5,6 +5,7 @@ import LoginPage from './LoginPage';
 import {AuthProvider} from '@/contexts/AuthContext';
 import {IntlProvider} from '@/contexts/IntlContext';
 import {ApiError} from '@/lib/apiClient';
+import {config} from '@/lib/config';
 import messages from '@/locales/tr.json';
 import {AuthService} from '@/services/auth';
 import {clearAuth, readAccessToken} from '@/lib/authStorage';
@@ -68,6 +69,19 @@ describe('login page', () => {
     renderLogin();
     expect(await screen.findByText(message('auth.login.subtitle'))).toBeInTheDocument();
     expect(message('auth.login.subtitle')).toMatch(/Kurum kullanıcı adınız ve parolanız/);
+  });
+
+  it('pairs the sign-in form with a panel naming what the product does', async () => {
+    renderLogin();
+    await screen.findByLabelText(message('auth.login.username'));
+    expect(screen.getByRole('heading', {level: 1}).textContent).toBe(message('auth.login.title'));
+    expect(screen.getByRole('heading', {level: 2}).textContent).toBe(config.productName);
+    expect(screen.getAllByRole('heading', {level: 3}).map((heading) => heading.textContent)).toEqual(
+      ['objectReview', 'scriptReview', 'rules', 'llm', 'history'].map((name) =>
+        message(`auth.login.hero.${name}.title`),
+      ),
+    );
+    expect(screen.getByText(message('auth.login.help.firstLogin'))).toBeInTheDocument();
   });
 
   it('keeps the access token in memory only after a successful login', async () => {

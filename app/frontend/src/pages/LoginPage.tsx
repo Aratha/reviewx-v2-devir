@@ -1,5 +1,11 @@
 import {useState, type FormEvent} from 'react';
 import {Navigate, useLocation, useNavigate} from 'react-router';
+import {LoginShowcase} from '@/components/auth/LoginShowcase';
+import {BrandMark} from '@/components/brand/BrandMark';
+import {Alert} from '@/components/ui/Alert';
+import {Button} from '@/components/ui/Button';
+import {Field} from '@/components/ui/Field';
+import {Icon} from '@/components/ui/Icon';
 import {useAuth} from '@/contexts/AuthContext';
 import {useIntl} from '@/contexts/IntlContext';
 import {ApiError} from '@/lib/apiClient';
@@ -25,6 +31,10 @@ function languageName(locale: string): string {
   }
 }
 
+/**
+ * Sign-in screen (directory-login Requirement 13): the form, its hints and the language choice on
+ * one half, the product showcase on the other. An open session skips straight to its target page.
+ */
 export default function LoginPage() {
   const {user, login} = useAuth();
   const {locale, locales, setLocale, t} = useIntl();
@@ -54,32 +64,77 @@ export default function LoginPage() {
 
   return (
     <main className="login-shell">
-      <section className="login-card">
-        <div className="eyebrow">{t('auth.login.context', {domain: config.primaryDomain})}</div>
-        <h1>{"DWH Code Review"}</h1>
-        <p>{t('auth.login.subtitle')}</p>
-        <form onSubmit={submit}>
-          <label htmlFor="username">{t('auth.login.username')}</label>
-          <input id="username" autoComplete="username" aria-describedby="username-hint" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <p id="username-hint" className="field-hint">{t('auth.login.usernameHint')}</p>
-          <label htmlFor="password">{t('auth.login.password')}</label>
-          <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {errorKey && <div role="alert">{t(errorKey)}</div>}
-          <button type="submit" disabled={busy}>{busy ? t('auth.login.busy') : t('auth.login.submit')}</button>
-        </form>
-        {locales.length > 1 && (
-          <div className="language">
-            <label htmlFor="language">{t('common.language.label')}</label>
-            <select id="language" value={locale} onChange={(e) => setLocale(e.target.value)}>
-              {locales.map((option) => (
-                <option key={option} value={option} lang={option}>
-                  {languageName(option)}
-                </option>
-              ))}
-            </select>
+      <div className="login-panel">
+        <header className="login-header">
+          <div className="login-brand">
+            <BrandMark />
+            <span>{config.productName}</span>
           </div>
-        )}
-      </section>
+          {locales.length > 1 && (
+            <div className="login-language">
+              <label htmlFor="language">{t('common.language.label')}</label>
+              <select id="language" className="select" value={locale} onChange={(e) => setLocale(e.target.value)}>
+                {locales.map((option) => (
+                  <option key={option} value={option} lang={option}>
+                    {languageName(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </header>
+
+        <div className="login-body">
+          <section className="login-form-block" aria-labelledby="login-title">
+            <div className="login-intro">
+              <p className="login-eyebrow">
+                <Icon name="building" />
+                {t('auth.login.eyebrow')}
+              </p>
+              <h1 id="login-title">{t('auth.login.title')}</h1>
+              <p>{t('auth.login.subtitle')}</p>
+            </div>
+
+            <form className="login-form" onSubmit={submit}>
+              {errorKey && <Alert tone="error">{t(errorKey)}</Alert>}
+              <Field id="username" label={t('auth.login.username')} hint={t('auth.login.usernameHint')}>
+                <input
+                  id="username"
+                  className="input"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  aria-describedby="username-hint"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </Field>
+              <Field id="password" label={t('auth.login.password')}>
+                <input
+                  id="password"
+                  className="input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+              <Button type="submit" variant="primary" className="login-submit" disabled={busy} busy={busy}>
+                {busy ? t('auth.login.busy') : t('auth.login.submit')}
+                {!busy && <Icon name="arrowRight" />}
+              </Button>
+            </form>
+
+            <div className="login-help">
+              <p>{t('auth.login.help.suffix')}</p>
+              <p>{t('auth.login.help.firstLogin')}</p>
+              <p>{t('auth.login.help.localAccount')}</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <LoginShowcase />
     </main>
   );
 }

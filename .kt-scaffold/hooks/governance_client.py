@@ -613,8 +613,9 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
 
     The specialist evaluates; this command copies every identifier and digest byte for byte
     from the bindings input `review-start` wrote. A rejected evaluation writes no report; a
-    schema violation names its JSON pointer, keyword and schema constraint so the main Agent
-    can return it to the same specialist once.
+    schema violation names its JSON pointer, keyword and schema constraint, and a wrong
+    `agent_id` names the exact expected identity, so the main Agent can return it to the same
+    specialist once.
     """
 
     if AGENT_SLUG_RE.fullmatch(agent) is None:
@@ -640,7 +641,13 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
             },
         )
     if evaluation.get("agent_id") != agent_id:
-        raise GovernanceClientError("evaluation-invalid")
+        # Never normalized or accepted for another Agent: the rejection names only the exact
+        # identity this specialist may return, so the same specialist can answer once more.
+        raise GovernanceClientError(
+            "evaluation-invalid",
+            reason_code="AGENT_ID_MISMATCH",
+            violation={"pointer": "/agent_id", "keyword": "const", "constraint": agent_id},
+        )
     bound_fields = set(guard["OBSERVATION_KEYS"]) - set(EVALUATED_FIELDS) | {"agent_id"}
     if (
         set(bindings) != bound_fields

@@ -82,7 +82,7 @@
       "artifact_id": "rule:13-tamamlanma-tanimi",
       "authority": "mandatory",
       "kind": "rule",
-      "sha256": "2f6870452c6a1c59ba11b90b7e99765d01598e457f1f4fce3ab3d4e4bd48937e",
+      "sha256": "d71415ea60de9329912d97b9e1c3570d47eb1fd32b9b673fa229ff715244891c",
       "version": "0.4.0"
     },
     {
@@ -359,12 +359,12 @@
       "version": "0.4.0"
     }
   ],
-  "authority_generation": 44,
+  "authority_generation": 45,
   "backend_profile": "python-fastapi",
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "1af6015f06c4630169c2dd2070a27c992973a1b12737122b4cff255ee8076fa0",
+  "governance_digest": "1e6b647daaeef51941b4dc07d4dfb06d02969897e9f3727fe4adaf51a654f78b",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

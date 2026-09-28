@@ -532,13 +532,20 @@ class _SchemaMismatch(ValueError):
     """Internal branch mismatch used by the dependency-free schema subset validator.
 
     It names the violated keyword with the schema's own constraint and, while it propagates, the
-    instance path to it; it never carries the offending instance value.
+    instance path to it; it never carries the offending instance value. A length violation also
+    carries the observed length, an integer and never the text.
     """
 
-    def __init__(self, keyword: str = "", constraint: object = None) -> None:
+    def __init__(
+        self,
+        keyword: str = "",
+        constraint: object = None,
+        observed_length: int | None = None,
+    ) -> None:
         super().__init__(keyword)
         self.keyword = keyword
         self.constraint = constraint
+        self.observed_length = observed_length
         self.path: list[str | int] = []
 
 
@@ -679,9 +686,14 @@ def _exact_keys(payload: object, expected: set[str], code: str) -> dict[str, Any
     return payload
 
 
-def _schema_condition(condition: bool, keyword: str = "", constraint: object = None) -> None:
+def _schema_condition(
+    condition: bool,
+    keyword: str = "",
+    constraint: object = None,
+    observed_length: int | None = None,
+) -> None:
     if not condition:
-        raise _SchemaMismatch(keyword, constraint)
+        raise _SchemaMismatch(keyword, constraint, observed_length)
 
 
 def _schema_matches(
@@ -788,11 +800,17 @@ def _schema_matches(
     if isinstance(instance, str):
         if "minLength" in schema:
             _schema_condition(
-                len(instance) >= schema["minLength"], "minLength", schema["minLength"]
+                len(instance) >= schema["minLength"],
+                "minLength",
+                schema["minLength"],
+                len(instance),
             )
         if "maxLength" in schema:
             _schema_condition(
-                len(instance) <= schema["maxLength"], "maxLength", schema["maxLength"]
+                len(instance) <= schema["maxLength"],
+                "maxLength",
+                schema["maxLength"],
+                len(instance),
             )
         if "pattern" in schema:
             try:
@@ -942,7 +960,8 @@ def schema_violation(
     """Name the first violated keyword so the instance's author can correct its own answer.
 
     ``_validate_against_schema`` stays the only verdict. This returns the JSON pointer, the keyword
-    and the schema's constraint, never the offending value, or ``None`` for a valid instance.
+    and the schema's constraint, never the offending value, or ``None`` for a valid instance. A
+    length violation adds the observed length, so the author learns how far over the limit it is.
     """
     try:
         schema = registry[name]
@@ -951,7 +970,14 @@ def schema_violation(
         pointer = "".join(
             "/" + str(part).replace("~", "~0").replace("/", "~1") for part in mismatch.path
         )
-        return {"pointer": pointer, "keyword": mismatch.keyword, "constraint": mismatch.constraint}
+        violation: dict[str, object] = {
+            "pointer": pointer,
+            "keyword": mismatch.keyword,
+            "constraint": mismatch.constraint,
+        }
+        if mismatch.observed_length is not None:
+            violation["observed_length"] = mismatch.observed_length
+        return violation
     except (KeyError, TypeError, ValueError):
         return {"pointer": "", "keyword": "", "constraint": None}
     return None

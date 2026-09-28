@@ -16,7 +16,7 @@ Kalıcılık otoritesi: `sqlalchemy-alembic`.
 - [Yönetici kılavuzu](docs/tr/yonetici-kilavuzu.md): süper yönetici, rol ve hesap yönetimi, kuralları
   yayımlama, SQL Server ve LLM ayarları, isteğe bağlı Azure gizli değişkenleri, günlükler.
 - [Yerel kurulum](docs/tr/yerel-kurulum.md): uygulamayı macOS'ta VS Code görevleriyle başlatma ve
-  durdurma, yerel hesap açma; Windows'un bugünkü durumu.
+  durdurma, yerel hesap açma.
 
 ## Üretilen sınırlar
 

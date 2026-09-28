@@ -9,13 +9,6 @@ Bütün adımlar VS Code içinden, hazır görevlerle (tek tıkla çalışan kom
 gerekmez. Uygulamanın kullanımı [kullanım kılavuzunda](kullanim-kilavuzu.md), yetki ve ayarlar
 [yönetici kılavuzunda](yonetici-kilavuzu.md) anlatılır.
 
-## Hangi bilgisayarda çalışır
-
-| İşletim sistemi | Durum |
-|---|---|
-| macOS | Desteklenir. Bu kılavuzdaki adımlar macOS içindir. |
-| Windows | Bugün desteklenmez. Nedeni [Windows bölümündedir](#windows). |
-
 ## Gerekenler
 
 Aşağıdaki araçları **kurumsal uygulama kataloğundan** (macOS'ta Self Service) kurun. Üreticinin
@@ -185,22 +178,6 @@ DWHCODEREVIEW_LLM_MODEL=<Ollama'da yüklü modelin adı>
 - Anahtar isteyen bir uç için `DWHCODEREVIEW_LLM_API_KEY` satırını ekleyin.
 - Uygulama yalnız kurum içi (özel) ağdaki adreslere istek gönderir; internetteki bir adres kabul
   edilmez.
-
-## Windows
-
-Bugün Windows bilgisayarda uygulamayı yerelde çalıştırmanın desteklenen bir yolu yoktur:
-
-- Başlatma ve hesap açma adımları macOS ve Linux komut kabuğu için yazılmış betiklerdir
-  (`scripts/*.sh`). Windows'un kendi komut ekranı (PowerShell) bunları çalıştıramaz. Linux alt sistemi
-  (WSL) kurulu bilgisayarda `bash` komutu da Git'in kabuğunu değil WSL'i açar.
-- Git ile gelen Git Bash kabuğu bu betiklerin bir kısmını çalıştırabilir, ama projeyi üreten fabrika
-  (kt-scaffold) Windows'ta yalnız kodlama asistanının denetimleri için Git Bash kullanır; uygulamayı
-  başlatma betikleri için bu yolu desteklemez. İlk kurulum denetimi (`scripts/bootstrap.sh`) de
-  Windows'ta `python3` adıyla gerçek Python yerine Microsoft Store kısayoluna ulaştığı için durur.
-- Bu yüzden VS Code görevleri Windows'ta yalnız bu bölüme yönlendiren bir ileti gösterir.
-
-Windows'ta şimdilik test ortamını tarayıcıdan kullanın. Windows desteği fabrikada bir değişiklik
-gerektirir; o gelene kadar bu bölüm geçerlidir.
 
 ## Sorun giderme
 

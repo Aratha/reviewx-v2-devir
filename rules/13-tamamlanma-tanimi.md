@@ -256,8 +256,10 @@ oturumun geçmişini ve başka uzmanların raporlarını görmez; Codex'te `spaw
 yalıtılmış sayılmaz. Ana Agent uzmanın yanıtını değiştirmeden `work/<agent-slug>-evaluation.json`
 dosyasına yazar ve `governance_client.py observation --run-id <run_id> --agent <agent-slug>`
 komutunu çalıştırır. Komut değerlendirmeyi bağlama dosyasıyla bayt bayt birleştirir, gözlem
-şemasıyla denetler ve raporu kanonik baytlarla bir kez yazar; sözleşmeye uymayan yanıt onarılmaz,
-`invalid` kaydıyla koşum `BLOCKED_INCOMPLETE` kalır. Sabit alanlar şemadan gelir;
+şemasıyla denetler ve raporu kanonik baytlarla bir kez yazar. Sözleşmeye uymayan yanıtı ana Agent
+onarmaz. Komut yanıtı uzmanın düzeltebileceği bir red koduyla reddederse, kimliği yanlış yanıt
+dahil, yanıt bu kod ve ihlal yeriyle yalnız o uzmana bir kez geri verilir; ikinci red veya başka
+bir red `invalid` kaydıyla koşumu `BLOCKED_INCOMPLETE` bırakır. Sabit alanlar şemadan gelir;
 `phase1-agentic-advisory` kısaltılamaz veya yeniden adlandırılamaz. Bağlama dosyası genel
 prompt/transcript saklamaz; yalnız kimlik, sürüm, digest ve sözleşme metadata'sıdır.
 

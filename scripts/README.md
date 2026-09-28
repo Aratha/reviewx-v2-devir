@@ -43,9 +43,12 @@ ana makine platformunu doğrular; Python wheel deposu, npm önbelleği, Playwrig
 yerel ajan işlemidir veya isteğe bağlı kurulu CLI'ı kullanır. `export-project-metadata.py` yalnız
 yönetişim MCP'sinin kabul ettiği sınırlı `.kt-scaffold/project-manifest.json` dosyasını üretir; çalışma
 alanını gezmez ve kaynak, gizli bilgi, bağımlılık durumu veya veritabanı verisi içermez.
-Generated `.pre-commit-config.yaml`, mevcut Gitleaks taramasının yanında bu ağsız ve belirlenimci
-sapma denetimini de çalıştırır; pre-commit hiçbir LLM veya on iki Agent incelemesi çağırmaz ve
-çevrimiçi otorite tazeliğini yenilemez.
+Generated `.pre-commit-config.yaml`, Gitleaks (gizli bilgi tarayıcısı) ile yalnız commit'e girecek
+stage edilmiş değişiklikleri tarar: `app/infra/.env` ve `app/infra/.data/` gibi Git'in yok saydığı
+yerel dosyalar commit'i durdurmaz, stage edilmiş değişiklikteki gizli bilgi durdurur. Deponun
+tamamını CI'daki `security-gate.sh` tarar. Aynı yapılandırma bu ağsız ve belirlenimci sapma
+denetimini de çalıştırır; pre-commit hiçbir LLM veya on iki Agent incelemesi çağırmaz ve çevrimiçi
+otorite tazeliğini yenilemez.
 
 `stack.sh`, Compose'u başlatmadan önce `dev-secrets.sh` ile yerel geliştirme sırlarını hazırlar ve
 Compose'a verir: arka ucun JWT imza anahtarı (`JWT_PRIVATE_KEY`), PostgreSQL `app` rolünün parolası

@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: gitleaks
         name: gitleaks offline secret scan
-        entry: gitleaks dir --config .gitleaks.toml --redact --exit-code 1 .
+        entry: gitleaks git --pre-commit --staged --config .gitleaks.toml --redact --exit-code 1 .
         language: system
         pass_filenames: false
       - id: kt-governance-drift

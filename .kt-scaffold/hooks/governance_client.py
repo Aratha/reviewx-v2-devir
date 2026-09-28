@@ -50,6 +50,21 @@ CLIENT_SESSION_ENVIRONMENT = {
     "cursor": ("CURSOR_SESSION_ID", "CURSOR_CONVERSATION_ID"),
     "github-copilot-vscode": ("VSCODE_SESSION_ID",),
 }
+# Codex runs a project hook only after the user trusts its exact definition. Project creation and
+# a hook-changing update record that trust; a copied project or an edited hook file needs the
+# user's own step on the VS Code extension's Hooks settings page, which has no `/hooks` command.
+PROMPT_HOOK_TRUST_GUIDANCE = {
+    "codex": (
+        "Codex bu projenin kancalarını (mesaj gönderince kendiliğinden çalışan denetimler) büyük "
+        "olasılıkla onaylı bulmadığı için çalıştırmadı. Proje bu bilgisayarda proje fabrikasıyla "
+        "oluşturulduysa veya güncellendiyse onay kendiliğinden yazılmıştır; bu projede yeni bir "
+        "sohbet açıp isteğinizi orada gönderin. Proje başka yerden kopyalandıysa ya da kancalar "
+        "sonradan değiştiyse onayı bir kez siz verin: VS Code'da Codex kenar çubuğundaki dişli "
+        "simgesinden Codex Settings'i açın; Hooks bölümünde bu projenin kancalarını tek tek Trust "
+        "ile onaylayın. Liste boşsa önce bu projede bir sohbet açın, sonra Reload hooks'a basın. "
+        "Onaydan sonra isteğinizi yeni bir mesajla gönderin."
+    ),
+}
 PROJECT_ID_RE = re.compile(r"project-(?!0{32}$)[0-9a-f]{32}")
 SESSION_ID_RE = re.compile(r"session:client\.[0-9a-f]{64}")
 TURN_ID_RE = re.compile(r"turn:(?:client\.[0-9a-f]{64}|local\.(?!0{32}$)[0-9a-f]{32})")
@@ -1940,7 +1955,9 @@ def current_prompt_metadata(client_id: str) -> dict[str, object]:
             candidates.append((observed_at, metadata))
 
     if not candidates:
-        raise GovernanceClientError("prompt-metadata-missing")
+        raise GovernanceClientError(
+            "prompt-metadata-missing", guidance=PROMPT_HOOK_TRUST_GUIDANCE.get(client_id)
+        )
     if len({str(value["prompt_session_id"]) for _, value in candidates}) != 1:
         raise GovernanceClientError("prompt-metadata-ambiguous")
     latest_time = max(observed_at for observed_at, _ in candidates)

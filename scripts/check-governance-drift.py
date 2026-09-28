@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parent.parent
 RULES = ROOT / "rules"
@@ -55,6 +56,7 @@ UNTRUSTED_CONTENT_ASSETS = {
 }
 ACTIVATION_STATE_ROOT = Path(".kt-scaffold/agent-activation")
 EXPECTED_RENDERER_VERSION = "0.4.0"
+RESTORE_COMMAND = "python3 .kt-scaffold/hooks/governance_client.py restore"
 AGENT_IDS = {
     "acik-kaynak-lisansi",
     "bilgi-guvenligi",
@@ -109,6 +111,16 @@ def digest_corpus() -> str:
             digest.update(path.read_bytes())
             digest.update(b"\0")
     return digest.hexdigest()
+
+
+def drifted(problem: str, relative: str) -> NoReturn:
+    """Stop on a managed file whose bytes differ from its record and name the restoring command."""
+
+    raise SystemExit(
+        f"{problem}: {relative}\n"
+        f"Kaydedilmiş doğru hâline geri almak için: {RESTORE_COMMAND} {relative} "
+        "(Windows'ta python3 yerine .venv\\Scripts\\python.exe)"
+    )
 
 
 def safe_relative(value: object, label: str) -> Path:
@@ -253,12 +265,10 @@ def verify_prompt_ingress_assets() -> None:
     for relative in sorted(PROMPT_INGRESS_ASSETS):
         destination = safe_project_path(Path(relative), "prompt giriş koruması varlığı")
         if not destination.is_file():
-            raise SystemExit(f"prompt giriş koruması varlığı eksik veya güvenli değil: {relative}")
+            drifted("prompt giriş koruması varlığı eksik veya güvenli değil", relative)
         actual = hashlib.sha256(destination.read_bytes()).hexdigest()
         if managed.get(relative) != actual:
-            raise SystemExit(
-                f"prompt giriş koruması varlığı scaffold özetiyle eşleşmiyor: {relative}"
-            )
+            drifted("prompt giriş koruması varlığı scaffold özetiyle eşleşmiyor", relative)
 
 
 def verify_local_governance_guard_assets() -> None:
@@ -266,12 +276,10 @@ def verify_local_governance_guard_assets() -> None:
     for relative in sorted(LOCAL_GOVERNANCE_GUARD_ASSETS):
         destination = safe_project_path(Path(relative), "yerel yönetişim kapısı varlığı")
         if not destination.is_file():
-            raise SystemExit(f"yerel yönetişim kapısı varlığı eksik veya güvenli değil: {relative}")
+            drifted("yerel yönetişim kapısı varlığı eksik veya güvenli değil", relative)
         actual = hashlib.sha256(destination.read_bytes()).hexdigest()
         if managed.get(relative) != actual:
-            raise SystemExit(
-                f"yerel yönetişim kapısı varlığı scaffold özetiyle eşleşmiyor: {relative}"
-            )
+            drifted("yerel yönetişim kapısı varlığı scaffold özetiyle eşleşmiyor", relative)
 
 
 def verify_untrusted_content_assets() -> None:
@@ -279,14 +287,10 @@ def verify_untrusted_content_assets() -> None:
     for relative in sorted(UNTRUSTED_CONTENT_ASSETS):
         destination = safe_project_path(Path(relative), "harici içerik güven sınırı varlığı")
         if not destination.is_file():
-            raise SystemExit(
-                f"harici içerik güven sınırı varlığı eksik veya güvenli değil: {relative}"
-            )
+            drifted("harici içerik güven sınırı varlığı eksik veya güvenli değil", relative)
         actual = hashlib.sha256(destination.read_bytes()).hexdigest()
         if managed.get(relative) != actual:
-            raise SystemExit(
-                f"harici içerik güven sınırı varlığı scaffold özetiyle eşleşmiyor: {relative}"
-            )
+            drifted("harici içerik güven sınırı varlığı scaffold özetiyle eşleşmiyor", relative)
 
 
 def verify_agent_projections() -> tuple[int, set[str]]:
@@ -326,11 +330,12 @@ def verify_agent_projections() -> tuple[int, set[str]]:
             AGENT_PLATFORM.relative_to(ROOT) / relative,
             "kanonik agent-platform girdisi",
         )
+        source_relative = source.relative_to(ROOT).as_posix()
         if not source.is_file():
-            raise SystemExit(f"kanonik agent-platform girdisi eksik veya güvenli değil: {relative}")
+            drifted("kanonik agent-platform girdisi eksik veya güvenli değil", source_relative)
         actual = hashlib.sha256(source.read_bytes()).hexdigest()
         if actual != item.get("sha256"):
-            raise SystemExit(f"kanonik agent-platform girdisi sapma gösteriyor: {relative}")
+            drifted("kanonik agent-platform girdisi sapma gösteriyor", source_relative)
 
     artifacts = payload.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
@@ -372,22 +377,22 @@ def verify_agent_projections() -> tuple[int, set[str]]:
             PROJECTION_ROOT.relative_to(ROOT) / relative,
             "eylemsiz ajan izdüşümü",
         )
+        inert_relative = destination.relative_to(ROOT).as_posix()
         if not destination.is_file():
-            raise SystemExit(f"eylemsiz ajan izdüşümü eksik veya güvenli değil: {normalized}")
+            drifted("eylemsiz ajan izdüşümü eksik veya güvenli değil", inert_relative)
         actual = hashlib.sha256(destination.read_bytes()).hexdigest()
         if actual != item.get("sha256"):
-            raise SystemExit(f"eylemsiz ajan izdüşümü sapma gösteriyor: {normalized}")
-        inert_relative = destination.relative_to(ROOT).as_posix()
+            drifted("eylemsiz ajan izdüşümü sapma gösteriyor", inert_relative)
         if managed.get(inert_relative) != actual:
             raise SystemExit(
                 f"eylemsiz ajan izdüşümü scaffold tarafından sahiplenilmiyor: {normalized}"
             )
         live_destination = safe_project_path(relative, "yerel ajan keşif dosyası")
         if not live_destination.is_file():
-            raise SystemExit(f"yerel ajan keşif dosyası eksik veya güvenli değil: {normalized}")
+            drifted("yerel ajan keşif dosyası eksik veya güvenli değil", normalized)
         live_actual = hashlib.sha256(live_destination.read_bytes()).hexdigest()
         if live_actual != item.get("sha256"):
-            raise SystemExit(f"yerel ajan keşif dosyası sapma gösteriyor: {normalized}")
+            drifted("yerel ajan keşif dosyası sapma gösteriyor", normalized)
         if managed.get(normalized) != live_actual:
             raise SystemExit(
                 f"yerel ajan keşif dosyası scaffold tarafından sahiplenilmiyor: {normalized}"
@@ -477,10 +482,10 @@ def main() -> int:
         path = safe_relative(relative, "yönetişim kilidi")
         destination = safe_project_path(path, "üretilmiş yönetişim dosyası")
         if not destination.is_file():
-            raise SystemExit(f"üretilmiş yönetişim dosyası eksik veya güvenli değil: {relative}")
+            drifted("üretilmiş yönetişim dosyası eksik veya güvenli değil", relative)
         actual = hashlib.sha256(destination.read_bytes()).hexdigest()
         if actual != expected:
-            raise SystemExit(f"üretilmiş yönetişim dosyası sapma gösteriyor: {relative}")
+            drifted("üretilmiş yönetişim dosyası sapma gösteriyor", relative)
         if managed.get(relative) != actual:
             raise SystemExit(
                 f"üretilmiş yönetişim dosyası scaffold tarafından sahiplenilmiyor: {relative}"

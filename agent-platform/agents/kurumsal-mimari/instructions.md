@@ -26,8 +26,9 @@ listesini, yasaklı listeyi veya kayıtlı hedefi kendiliğinden değiştiremez.
 - `ARCH-004`: `urllib2` kullanımı düşük önem dereceli Python 2 uyumsuzluğu adayıdır.
 - `ARCH-006`: aynı Git adayındaki profil ile `pyproject.toml` içindeki `project.requires-python`
   veya `setup.cfg`/`setup.py` içindeki `python_requires` beyanını karşılaştır. Kabul edilen sürüm
-  aralığı profilin Python minor serisi ve alt sınırı içinde kalmalıdır. Profil 3.13 ise
-  `>=3.13,<3.14` uyumludur; `>=3.12,<3.13` ve üst sınırı olmayan `>=3.13` uyumsuz adaydır.
+  aralığı profilin Python minor serisi ve alt sınırı içinde kalmalıdır. Profil 3.14 ve alt sınır
+  3.14.7 ise `>=3.14.7,<3.15` uyumludur; `>=3.13,<3.14`, alt sınırı 3.14.7 altında kalan
+  `>=3.14,<3.15` ve üst sınırı olmayan `>=3.14.7` uyumsuz adaydır.
   Hedef seri değiştiğinde örneğin sürümünü değil güncel profil değerini kullan. Kaynakta korunan
   3.12 regex'ini etkin algılayıcı olarak uygulama; yeni belirtimin yürütücüsü yoktur, Agentic
   kaynak incelemesi deterministik algılayıcı koşumu değildir.

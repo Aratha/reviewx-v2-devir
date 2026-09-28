@@ -206,7 +206,7 @@ def line_reference_for_item(item: dict[str, Any], source_sql: str | None, snippe
     if line_number is not None:
         try:
             number = int(line_number)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             number = 0
         if number > 0:
             return f"Satır {number}"

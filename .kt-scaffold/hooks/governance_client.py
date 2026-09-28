@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Dependency-free governance commands over the shared, repository-free governance root."""
+"""Dependency-free governance commands over the shared, repository-free governance root.
+
+`restore` is the one command that writes project files: it puts drifted scaffold-managed files
+back to the bytes the scaffold recorded for them, taken only from the project's commit history.
+"""
 
 from __future__ import annotations
 
@@ -14,10 +18,11 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, NoReturn, cast
 
 # Started with the host's python3 before moving to the project's `.venv`; keep 3.9 syntax.
@@ -92,7 +97,7 @@ EVALUATED_FIELDS = (
     "status",
 )
 GUARD_REASON_RE = re.compile(r"[A-Z][A-Z0-9_]{2,63}")
-# One `standard_refs` entry of an Agent policy pack; the only controls a finding may cite.
+# One `standard_refs` entry of an Agent policy pack; code binds these controls to every finding.
 POLICY_STANDARD_REF_RE = re.compile(
     r"^\s*- standard_id: \"?([^\s\"]+)\"?\n"
     r"\s+control_id: \"?([^\s\"]+)\"?\n"
@@ -114,6 +119,29 @@ EVALUATOR_POLICY_PATH = "agent-platform/policies/aggregation/governed-review-age
 EXPLANATION_TEMPLATES_PATH = (
     "agent-platform/policies/aggregation/decision-explanation-templates.yml"
 )
+# `restore` takes a file's recorded digest from the scaffold ownership manifest that the drift
+# check trusts and its bytes only from commit trees, never from the Git index.
+MANAGED_MANIFEST_PATH = ".kt-scaffold/manifest.json"
+MAX_RESTORE_BLOB_BYTES = 16 * 1024 * 1024
+RESTORE_FILE_MODES = {"100644": 0o644, "100755": 0o755}
+RESTORE_GUIDANCE = {
+    "UNSAFE_PATH": "Yol, proje klasörü içinde göreli bir dosya yolu olmalı.",
+    "UNMANAGED_PATH": (
+        "Yalnız proje iskeletinin yönettiği, .kt-scaffold/manifest.json kaydındaki dosyalar geri "
+        "alınır."
+    ),
+    "LINKED_PATH": (
+        "Yolda sembolik bağlantı (başka bir yeri gösteren kısayol) var veya yol normal bir dosyayı "
+        "göstermiyor."
+    ),
+    "NOT_IN_HISTORY": (
+        "Dosyanın kaydedilmiş doğru hâli (kayıttaki parmak izine uyan içerik) bu projenin commit "
+        "geçmişinde yok. Dosyayı elle yazma; projeyi fabrika güncellemesiyle güncelle: asistanın "
+        "proje fabrikası bağlantısındaki (MCP) proje_iskelesini_esitle aracı veya kt-iskelet "
+        "guncelle komutu."
+    ),
+    "WRITE_FAILED": "Dosya yazılamadı; yazma izni olmayabilir.",
+}
 
 
 class GovernanceClientError(ValueError):
@@ -516,21 +544,6 @@ def _read_run_input(path: Path) -> dict[str, object]:
     return value
 
 
-def _policy_controls(project_root: Path, agent: str) -> set[tuple[str, str, str]]:
-    """The `{standard_id, control_id, version}` triples the Agent's policy pack declares."""
-
-    path = project_root / "agent-platform" / "agents" / agent / "policy.yml"
-    try:
-        if path.is_symlink() or not path.is_file():
-            raise GovernanceClientError("evaluation-invalid", reason_code="POLICY_UNAVAILABLE")
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        raise GovernanceClientError(
-            "evaluation-invalid", reason_code="POLICY_UNAVAILABLE"
-        ) from None
-    return {match.groups() for match in POLICY_STANDARD_REF_RE.finditer(text)}
-
-
 def _staged_paths(project_root: Path, error: str = "evaluation-invalid") -> set[str]:
     """Repository-relative paths the staged candidate adds, changes or deletes."""
 
@@ -564,10 +577,8 @@ def _staged_paths(project_root: Path, error: str = "evaluation-invalid") -> set[
         raise GovernanceClientError(error, reason_code="CANDIDATE_UNAVAILABLE") from None
 
 
-def _validate_evaluation_scope(
-    project_root: Path, agent: str, evaluation: dict[str, object]
-) -> None:
-    """Mechanically bind a specialist answer to its policy controls and the staged candidate.
+def _validate_evaluation_scope(project_root: Path, evaluation: dict[str, object]) -> None:
+    """Mechanically bind a specialist answer to the staged candidate.
 
     A rejected answer writes no report, so the main Agent asks the same specialist again with
     the returned reason instead of repeating the whole review.
@@ -577,23 +588,6 @@ def _validate_evaluation_scope(
     scanned = evaluation.get("scanned_files")
     if not isinstance(findings, list) or not isinstance(scanned, list):
         raise GovernanceClientError("evaluation-invalid")
-    if findings:
-        allowed = _policy_controls(project_root, agent)
-        for finding in findings:
-            controls = finding.get("controls") if isinstance(finding, dict) else None
-            if not isinstance(controls, list) or any(
-                not isinstance(control, dict)
-                or (
-                    str(control.get("standard_id")),
-                    str(control.get("control_id")),
-                    str(control.get("version")),
-                )
-                not in allowed
-                for control in controls
-            ):
-                raise GovernanceClientError(
-                    "evaluation-invalid", reason_code="CONTROL_NOT_IN_POLICY"
-                )
     if scanned:
         candidate = _staged_paths(project_root)
         if any(path not in candidate for path in scanned):
@@ -612,10 +606,11 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
     """Write one specialist report from its bindings input and its returned evaluation.
 
     The specialist evaluates; this command copies every identifier and digest byte for byte
-    from the bindings input `review-start` wrote. A rejected evaluation writes no report; a
-    schema violation names its JSON pointer, keyword and schema constraint, and a wrong
-    `agent_id` names the exact expected identity, so the main Agent can return it to the same
-    specialist once.
+    from the bindings input `review-start` wrote and binds the Agent's policy controls to every
+    finding, so no specialist chooses a control identifier. A rejected evaluation writes no
+    report; a schema violation names its JSON pointer, keyword and schema constraint, and a
+    wrong `agent_id` names the exact expected identity, so the main Agent can return it to the
+    same specialist once.
     """
 
     if AGENT_SLUG_RE.fullmatch(agent) is None:
@@ -648,6 +643,32 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
             reason_code="AGENT_ID_MISMATCH",
             violation={"pointer": "/agent_id", "keyword": "const", "constraint": agent_id},
         )
+    findings = evaluation.get("findings")
+    if isinstance(findings, list):
+        for index, finding in enumerate(findings):
+            if isinstance(finding, dict) and "controls" in finding:
+                # Code binds the policy controls; a specialist that cites its own control
+                # identifier is returned once instead of having the identifier replaced.
+                raise GovernanceClientError(
+                    "evaluation-invalid",
+                    reason_code="EVALUATION_SCHEMA_INVALID",
+                    violation={
+                        "pointer": f"/findings/{index}",
+                        "keyword": "additionalProperties",
+                        "constraint": ["controls"],
+                    },
+                )
+        if findings:
+            controls = _policy_standard_refs(project_root, agent, "evaluation-invalid")
+            if not controls:
+                raise GovernanceClientError("evaluation-invalid", reason_code="POLICY_UNAVAILABLE")
+            evaluation = {
+                **evaluation,
+                "findings": [
+                    {**finding, "controls": controls} if isinstance(finding, dict) else finding
+                    for finding in findings
+                ],
+            }
     bound_fields = set(guard["OBSERVATION_KEYS"]) - set(EVALUATED_FIELDS) | {"agent_id"}
     if (
         set(bindings) != bound_fields
@@ -681,7 +702,7 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
             reason_code="EVALUATION_SCHEMA_INVALID",
             violation=guard["schema_violation"](observation, schema, schemas),
         ) from None
-    _validate_evaluation_scope(project_root, agent, evaluation)
+    _validate_evaluation_scope(project_root, evaluation)
     payload = _canonical_bytes(observation)
     writer = _hook_module("governance_records.py")
     try:
@@ -703,18 +724,16 @@ def record_observation(run_id: str, agent: str) -> dict[str, object]:
     }
 
 
-def _policy_standard_refs(project_root: Path, agent: str) -> list[dict[str, str]]:
-    """The Agent's policy controls in file order, as a specialist invocation must cite them."""
+def _policy_standard_refs(project_root: Path, agent: str, error: str) -> list[dict[str, str]]:
+    """The Agent's policy controls in file order, as code binds them to every finding."""
 
     path = project_root / "agent-platform" / "agents" / agent / "policy.yml"
     try:
         if path.is_symlink() or not path.is_file():
-            raise GovernanceClientError("review-start-invalid", reason_code="POLICY_UNAVAILABLE")
+            raise GovernanceClientError(error, reason_code="POLICY_UNAVAILABLE")
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
-        raise GovernanceClientError(
-            "review-start-invalid", reason_code="POLICY_UNAVAILABLE"
-        ) from None
+        raise GovernanceClientError(error, reason_code="POLICY_UNAVAILABLE") from None
     references: list[dict[str, str]] = []
     for standard_id, control_id, version in POLICY_STANDARD_REF_RE.findall(text):
         reference = {"standard_id": standard_id, "control_id": control_id, "version": version}
@@ -1020,7 +1039,6 @@ def review_start(
                 "report": "written"
                 if (run_root / "reports" / f"{slug}.json").exists()
                 else "missing",
-                "standard_refs": _policy_standard_refs(project_root, slug),
             }
         )
     return {
@@ -1818,6 +1836,211 @@ def finalize_review(run_id: str) -> dict[str, object]:
     }
 
 
+def _restore_relative(value: str) -> str:
+    """A project-relative POSIX path; Windows separators are accepted, escapes are not."""
+
+    if "\0" in value:
+        raise ValueError("UNSAFE_PATH")
+    windows = PureWindowsPath(value)
+    text = value.replace("\\", "/")
+    parts = [part for part in text.split("/") if part not in {"", "."}]
+    if text.startswith("/") or windows.drive or windows.root or not parts or ".." in parts:
+        raise ValueError("UNSAFE_PATH")
+    return "/".join(parts)
+
+
+def _restore_destination(project_root: Path, relative: str) -> Path:
+    """The project path of `relative` when no part of it is a link and it stays in the project."""
+
+    current = project_root
+    for part in relative.split("/"):
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("LINKED_PATH")
+    try:
+        current.resolve(strict=False).relative_to(project_root)
+    except (OSError, ValueError):
+        raise ValueError("LINKED_PATH") from None
+    if current.exists() and not current.is_file():
+        raise ValueError("LINKED_PATH")
+    return current
+
+
+def _recorded_digests(project_root: Path) -> dict[str, str]:
+    """The managed path to SHA-256 record of the scaffold ownership manifest."""
+
+    try:
+        manifest = _restore_destination(project_root, MANAGED_MANIFEST_PATH)
+        payload = _decode(manifest.read_bytes())
+    except (OSError, ValueError, GovernanceClientError):
+        raise GovernanceClientError("restore-refused", reason_code="MANIFEST_INVALID") from None
+    managed = payload.get("managed") if isinstance(payload, dict) else None
+    if not isinstance(managed, dict) or any(
+        not isinstance(path, str) or not isinstance(digest, str) or not DIGEST_RE.fullmatch(digest)
+        for path, digest in managed.items()
+    ):
+        raise GovernanceClientError("restore-refused", reason_code="MANIFEST_INVALID")
+    return cast(dict[str, str], managed)
+
+
+class _History:
+    """Read the project's object store only: commit trees and blobs, never the index."""
+
+    def __init__(self, project_root: Path, records: dict[str, Any]) -> None:
+        executable = shutil.which("git")
+        if executable is None:
+            raise OSError("git-unavailable")
+        self.command = [executable, "-C", str(project_root), "--literal-pathspecs"]
+        excluded = records["GIT_LOCATION_VARIABLES"]
+        self.environment = {key: value for key, value in os.environ.items() if key not in excluded}
+        self.environment["GIT_OPTIONAL_LOCKS"] = "0"
+        self.environment["GIT_TERMINAL_PROMPT"] = "0"
+
+    def __call__(self, *arguments: str) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(
+            [*self.command, *arguments],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=False,
+            timeout=GIT_TIMEOUT_SECONDS,
+            env=self.environment,
+        )
+
+
+def _recorded_bytes(git: _History, relative: str, expected: str) -> tuple[bytes, int] | None:
+    """Find the recorded bytes of `relative` in `HEAD`, then in its history, newest first."""
+
+    checked: set[str] = set()
+
+    def search(commits: list[str]) -> tuple[bytes, int] | None:
+        for commit in commits:
+            listed = git("ls-tree", "-l", "-z", commit, "--", relative)
+            if listed.returncode != 0:
+                continue
+            for record in listed.stdout.split(b"\0"):
+                metadata, _, name = record.partition(b"\t")
+                fields = metadata.decode("ascii", "replace").split()
+                if len(fields) != 4 or name.decode("utf-8", "surrogateescape") != relative:
+                    continue
+                mode, kind, object_id, size = fields
+                if (
+                    kind != "blob"
+                    or mode not in RESTORE_FILE_MODES
+                    or object_id in checked
+                    or not size.isdigit()
+                    or int(size) > MAX_RESTORE_BLOB_BYTES
+                ):
+                    continue
+                checked.add(object_id)
+                blob = git("cat-file", "blob", object_id)
+                if blob.returncode == 0 and hashlib.sha256(blob.stdout).hexdigest() == expected:
+                    return blob.stdout, RESTORE_FILE_MODES[mode]
+        return None
+
+    found = search(["HEAD"])
+    if found is not None:
+        return found
+    history = git("rev-list", "--full-history", "HEAD", "--", relative)
+    if history.returncode != 0:
+        return None
+    return search(history.stdout.decode("ascii", "replace").split())
+
+
+def _replace_file(destination: Path, content: bytes, mode: int) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".kt-restore-", dir=destination.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, destination)
+    except BaseException:
+        if os.path.lexists(temporary):
+            os.unlink(temporary)
+        raise
+
+
+def _utf8_output() -> None:
+    """A Windows pipe defaults to the ANSI code page, which cannot print Turkish letters."""
+
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8", errors="replace")
+
+
+def _restore_refused(refused: list[dict[str, str]]) -> GovernanceClientError:
+    reasons = list(dict.fromkeys(item["reason"] for item in refused))
+    guidance = " ".join(RESTORE_GUIDANCE[reason] for reason in reasons)
+    return GovernanceClientError(
+        "restore-refused",
+        reason_code=reasons[0],
+        violation={"refused": refused},
+        guidance=f"{guidance} Hiçbir dosya değiştirilmedi.",
+    )
+
+
+def restore_managed_files(arguments: list[str]) -> dict[str, object]:
+    """Write drifted scaffold-managed files back to their recorded bytes from commit history.
+
+    All named paths are checked first; one refusal writes nothing.  Output names only paths.
+    """
+
+    project_root = Path(__file__).resolve().parents[2]
+    managed = _recorded_digests(project_root)
+    refused: list[dict[str, str]] = []
+    current: list[str] = []
+    planned: list[tuple[str, Path, bytes, int]] = []
+    git: _History | None = None
+    for value in dict.fromkeys(arguments):
+        shown = value[:512]
+        try:
+            relative = shown = _restore_relative(value)
+            if relative in {item[0] for item in planned} or relative in current:
+                continue
+            expected = managed.get(relative)
+            if expected is None:
+                raise ValueError("UNMANAGED_PATH")
+            destination = _restore_destination(project_root, relative)
+            if destination.is_file() and hashlib.sha256(destination.read_bytes()).hexdigest() == (
+                expected
+            ):
+                current.append(relative)
+                continue
+            if git is None:
+                records = _hook_module("governance_records.py")
+                if records["repository_status"](project_root) != "ok":
+                    raise ValueError("NOT_IN_HISTORY")
+                git = _History(project_root, records)
+            found = _recorded_bytes(git, relative, expected)
+            if found is None:
+                raise ValueError("NOT_IN_HISTORY")
+            planned.append((relative, destination, *found))
+        except ValueError as reason:
+            code = str(reason) if str(reason) in RESTORE_GUIDANCE else "UNSAFE_PATH"
+            refused.append({"path": shown, "reason": code})
+        except (OSError, subprocess.SubprocessError):
+            refused.append({"path": shown, "reason": "NOT_IN_HISTORY"})
+    if refused:
+        raise _restore_refused(refused)
+    restored: list[str] = []
+    for relative, destination, content, mode in planned:
+        try:
+            _restore_destination(project_root, relative)
+            _replace_file(destination, content, mode)
+        except (OSError, ValueError):
+            error = _restore_refused([{"path": relative, "reason": "WRITE_FAILED"}])
+            error.guidance = (
+                f"{RESTORE_GUIDANCE['WRITE_FAILED']} Geri alınan dosyalar: "
+                f"{', '.join(restored) or 'yok'}."
+            )
+            raise error from None
+        restored.append(relative)
+    status = "restored" if restored else "current"
+    return {"status": status, "restored": restored, "current": current}
+
+
 def _project_id(project_root: Path) -> str:
     value = _read_regular_json(
         project_root / ".kt-scaffold/project-manifest.json", maximum=MAX_PROMPT_METADATA_BYTES
@@ -1998,6 +2221,8 @@ def main(argv: list[str] | None = None) -> int:
     observation.add_argument("--run-id", required=True)
     observation.add_argument("--agent", required=True)
     commands.add_parser("consultation")
+    restore = commands.add_parser("restore")
+    restore.add_argument("paths", nargs="+")
     if argv is None:
         script = Path(__file__)
         if _hook_module("governance_records.py")["ensure_profile_interpreter"](
@@ -2027,6 +2252,9 @@ def main(argv: list[str] | None = None) -> int:
             exit_code = 0 if result["status"] == "complete" else 1
         elif arguments.operation == "consultation":
             result = record_consultation(sys.stdin.buffer.read(MAX_REQUEST_BYTES + 1))
+        elif arguments.operation == "restore":
+            _utf8_output()
+            result = restore_managed_files(arguments.paths)
         else:
             result = record_observation(arguments.run_id, arguments.agent)
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

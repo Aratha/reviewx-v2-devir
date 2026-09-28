@@ -719,6 +719,28 @@ def profile_python_version(project_root: Path) -> str | None:
     return None
 
 
+def profile_python_minimum(project_root: Path) -> str | None:
+    """The lowest `major.minor.micro` Python the technology profile admits, if it names one."""
+    profile = project_root / "technology-profile.yml"
+    try:
+        if profile.is_symlink() or not profile.is_file():
+            return None
+        text = profile.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    in_backend = False
+    for line in text.splitlines():
+        if line and not line[0].isspace():
+            in_backend = line.rstrip() == "backend:"
+            continue
+        match = re.fullmatch(
+            r"\s+minimum_language_version:\s*\"(\d+\.\d+\.\d+)\"\s*", line
+        )
+        if in_backend and match:
+            return match.group(1)
+    return None
+
+
 PYTHON_ENVIRONMENT_SCRIPT = ".kt-scaffold/hooks/python_environment.py"
 
 

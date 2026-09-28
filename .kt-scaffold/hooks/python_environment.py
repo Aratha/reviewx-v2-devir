@@ -8,8 +8,8 @@ the one recovery step. The factory package loads the same file through
 
 Usage from the project root, on the technology profile's Python:
 
-    python3.13 .kt-scaffold/hooks/python_environment.py hazirla
-    python3.13 .kt-scaffold/hooks/python_environment.py dogrula
+    python3.14 .kt-scaffold/hooks/python_environment.py hazirla
+    python3.14 .kt-scaffold/hooks/python_environment.py dogrula
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ print(json.dumps({"version": ".".join(map(str, sys.version_info[:3])),
                   "venv_launcher": str(launcher)}))
 """
 
-# On Python 3.13 -S deliberately leaves sys.prefix at the base interpreter.
+# On Python 3.14 -S deliberately leaves sys.prefix at the base interpreter.
 # Run the trusted stdlib's prefix discovery while disabling every site directory
 # and startup hook. Existing .pth, sitecustomize, and pip code must never execute.
 _ENVIRONMENT_PROBE = """import site, sys
@@ -112,6 +112,23 @@ def required_version(root: Path) -> str | None:
 
     version: str | None = _records()["profile_python_version"](root)
     return version
+
+
+def minimum_version(root: Path) -> str | None:
+    """The lowest `major.minor.micro` Python the project's technology profile admits."""
+
+    version: str | None = _records()["profile_python_minimum"](root)
+    return version
+
+
+def meets_minimum(version: str, minimum: str | None) -> bool:
+    """Whether a probed `major.minor.micro` is at or above the profile's security floor."""
+
+    if minimum is None:
+        return True
+    return tuple(int(part) for part in version.split(".")) >= tuple(
+        int(part) for part in minimum.split(".")
+    )
 
 
 def _run_python(
@@ -256,7 +273,8 @@ def _validate_paths(environment: Path, executable: Path, host: dict[str, Any]) -
             resolved = path.resolve(strict=True)
             ordinary_interpreter = (
                 path.parent == interpreter_directory
-                and re.fullmatch(r"python(?:\d+(?:\.\d+)?)?", path.name) is not None
+                # Python 3.14 venv also links the `𝜋thon` alias to the same interpreter.
+                and re.fullmatch(r"python(?:\d+(?:\.\d+)?)?|𝜋thon", path.name) is not None
                 and resolved == executable
             )
             ordinary_lib64 = path == environment / "lib64" and resolved == environment / "lib"
@@ -323,6 +341,13 @@ def _result(*, create: bool, root: Path) -> dict[str, object]:
             raise _EnvironmentError(
                 f"Kurulu Python sürümü {required}.x koşulunu sağlamıyor; "
                 f"proje kökünde çalıştırın: {repair_command(required)}"
+            )
+        minimum = minimum_version(root)
+        if not meets_minimum(version, minimum):
+            raise _EnvironmentError(
+                f"Kurulu Python {version}, projenin istediği en az Python {minimum} sürümünden "
+                f"eski; güvenlik düzeltmeleri için kurumsal uygulama kataloğundan Python "
+                f"{minimum} veya daha yenisini kurun."
             )
         environment = root / ".venv"
         if not environment.exists() and not _is_link(environment) and create:

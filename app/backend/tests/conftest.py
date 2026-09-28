@@ -59,7 +59,7 @@ def postgres_database_url() -> str:
 
 
 @pytest.fixture
-def telemetry_capture() -> Iterator["TelemetryCapture"]:
+def telemetry_capture() -> Iterator[TelemetryCapture]:
     """In-memory trace and metric providers for the duration of one test."""
 
     # Imported here: application modules load only after the safe defaults above.

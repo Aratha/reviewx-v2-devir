@@ -255,7 +255,9 @@ oturumun geçmişini ve başka uzmanların raporlarını görmez; Codex'te `spaw
 `fork_turns: "none"` taşır, varsayılan `all` geçmişi aktarır. Geçmiş aktarılan çağrının raporu
 yalıtılmış sayılmaz. Ana Agent uzmanın yanıtını değiştirmeden `work/<agent-slug>-evaluation.json`
 dosyasına yazar ve `governance_client.py observation --run-id <run_id> --agent <agent-slug>`
-komutunu çalıştırır. Komut değerlendirmeyi bağlama dosyasıyla bayt bayt birleştirir, gözlem
+komutunu çalıştırır. Uzman bulguya kontrol kimliği (`controls`) yazmaz; talimatında geçen kaynak
+kural kimlikleri bulgu alanı değildir. Komut değerlendirmeyi bağlama dosyasıyla bayt bayt
+birleştirir, Agent politikasındaki `standard_refs` üçlülerini her bulguya kendisi ekler, gözlem
 şemasıyla denetler ve raporu kanonik baytlarla bir kez yazar. Sözleşmeye uymayan yanıtı ana Agent
 onarmaz. Komut yanıtı uzmanın düzeltebileceği bir red koduyla reddederse, kimliği yanlış yanıt
 dahil, yanıt bu kod ve ihlal yeriyle yalnız o uzmana bir kez geri verilir; ikinci red veya başka

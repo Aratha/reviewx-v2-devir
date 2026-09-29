@@ -46,6 +46,11 @@ geçti) kanıtıdır. Yerel tarayıcı kanıtı (L2, gerçek istemcide gözlem) 
   `app/frontend/src/contexts/AuthContext.test.tsx`, `app/frontend/src/pages/LoginPage.test.tsx`,
   `app/frontend/src/components/layout/AppShell.test.tsx`,
   `app/frontend/src/pages/UserAdministrationPage.test.tsx`, `e2e/auth/01-super-admin-login.mjs`.
+  Giriş ekranı iki bölümlüdür: solda form ve giriş notları (kurum soneki, ilk girişte `inceleyici`
+  rolü, yerel yönetici hesabı), geniş ekranda sağda kabul edilmiş PRD'lerdeki yetenekleri anlatan
+  tanıtım paneli; davranış ve iletiler Requirement 13 ile aynıdır. Kanıt:
+  `app/frontend/src/pages/LoginPage.test.tsx` (`pairs the sign-in form with a panel naming what the
+  product does`).
 - [x] Task 11 — Requirement 3, 5–8, 11, 13 / Acceptance 2: yerel Compose'da tarayıcıyla L2
   doğrulaması. 2026-09-26'da `scripts/create-local-user.sh` ile açılan yerel hesaplarla (dizin
   kapalı) Chromium'da gözlendi: `e2e/auth/01-super-admin-login.mjs` (belirteç tarayıcı deposunda

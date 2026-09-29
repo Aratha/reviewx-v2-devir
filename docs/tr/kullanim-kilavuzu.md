@@ -18,7 +18,9 @@ Bu kılavuz uygulamayı kullanan herkes içindir. Kullanıcı yetkileri ve kural
 
 ## Giriş
 
-Giriş ekranı "Kurum kullanıcı adınız ve parolanızla giriş yapın." der.
+Giriş ekranı "Kurum kullanıcı adınız ve parolanızla giriş yapın." der. Ekran iki bölümdür: solda giriş
+formu, geniş ekranda sağda uygulamanın neler yaptığını anlatan kısa bir tanıtım. Telefonda yalnız form
+görünür.
 
 - **Test ortamında** kurum hesabınızla girersiniz: kullanıcı adı `ad.soyad` biçimindedir, parola kurum
   parolanızdır. Parolanız uygulamada saklanmaz; yalnız o anki doğrulama için kurum dizinine

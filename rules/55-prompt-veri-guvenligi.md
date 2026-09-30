@@ -27,7 +27,9 @@ gecmesine izin verebilir; bu nedenle evrensel native fail-closed iddiasi kurulma
 
 Bu Faz 1 kapisi yalniz kullanicinin yazdigi prompt metnini kapsar. Dosya ve ek icerikleri, terminal,
 arama, arac ve MCP ciktilari, otomatik toplanan calisma alani baglami ile model gecidi Faz 2
-kapsamindadir. Faz 1 sonucunu tam GR-F01, merkezi DLP, uretim uygunlugu veya hukuki uygunluk kaniti
+kapsamindadir. Claude Code VS Code eklentisinin promptun basina ekledigi acik dosya veya secim
+basligindaki dosya yolunda kullanici klasorunun adi e-posta biciminde olsa bile e-posta bulgusu
+sayilmaz; secilen satirlar ve kullanicinin yazdigi metin taranmaya devam eder. Faz 1 sonucunu tam GR-F01, merkezi DLP, uretim uygunlugu veya hukuki uygunluk kaniti
 olarak sunma.
 
 Kanca makbuzu, surumlu detektorlerde eslesme bulunmayan `clean` promptu exact kaydeder. Dogrulanmis

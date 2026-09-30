@@ -166,7 +166,7 @@
       "artifact_id": "rule:55-prompt-veri-guvenligi",
       "authority": "mandatory",
       "kind": "rule",
-      "sha256": "d81018c7971c6a446b46f0b8414e2aad4d6994509d9ab44e9af2875a9cc85f26",
+      "sha256": "202686f3d1ccaeb83e9d2e8b60dd52cf895d45847d23097f0b0bf39540b0e254",
       "version": "0.4.0"
     },
     {
@@ -364,7 +364,7 @@
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "3822d63076d692fd1ff0db19cb453688b84da95454e48ed3728bc4452a9220c0",
+  "governance_digest": "785cb7cb05b4c13b179f22e62a48bb81f491060f01fd200fdf5af0013189184d",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

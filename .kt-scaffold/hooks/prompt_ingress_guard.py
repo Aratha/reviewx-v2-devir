@@ -81,6 +81,19 @@ PRIVATE_KEY_END_MARKER_RE = re.compile(
     r"-----END (?:[A-Z0-9]{1,24}(?: [A-Z0-9]{1,24}){0,3} )?PRIVATE KEY-----"
 )
 PRIVATE_KEY_BODY_LINE_RE = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+# Claude Code's VS Code extension prepends one of these exact headers to the prompt. Only the home
+# directory's account segment of the header path leaves the email detector; the selected lines and
+# the text the user typed are scanned as before.
+CLAUDE_IDE_CONTEXT_HEADER_RES = (
+    re.compile(
+        r"<ide_opened_file>The user opened the file (?P<path>[^\n<>]+) in the IDE\. "
+        r"This may or may not be related to the current task\.</ide_opened_file>(?:\n|\Z)"
+    ),
+    re.compile(r"<ide_selection>The user selected the lines \d+ to \d+ from (?P<path>[^\n<>]+):\n"),
+)
+HOME_ACCOUNT_SEGMENT_RE = re.compile(
+    r"(?:/Users/|/home/|[A-Za-z]:\\Users\\)(?P<account>[^/\\\n]+)(?=[/\\])"
+)
 MAX_PRIVATE_KEY_BODY_LINES = 256
 MAX_PRIVATE_KEY_BODY_LINE_CHARS = 128
 MAX_PRIVATE_KEY_BLOCK_CHARS = 32_768
@@ -646,9 +659,23 @@ def _private_key_pem_spans(prompt: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _ide_context_account_span(prompt: str, client_id: str) -> tuple[int, int] | None:
+    """Locate the account segment of the IDE header path that Claude Code puts at the start."""
+    if client_id != "claude-code":
+        return None
+    for header_re in CLAUDE_IDE_CONTEXT_HEADER_RES:
+        header = header_re.match(prompt)
+        if header is None:
+            continue
+        account = HOME_ACCOUNT_SEGMENT_RE.match(prompt, header.start("path"), header.end("path"))
+        return None if account is None else account.span("account")
+    return None
+
+
 def _scan(
     prompt: str,
     policy: dict[str, Any],
+    ide_account_span: tuple[int, int] | None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     counts: list[dict[str, object]] = []
     spans: list[dict[str, object]] = []
@@ -662,6 +689,13 @@ def _scan(
                 (match.start(), match.end())
                 for match in pattern.finditer(prompt)
                 if _validated_match(implementation["validator"], match.group(0))
+            ]
+        if detector["class"] == "email" and ide_account_span is not None:
+            account_start, account_end = ide_account_span
+            validated_spans = [
+                (start, end)
+                for start, end in validated_spans
+                if not (account_start <= start and end <= account_end)
             ]
         count = len(validated_spans)
         if count:
@@ -1170,7 +1204,7 @@ def _run(client_id: str) -> tuple[dict[str, object], dict[str, object] | None]:
             detector_counts=[],
         )
     try:
-        counts, spans = _scan(prompt, policy)
+        counts, spans = _scan(prompt, policy, _ide_context_account_span(prompt, client_id))
         prompt_capture = _prompt_capture(prompt, spans, policy)
     except GuardError:
         return _finish(

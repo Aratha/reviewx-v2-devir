@@ -115,7 +115,9 @@
               "validator": {
                 "enum": [
                   null,
+                  "secret-value-shape",
                   "private-key-pem-block",
+                  "email-address-shape",
                   "tckn-checksum",
                   "iban-mod97",
                   "luhn-checksum"
@@ -154,9 +156,17 @@
             }
           },
           {
+            "if": {"properties": {"class": {"const": "labelled-secret"}}, "required": ["class"]},
+            "then": {"properties": {"implementation": {"properties": {"validator": {"const": "secret-value-shape"}}}}}
+          },
+          {
+            "if": {"properties": {"class": {"const": "email"}}, "required": ["class"]},
+            "then": {"properties": {"implementation": {"properties": {"validator": {"const": "email-address-shape"}}}}}
+          },
+          {
             "if": {
               "properties": {
-                "class": {"enum": ["labelled-secret", "cloud-access-key", "email"]}
+                "class": {"enum": ["cloud-access-key", "phone-number"]}
               },
               "required": ["class"]
             },

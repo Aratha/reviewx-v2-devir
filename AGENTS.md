@@ -1246,9 +1246,11 @@ eksikse eski listeden örtük genel izin üretme.
 
 Kullanici tarafindan girilen ham prompt metnini modele gondermeden once surumlu
 `agent-platform/policies/prompt-ingress/prompt-ingress-policy.json` politikasina gore
-belirlenimci olarak tara. Sir veya kisisel veri adayi bulunursa promptu gonderme; ham degeri
-tekrarlamayan genel bir uyari goster. Bu kural tek basina uygulatim kaniti degildir; gercek engelleme
-secilen istemcinin proje-yerel `UserPromptSubmit` veya `beforeSubmitPrompt` kancasi tarafindan yapilir.
+belirlenimci olarak tara. Sir veya kisisel veri adayi bulunursa promptu gonderme; eslesen bilginin
+turunu, adedini ve satir numarasini bildiren, ham degeri tekrarlamayan bir uyari goster. Cok uzun veya
+bicimi gecersiz prompt kendi uyarisiyla durdurulur. Bu kural tek basina uygulatim kaniti degildir;
+gercek engelleme secilen istemcinin proje-yerel `UserPromptSubmit` veya `beforeSubmitPrompt` kancasi
+tarafindan yapilir.
 
 Kanca gercekten calistiginda gecersiz girdi ile policy, durum veya yazim hatasi promptu engeller.
 Yalniz Cursor `beforeSubmitPrompt` projeksiyonu `failClosed: true` tasir. Claude Code kancasi
@@ -1260,18 +1262,27 @@ gecmesine izin verebilir; bu nedenle evrensel native fail-closed iddiasi kurulma
 
 Bu Faz 1 kapisi yalniz kullanicinin yazdigi prompt metnini kapsar. Dosya ve ek icerikleri, terminal,
 arama, arac ve MCP ciktilari, otomatik toplanan calisma alani baglami ile model gecidi Faz 2
-kapsamindadir. Claude Code VS Code eklentisinin promptun basina ekledigi acik dosya veya secim
-basligindaki dosya yolunda kullanici klasorunun adi e-posta biciminde olsa bile e-posta bulgusu
-sayilmaz; secilen satirlar ve kullanicinin yazdigi metin taranmaya devam eder. Faz 1 sonucunu tam GR-F01, merkezi DLP, uretim uygunlugu veya hukuki uygunluk kaniti
-olarak sunma.
+kapsamindadir. Kancayi calistiran kullanicinin kendi kullanici klasorunun adi e-posta bicimindeyse,
+bu ad promptta bir dosya yolunun kullanici klasoru parcasi olarak (`/Users/<ad>`, `/home/<ad>`,
+`<surucu>:\Users\<ad>`) gectigi yerde, hangi istemcide ve promptun neresinde olursa olsun e-posta
+bulgusu sayilmaz. Ayni adin bu yol konumu disindaki kullanimi, baska bir kullanicinin klasor adi,
+prompttaki diger e-postalar ve diger tum bulgu siniflari taranmaya devam eder; kullanici klasoru
+belirlenemezse hicbir e-posta eslesmesi muaf tutulmaz. Faz 1 sonucunu tam GR-F01, merkezi DLP,
+uretim uygunlugu veya hukuki uygunluk kaniti olarak sunma.
 
 Kanca makbuzu, surumlu detektorlerde eslesme bulunmayan `clean` promptu exact kaydeder. Dogrulanmis
 hassas eslesme varsa ham promptu, eslesen degeri veya bunlarin ham ozetini kaydetmeden once kanonik
 span redaksiyonu uygular; yalniz arindirilmis metni ve arindirilmis metnin ozetini kaydeder. Gecersiz
 girdi veya kanca hatasinda metin ve ozet `null` olur. Reasoning, assistant/model yaniti, dosya/ek,
 transcript, terminal, arac ve MCP ciktilari makbuza alinmaz.
-TCKN, IBAN MOD-97 ve Luhn dogrulamasi sadece yanlis pozitifleri azaltir; kimlik, hesap sahipligi
-veya mevzuat uyumu iddiasi uretmez.
+TCKN, IBAN MOD-97 ve kart numarasinda Luhn ile kart agi on eki dogrulamasi sadece yanlis pozitifleri
+azaltir; kimlik, hesap sahipligi veya mevzuat uyumu iddiasi uretmez. Ayni amacla su bicimler bulgu
+sayilmaz: etiketten sonra gelen yer tutucu (`<...>`, `${...}`, `changeme`), sirrin okundugu yeri
+gosteren kod ifadesi (ortam degiskeni, ayar alani, fonksiyon cagrisi, parametre adi) ve cesitliligi
+cok dusuk deger; adres satirindaki kullanici adi (`https://kullanici@sunucu`, `git@sunucu`), `%@`
+joker ifadesi ve belge ile test icin ayrilmis alan adlarindaki (`example.com`, `.test`, `.example`,
+`.invalid`, `.localhost`, `users.noreply.github.com`) adresler; yaninda anahtar govdesi bulunmayan,
+yalniz adi gecen ozel anahtar basligi. Govdesi bulunan ozel anahtar eksik veya bozuk olsa da bulgudur.
 
 Kayıt yetkisi Agent Platform ortak yönetişim kayıtları sözleşmesidir. Prompt makbuzu ve çağrı
 olayları repo ve kullanıcı dizini dışında, işletim sisteminin bütün kullanıcılarına açık ortak kökte

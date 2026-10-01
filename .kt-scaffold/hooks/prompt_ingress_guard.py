@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 import contextlib
 import getpass
 import hashlib
 import json
+import math
 import re
 import runpy
 import secrets
@@ -54,10 +56,28 @@ MAX_IDENTITY_FIELD_LENGTHS = {
     "email": 320,
     "account_id": 200,
 }
-SAFE_BLOCK_MESSAGE = (
-    "Mesajiniz (prompt) gonderilmedi: icinde paylasilmamasi gereken bir bilgi (ornegin parola, "
-    "erisim anahtari, e-posta, T.C. kimlik, IBAN, kart veya telefon numarasi) ya da islenemeyen "
-    "bir girdi var. Bu bilgiyi cikarip mesaji yeniden gonderin."
+BLOCK_MESSAGE = (
+    "Mesajiniz (prompt) gonderilmedi: icinde paylasilmamasi gereken bilgi bicimine uyan ifade "
+    "var: {findings}. Bu ifadeyi cikarip mesaji yeniden gonderin. Ornek ya da test verisiyse "
+    "yerine gercek olmadigi acikca anlasilan bir deger yazin."
+)
+# One finding reads "<label> (<count> adet, satir <line numbers>)"; the matched value never appears.
+BLOCK_FINDING = "{label} ({count} adet, satir {lines})"
+BLOCK_CLASS_LABELS = {
+    "labelled-secret": "parola veya erisim anahtari",
+    "cloud-access-key": "bulut erisim anahtari",
+    "private-key": "ozel anahtar",
+    "email": "e-posta adresi",
+    "tckn": "T.C. kimlik numarasi",
+    "iban": "IBAN",
+    "payment-card": "kart numarasi",
+    "phone-number": "telefon numarasi",
+}
+MAX_REPORTED_LINES = 5
+INPUT_INVALID_MESSAGE = (
+    "Mesajiniz (prompt) gonderilmedi, cunku okunamadi: mesaj cok uzun (en fazla {limit_kb} KB, "
+    "yani kabaca {limit_kb} bin harf) ya da bicimi gecersiz. Mesaji kisaltip yeniden gonderin; "
+    "uzun bir ciktiyi mesaja yapistirmak yerine dosyaya kaydedip dosyanin yolunu yazin."
 )
 SAFE_ERROR_MESSAGE = (
     "Mesajiniz (prompt) gonderilmedi, cunku gonderimden once yapilan veri guvenligi denetimi "
@@ -80,23 +100,64 @@ PRIVATE_KEY_BEGIN_MARKER_RE = re.compile(EXPECTED_PRIVATE_KEY_BEGIN_PATTERN)
 PRIVATE_KEY_END_MARKER_RE = re.compile(
     r"-----END (?:[A-Z0-9]{1,24}(?: [A-Z0-9]{1,24}){0,3} )?PRIVATE KEY-----"
 )
-PRIVATE_KEY_BODY_LINE_RE = re.compile(r"[A-Za-z0-9+/]+={0,2}")
-# Claude Code's VS Code extension prepends one of these exact headers to the prompt. Only the home
-# directory's account segment of the header path leaves the email detector; the selected lines and
-# the text the user typed are scanned as before.
-CLAUDE_IDE_CONTEXT_HEADER_RES = (
-    re.compile(
-        r"<ide_opened_file>The user opened the file (?P<path>[^\n<>]+) in the IDE\. "
-        r"This may or may not be related to the current task\.</ide_opened_file>(?:\n|\Z)"
-    ),
-    re.compile(r"<ide_selection>The user selected the lines \d+ to \d+ from (?P<path>[^\n<>]+):\n"),
+# A marker is a private key only next to key material: a base64 run this long. A marker that is
+# merely quoted or discussed has no such run and stays out of the finding.
+PRIVATE_KEY_MATERIAL_RE = re.compile(r"[A-Za-z0-9+/]{40,}")
+PRIVATE_KEY_LEADING_MATERIAL_RE = re.compile(r"\s*[A-Za-z0-9+/]{40,}")
+PRIVATE_KEY_TRAILING_MATERIAL_RE = re.compile(
+    r"[A-Za-z0-9+/]{40,}(?:\s+[A-Za-z0-9+/]+)*={0,2}\s*\Z"
 )
-HOME_ACCOUNT_SEGMENT_RE = re.compile(
-    r"(?:/Users/|/home/|[A-Za-z]:\\Users\\)(?P<account>[^/\\\n]+)(?=[/\\])"
+PRIVATE_KEY_TRAILING_WINDOW_CHARS = 256
+# An email match leaves the email detector only when it is the whole account segment of a home
+# directory path and equals the name of the running user's own home directory. The same text
+# anywhere else, another account's name and every other detector class stay findings.
+HOME_PATH_ROOT_RE = re.compile(r"(?:/Users/|/home/|[A-Za-z]:\\{1,2}Users\\{1,2})\Z")
+HOME_PATH_ROOT_MAX_CHARS = 12
+HOME_ACCOUNT_SEGMENT_END = frozenset("/\\\"'`)]}>,;:")
+# A labelled value is a secret candidate unless it is a placeholder, a reference to where the
+# secret lives, or text with too little variety to be one.
+SECRET_SEPARATOR_RE = re.compile(r"[^:=]*[:=]\s*")
+SECRET_PLACEHOLDER_RE = re.compile(
+    r"<[^<>]*>|\$\{\{?[^{}]*\}\}?|\$\([^()]*\)|\{\{[^{}]*\}\}|%[A-Za-z_]\w*%"
+    r"|[*xX.#_-]+|change[-_]?me|your[-_ ][a-z_ -]*|redacted|placeholder",
+    re.IGNORECASE,
 )
-MAX_PRIVATE_KEY_BODY_LINES = 256
-MAX_PRIVATE_KEY_BODY_LINE_CHARS = 128
-MAX_PRIVATE_KEY_BLOCK_CHARS = 32_768
+# A name is a word, a constant or a camel-case identifier without digits; a random letter mix is
+# not a name and stays a secret candidate.
+SECRET_NAME_RE = re.compile(r"[^\W\d]\w*")
+SECRET_CAMEL_CASE_RE = re.compile(
+    r"[A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc]?[a-z\u00e7\u011f\u0131\u00f6\u015f\u00fc]+"
+    r"(?:[A-Z\u00c7\u011e\u0130\u00d6\u015e\u00dc][a-z\u00e7\u011f\u0131\u00f6\u015f\u00fc]{2,})*"
+)
+SECRET_CALL_OR_INDEX_RE = re.compile(r"(?P<head>[^\W\d][\w.]*)[(\[][\w.,'\"()\[\]=:*/-]*")
+SECRET_REFERENCE_ROOTS = frozenset(
+    {
+        "os", "process", "env", "settings", "config", "cfg", "conf", "self", "this", "args",
+        "kwargs", "options", "opts", "params", "props", "state", "secrets", "vars", "values",
+        "request", "req", "response", "res", "ctx", "context",
+    }
+)  # fmt: skip
+SECRET_TRAILING_PUNCTUATION = ";,.:"
+MIN_SECRET_VALUE_ENTROPY_BITS = 2.0
+# An address-shaped match is not a person's address when it is the user part of a URL, a
+# transport account, a wildcard, or sits on a domain reserved for documentation and tests.
+EMAIL_NON_ADDRESS_LOCAL_PARTS = frozenset({"git", "%"})
+EMAIL_RESERVED_DOMAINS = ("example.com", "example.net", "example.org", "users.noreply.github.com")
+EMAIL_RESERVED_TOP_LEVEL_DOMAINS = frozenset({"example", "invalid", "localhost", "test"})
+URL_PASSWORD_PREFIX_RE = re.compile(r"://[^\s/:@]+:\Z")
+URL_PASSWORD_PREFIX_MAX_CHARS = 128
+# Issuer prefix and length of the card networks; a digit run outside them is not a card number.
+PAYMENT_CARD_ISSUER_RE = re.compile(
+    r"4(?:\d{12}|\d{15}|\d{18})"
+    r"|(?:5[1-5]\d{2}|222[1-9]|22[3-9]\d|2[3-6]\d{2}|27[01]\d|2720)\d{12}"
+    r"|3[47]\d{13}"
+    r"|(?:6011|65\d{2}|64[4-9]\d)\d{12,15}"
+    r"|62\d{14,17}"
+    r"|35(?:2[89]|[3-8]\d)\d{12,15}"
+    r"|(?:30[0-5]\d|36\d{2}|3[89]\d{2})\d{10,15}"
+    r"|9792\d{12}"
+    r"|(?:5018|5020|5038|5893|6304|6759|676[1-3])\d{9,15}"
+)
 DETECTOR_CLASSES = frozenset(
     {
         "labelled-secret",
@@ -490,7 +551,9 @@ def _validate_policy(policy: dict[str, Any]) -> None:
             or implementation.get("validator")
             not in {
                 None,
+                "secret-value-shape",
                 "private-key-pem-block",
+                "email-address-shape",
                 "tckn-checksum",
                 "iban-mod97",
                 "luhn-checksum",
@@ -498,7 +561,9 @@ def _validate_policy(policy: dict[str, Any]) -> None:
         ):
             raise GuardError("policy-invalid")
         expected_validator = {
+            "labelled-secret": "secret-value-shape",
             "private-key": "private-key-pem-block",
+            "email": "email-address-shape",
             "tckn": "tckn-checksum",
             "iban": "iban-mod97",
             "payment-card": "luhn-checksum",
@@ -554,6 +619,8 @@ def _valid_luhn(candidate: str) -> bool:
     digits = [int(value) for value in candidate if value.isdigit()]
     if not 13 <= len(digits) <= 19 or len(set(digits)) == 1:
         return False
+    if PAYMENT_CARD_ISSUER_RE.fullmatch("".join(str(value) for value in digits)) is None:
+        return False
     total = 0
     parity = len(digits) % 2
     for index, value in enumerate(digits):
@@ -584,7 +651,72 @@ def _valid_iban(candidate: str) -> bool:
     return remainder == 1
 
 
-def _validated_match(validator: str | None, candidate: str) -> bool:
+def _entropy_bits(value: str) -> float:
+    counts: dict[str, int] = {}
+    for character in value:
+        counts[character] = counts.get(character, 0) + 1
+    total = len(value)
+    return -sum(count / total * math.log2(count / total) for count in counts.values())
+
+
+def _name_like(value: str) -> bool:
+    if SECRET_NAME_RE.fullmatch(value) is None or any(character.isdigit() for character in value):
+        return False
+    return value.islower() or value.isupper() or SECRET_CAMEL_CASE_RE.fullmatch(value) is not None
+
+
+def _reference_like(value: str) -> bool:
+    """True for a name or a dotted chain of names that points at where a value is kept."""
+    segments = value.split(".")
+    if len(segments) > 1 and segments[0].lower() in SECRET_REFERENCE_ROOTS:
+        return all(SECRET_NAME_RE.fullmatch(segment) is not None for segment in segments[1:])
+    return all(_name_like(segment) for segment in segments)
+
+
+def _secret_value_shape(candidate: str) -> bool:
+    """True when the value after the label can be a secret, not a placeholder or a reference."""
+    separator = SECRET_SEPARATOR_RE.match(candidate)
+    if separator is None:
+        return True
+    value = candidate[separator.end() :]
+    quoted = len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]
+    value = value[1:-1] if quoted else value.rstrip(SECRET_TRAILING_PUNCTUATION)
+    if not value or SECRET_PLACEHOLDER_RE.fullmatch(value) is not None:
+        return False
+    if value.startswith("$") and _reference_like(value[1:]):
+        return False
+    if not quoted:
+        if _reference_like(value.lstrip("@")):
+            return False
+        call = SECRET_CALL_OR_INDEX_RE.fullmatch(value)
+        if call is not None and _reference_like(call.group("head")):
+            return False
+    return _entropy_bits(value) >= MIN_SECRET_VALUE_ENTROPY_BITS
+
+
+def _email_address_shape(prompt: str, start: int, candidate: str) -> bool:
+    """True when the address-shaped match can be a person's address."""
+    local_part, _, domain = candidate.rpartition("@")
+    preceding = prompt[max(0, start - URL_PASSWORD_PREFIX_MAX_CHARS) : start]
+    if URL_PASSWORD_PREFIX_RE.search(preceding) is not None:
+        # The password of a URL credential; it stays a finding on any domain.
+        return True
+    if preceding.endswith("://") or local_part in EMAIL_NON_ADDRESS_LOCAL_PARTS:
+        return False
+    domain = domain.lower().rstrip(".")
+    if domain.rpartition(".")[2] in EMAIL_RESERVED_TOP_LEVEL_DOMAINS:
+        return False
+    return not any(
+        domain == reserved or domain.endswith("." + reserved) for reserved in EMAIL_RESERVED_DOMAINS
+    )
+
+
+def _validated_match(validator: str | None, prompt: str, match: re.Match[str]) -> bool:
+    candidate = match.group(0)
+    if validator == "secret-value-shape":
+        return _secret_value_shape(candidate)
+    if validator == "email-address-shape":
+        return _email_address_shape(prompt, match.start(), candidate)
     if validator == "tckn-checksum":
         return _valid_tckn(candidate)
     if validator == "iban-mod97":
@@ -597,85 +729,58 @@ def _validated_match(validator: str | None, candidate: str) -> bool:
 
 
 def _private_key_pem_spans(prompt: str) -> list[tuple[int, int]]:
-    begin_markers = list(PRIVATE_KEY_BEGIN_MARKER_RE.finditer(prompt))
-    end_markers = list(PRIVATE_KEY_END_MARKER_RE.finditer(prompt))
-    if not begin_markers:
-        if end_markers:
-            raise GuardError("private-key-pem-malformed")
-        return []
-
+    """Spans of private key blocks: complete, cut short or malformed, but with key material."""
     spans: list[tuple[int, int]] = []
-    previous_end = -1
-    for index, begin in enumerate(begin_markers):
-        if begin.start() < previous_end:
-            raise GuardError("private-key-pem-malformed")
-
-        marker = begin.group(0)
-        label = marker.removeprefix("-----BEGIN ").removesuffix("-----")
-        if prompt.startswith("\r\n", begin.end()):
-            body_start = begin.end() + 2
-        elif prompt.startswith("\n", begin.end()):
-            body_start = begin.end() + 1
-        else:
-            raise GuardError("private-key-pem-malformed")
-
-        end_marker = f"-----END {label}-----"
-        end_start = prompt.find(end_marker, body_start)
-        if end_start < 0:
-            raise GuardError("private-key-pem-unclosed")
-        if index + 1 < len(begin_markers) and begin_markers[index + 1].start() < end_start:
-            raise GuardError("private-key-pem-malformed")
-
-        block_end = end_start + len(end_marker)
-        if block_end - begin.start() > MAX_PRIVATE_KEY_BLOCK_CHARS:
-            raise GuardError("private-key-pem-bounds-exceeded")
-
-        body_with_final_newline = prompt[body_start:end_start]
-        if body_with_final_newline.endswith("\r\n"):
-            body = body_with_final_newline[:-2]
-        elif body_with_final_newline.endswith("\n"):
-            body = body_with_final_newline[:-1]
-        else:
-            raise GuardError("private-key-pem-malformed")
-        lines = body.splitlines()
-        if not 1 <= len(lines) <= MAX_PRIVATE_KEY_BODY_LINES:
-            raise GuardError("private-key-pem-bounds-exceeded")
-        if any(
-            not 1 <= len(line) <= MAX_PRIVATE_KEY_BODY_LINE_CHARS
-            or PRIVATE_KEY_BODY_LINE_RE.fullmatch(line) is None
-            or (index < len(lines) - 1 and "=" in line)
-            for index, line in enumerate(lines)
-        ):
-            raise GuardError("private-key-pem-malformed")
-
-        spans.append((begin.start(), block_end))
-        previous_end = block_end
-
-    if any(
-        not any(start <= marker.start() and marker.end() <= end for start, end in spans)
-        for marker in end_markers
-    ):
-        raise GuardError("private-key-pem-malformed")
-    return spans
-
-
-def _ide_context_account_span(prompt: str, client_id: str) -> tuple[int, int] | None:
-    """Locate the account segment of the IDE header path that Claude Code puts at the start."""
-    if client_id != "claude-code":
-        return None
-    for header_re in CLAUDE_IDE_CONTEXT_HEADER_RES:
-        header = header_re.match(prompt)
-        if header is None:
+    covered_until = 0
+    for begin in PRIVATE_KEY_BEGIN_MARKER_RE.finditer(prompt):
+        if begin.start() < covered_until:
             continue
-        account = HOME_ACCOUNT_SEGMENT_RE.match(prompt, header.start("path"), header.end("path"))
-        return None if account is None else account.span("account")
-    return None
+        label = begin.group(0)[len("-----BEGIN ") : -len("-----")]
+        end_marker = f"-----END {label}-----"
+        end_start = prompt.find(end_marker, begin.end())
+        if end_start >= 0:
+            if PRIVATE_KEY_MATERIAL_RE.search(prompt, begin.end(), end_start) is None:
+                continue
+            block_end = end_start + len(end_marker)
+        else:
+            if PRIVATE_KEY_LEADING_MATERIAL_RE.match(prompt, begin.end()) is None:
+                continue
+            block_end = len(prompt)
+        spans.append((begin.start(), block_end))
+        covered_until = block_end
+    for end in PRIVATE_KEY_END_MARKER_RE.finditer(prompt):
+        if any(start <= end.start() and end.end() <= stop for start, stop in spans):
+            continue
+        window_start = max(0, end.start() - PRIVATE_KEY_TRAILING_WINDOW_CHARS)
+        material = PRIVATE_KEY_TRAILING_MATERIAL_RE.search(prompt[window_start : end.start()])
+        if material is not None:
+            spans.append((window_start + material.start(), end.end()))
+    return sorted(spans)
+
+
+def _home_account_name() -> str | None:
+    """Name of the running user's home directory; ``None`` keeps every email match a finding."""
+    try:
+        name = Path.home().name
+    except (RuntimeError, KeyError, OSError):
+        return None
+    return name or None
+
+
+def _is_home_account_segment(prompt: str, start: int, end: int, home_account: str) -> bool:
+    """True when ``prompt[start:end]`` is the user's own account segment of a home path."""
+    if prompt[start:end] != home_account:
+        return False
+    if end < len(prompt) and not (prompt[end] in HOME_ACCOUNT_SEGMENT_END or prompt[end].isspace()):
+        return False
+    root = prompt[max(0, start - HOME_PATH_ROOT_MAX_CHARS) : start]
+    return HOME_PATH_ROOT_RE.search(root) is not None
 
 
 def _scan(
     prompt: str,
     policy: dict[str, Any],
-    ide_account_span: tuple[int, int] | None,
+    home_account: str | None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     counts: list[dict[str, object]] = []
     spans: list[dict[str, object]] = []
@@ -688,14 +793,13 @@ def _scan(
             validated_spans = [
                 (match.start(), match.end())
                 for match in pattern.finditer(prompt)
-                if _validated_match(implementation["validator"], match.group(0))
+                if _validated_match(implementation["validator"], prompt, match)
             ]
-        if detector["class"] == "email" and ide_account_span is not None:
-            account_start, account_end = ide_account_span
+        if detector["class"] == "email" and home_account is not None:
             validated_spans = [
                 (start, end)
                 for start, end in validated_spans
-                if not (account_start <= start and end <= account_end)
+                if not _is_home_account_segment(prompt, start, end, home_account)
             ]
         count = len(validated_spans)
         if count:
@@ -817,9 +921,23 @@ def _event_name(client_id: str) -> str:
     return "beforeSubmitPrompt" if client_id == "cursor" else "UserPromptSubmit"
 
 
-def _decision_output(
-    client_id: str, blocked: bool, *, message: str = SAFE_BLOCK_MESSAGE
-) -> dict[str, object]:
+def _block_message(prompt: str, spans: list[dict[str, object]]) -> str:
+    """Name each matched data class with its count and line numbers; never the matched value."""
+    line_starts = [index + 1 for index, character in enumerate(prompt) if character == "\n"]
+    findings: list[str] = []
+    for detector_class, label in BLOCK_CLASS_LABELS.items():
+        starts = [int(span["start"]) for span in spans if span["class"] == detector_class]
+        if not starts:
+            continue
+        lines = sorted({bisect.bisect_right(line_starts, start) + 1 for start in starts})
+        shown = ", ".join(str(line) for line in lines[:MAX_REPORTED_LINES])
+        if len(lines) > MAX_REPORTED_LINES:
+            shown += " ve sonrasi"
+        findings.append(BLOCK_FINDING.format(label=label, count=len(starts), lines=shown))
+    return BLOCK_MESSAGE.format(findings="; ".join(findings))
+
+
+def _decision_output(client_id: str, blocked: bool, *, message: str = "") -> dict[str, object]:
     if client_id == "cursor":
         result: dict[str, object] = {"continue": not blocked}
         if blocked:
@@ -1130,7 +1248,7 @@ def _finish(
     outcome: str,
     prompt_capture: dict[str, object],
     detector_counts: list[dict[str, object]],
-    message: str = SAFE_BLOCK_MESSAGE,
+    message: str = "",
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     blocked = outcome != "clean"
     receipt: dict[str, object] | None = None
@@ -1202,9 +1320,12 @@ def _run(client_id: str) -> tuple[dict[str, object], dict[str, object] | None]:
             outcome="input-invalid",
             prompt_capture=unavailable,
             detector_counts=[],
+            message=INPUT_INVALID_MESSAGE.format(
+                limit_kb=max(1, policy["limits"]["max_prompt_bytes"] // 1024)
+            ),
         )
     try:
-        counts, spans = _scan(prompt, policy, _ide_context_account_span(prompt, client_id))
+        counts, spans = _scan(prompt, policy, _home_account_name())
         prompt_capture = _prompt_capture(prompt, spans, policy)
     except GuardError:
         return _finish(
@@ -1227,6 +1348,7 @@ def _run(client_id: str) -> tuple[dict[str, object], dict[str, object] | None]:
         outcome="matched" if counts else "clean",
         prompt_capture=prompt_capture,
         detector_counts=counts,
+        message=_block_message(prompt, spans) if counts else "",
     )
 
 

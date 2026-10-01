@@ -2,10 +2,12 @@
 
 Every driver call runs in a thread pool of ``DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY`` workers, never
 on the event loop (Requirement 6). Login and query timeouts come from the settings. The
-allow-list is applied before any connection opens (Requirement 7). Driver errors become the
-fixed classes of Requirement 8; the only log is one ``sql_server.call`` event per operation
-without server, user, password, SQL text or driver message, and the only telemetry is one span and
-the Gözlemlenebilirlik metrics per operation, without the database name either.
+connection and its allow-list are read together on every call, so a saved change is used without
+a restart (Requirement 11), and the allow-list is applied before any connection opens
+(Requirement 7). Driver errors become the fixed classes of Requirement 8; the only log is one
+``sql_server.call`` event per operation without server, user, password, SQL text or driver
+message, and the only telemetry is one span and the Gözlemlenebilirlik metrics per operation,
+without the database name either.
 """
 
 import asyncio
@@ -25,6 +27,7 @@ from app.core.telemetry import sql_server_call
 from app.domain.sql_server import (
     CatalogObject,
     DatabaseNotAllowed,
+    EffectiveSqlConnection,
     SqlCatalogPort,
     SqlConnectionProbe,
     SqlServerConnectionConfig,
@@ -86,16 +89,13 @@ class PyodbcSqlCatalog:
     def __init__(
         self,
         *,
-        config: Callable[[], SqlServerConnectionConfig],
-        allowed_databases: frozenset[str],
+        connection: Callable[[], EffectiveSqlConnection],
         login_timeout_seconds: int,
         query_timeout_seconds: int,
         max_concurrency: int,
         connect: ConnectFactory = pyodbc.connect,
     ) -> None:
-        self._config = config
-        # Case-insensitive; empty means every online database (possible only locally).
-        self._allowed = frozenset(name.casefold() for name in allowed_databases)
+        self._connection = connection
         self._login_timeout = login_timeout_seconds
         self._query_timeout = query_timeout_seconds
         self._connect_factory = connect
@@ -107,63 +107,62 @@ class PyodbcSqlCatalog:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
     def is_allowed(self, database: str) -> bool:
-        return not self._allowed or database.casefold() in self._allowed
+        return self._connection().allows(database)
 
     async def list_databases(self) -> list[str]:
-        config = self._configured()
+        connection = self._configured()
         return await self._run(
-            "list_databases", "master", lambda: self._online_databases(config, self._login_timeout)
+            "list_databases",
+            "master",
+            lambda: self._online_databases(connection, self._login_timeout),
         )
 
     async def list_objects(
         self, database: str, *, query: str | None = None, from_date: date | None = None
     ) -> list[CatalogObject]:
-        config = self._configured()
-        self._require_allowed(database)
+        connection = self._configured(database)
         return await self._run(
             "list_objects",
             database,
-            lambda: self._objects(config, database, query, from_date),
+            lambda: self._objects(connection.config, database, query, from_date),
         )
 
     async def fetch_definition(
         self, database: str, schema: str, name: str, type_code: str
     ) -> str | None:
-        config = self._configured()
-        self._require_allowed(database)
+        connection = self._configured(database)
         return await self._run(
             "fetch_definition",
             database,
-            lambda: self._definition(config, database, schema, name, type_code.strip()),
+            lambda: self._definition(connection.config, database, schema, name, type_code.strip()),
         )
 
     async def fetch_object_metadata(self, database: str, schema: str, name: str) -> str:
-        config = self._configured()
-        self._require_allowed(database)
+        connection = self._configured(database)
         return await self._run(
             "dependency_metadata",
             database,
-            lambda: self._metadata(config, database, schema, name),
+            lambda: self._metadata(connection, database, schema, name),
         )
 
-    async def probe(self, config: SqlServerConnectionConfig) -> list[str]:
-        if not config.configured:
+    async def probe(self, connection: EffectiveSqlConnection) -> list[str]:
+        if not connection.configured:
             raise SqlServerNotConfigured()
         return await self._run(
             "connection_test",
             "master",
-            lambda: self._online_databases(config, CONNECTION_TEST_LOGIN_TIMEOUT_SECONDS),
+            lambda: self._online_databases(connection, CONNECTION_TEST_LOGIN_TIMEOUT_SECONDS),
         )
 
-    def _configured(self) -> SqlServerConnectionConfig:
-        config = self._config()
-        if not config.configured:
-            raise SqlServerNotConfigured()
-        return config
+    def _configured(self, database: str | None = None) -> EffectiveSqlConnection:
+        """One snapshot per operation: the connection and the allow-list it was saved with."""
 
-    def _require_allowed(self, database: str) -> None:
-        if not self.is_allowed(database):
+        connection = self._connection()
+        if not connection.configured:
+            raise SqlServerNotConfigured()
+        if database is not None and not connection.allows(database):
             raise DatabaseNotAllowed()
+        return connection
 
     async def _run(self, operation: str, database: str, work: Callable[[], T]) -> T:
         started = time.monotonic()
@@ -214,12 +213,12 @@ class PyodbcSqlCatalog:
         connection.timeout = self._query_timeout
         return connection  # type: ignore[no-any-return]
 
-    def _online_databases(self, config: SqlServerConnectionConfig, login_timeout: int) -> list[str]:
-        with closing(self._open(config, "master", login_timeout)) as connection:
+    def _online_databases(self, source: EffectiveSqlConnection, login_timeout: int) -> list[str]:
+        with closing(self._open(source.config, "master", login_timeout)) as connection:
             cursor = connection.cursor()
             cursor.execute(LIST_DATABASES_SQL)
             names = [str(row[0]) for row in cursor.fetchall()]
-        return [name for name in names if self.is_allowed(name)]
+        return [name for name in names if source.allows(name)]
 
     def _objects(
         self,
@@ -274,11 +273,11 @@ class PyodbcSqlCatalog:
         return str(row[0])
 
     def _metadata(
-        self, config: SqlServerConnectionConfig, database: str, schema: str, name: str
+        self, source: EffectiveSqlConnection, database: str, schema: str, name: str
     ) -> str:
         collector = DependencyMetadataCollector(
-            connect=lambda db: self._open(config, db, self._login_timeout),
-            database_names=self._online_databases(config, self._login_timeout),
+            connect=lambda db: self._open(source.config, db, self._login_timeout),
+            database_names=self._online_databases(source, self._login_timeout),
         )
         return collector.collect(database, schema, name)
 

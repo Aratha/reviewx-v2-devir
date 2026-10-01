@@ -33,7 +33,8 @@ function menuLinks(): string[] {
 
 function connectionViews(editable: boolean) {
   const environment = editable ? 'local' : 'nonprod';
-  vi.spyOn(ConnectionService, 'sql').mockResolvedValue({environment, editable, configured: true});
+  const managed_by = editable ? 'local_process' : 'deployment';
+  vi.spyOn(ConnectionService, 'sql').mockResolvedValue({environment, editable, configured: true, managed_by});
   vi.spyOn(ConnectionService, 'llm').mockResolvedValue({environment, editable, chat_api: 'openai', model: 'm'});
 }
 
@@ -77,6 +78,49 @@ describe('application shell', () => {
     await waitFor(() => expect(ConnectionService.llm).toHaveBeenCalled());
     expect(menuLinks()).not.toContain('SQL bağlantısı');
     expect(menuLinks()).not.toContain('LLM bağlantısı');
+  });
+
+  it('offers the SQL connection page in nonprod only to the super admin who may edit it', async () => {
+    // sql-server-connection Requirement 5: the backend reports editable only to the super admin.
+    vi.restoreAllMocks();
+    vi.spyOn(ConnectionService, 'llm').mockResolvedValue({
+      environment: 'nonprod',
+      editable: false,
+      chat_api: 'openai',
+      model: 'm',
+    });
+    vi.spyOn(ConnectionService, 'sql').mockResolvedValue({
+      environment: 'nonprod',
+      editable: true,
+      configured: false,
+      managed_by: 'super_admin',
+      password_set: false,
+      allowed_databases: [],
+    });
+    renderApp('super_admin');
+    await screen.findByRole('link', {name: 'SQL bağlantısı'});
+    expect(menuLinks()).not.toContain('LLM bağlantısı');
+    expect(menuLinks()).toContain('Kullanıcılar');
+  });
+
+  it('hides the nonprod SQL connection page from the rule manager while the super admin manages it', async () => {
+    vi.restoreAllMocks();
+    vi.spyOn(ConnectionService, 'llm').mockResolvedValue({
+      environment: 'nonprod',
+      editable: false,
+      chat_api: 'openai',
+      model: 'm',
+    });
+    const sql = vi.spyOn(ConnectionService, 'sql').mockResolvedValue({
+      environment: 'nonprod',
+      editable: false,
+      configured: true,
+      managed_by: 'super_admin',
+    });
+    renderApp('kural-yoneticisi');
+    await screen.findByRole('link', {name: 'Kurallar'});
+    await waitFor(() => expect(sql).toHaveBeenCalled());
+    expect(menuLinks()).not.toContain('SQL bağlantısı');
   });
 
   it('adds user administration for the super admin', async () => {

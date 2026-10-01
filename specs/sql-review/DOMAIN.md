@@ -13,6 +13,9 @@ taşır; mevcut davranış kaynak kabul edilir, farklılıklar PRD'lerde açık�
 - **İnceleyici:** Veri ambarı geliştiricisi. Nesne veya metin inceletir, sonuçları görür, dışa aktarır.
 - **Kural yöneticisi:** İnceleyicinin yapabildiklerine ek olarak kuralları düzenler ve yayımlar,
   LLM çağrı özetlerini görür.
+- **Uygulama yöneticisi (süper yönetici):** Nonprod'da, dağıtım SQL Server bağlantısını vermiyorsa
+  bağlantıyı ve izinli veritabanı listesini arayüzden girer. Kimliği ve yetkisi
+  `application-foundation` alanındadır.
 - **İşletim ekibi:** Ortam ayarlarını, sırları ve dağıtımı yönetir; uygulama içinde bir rol değildir.
 
 ## Ortak dil
@@ -43,13 +46,16 @@ taşır; mevcut davranış kaynak kabul edilir, farklılıklar PRD'lerde açık�
 - Ham SQL metni ve ham LLM yanıtı günlüklere yazılmaz; yalnız LLM çağrı özeti saklanır.
 - LLM isteği yalnız onaylı kurum içi LLM ucuna gider; ağ politikası dışındaki hedef reddedilir.
 - Sırlar (SQL Server parolası, LLM anahtarı, LDAP ve oturum anahtarları) yalnız sunucu sınırındadır;
-  arayüze, Git'e ve loga girmez.
-- Nonprod'da SQL Server ve LLM bağlantı ayarları arayüzden değiştirilemez.
+  arayüze, Git'e ve loga girmez. Veritabanına yalnız nonprod'un SQL Server parolası, şifrelenmiş
+  olarak yazılır.
+- Nonprod'da LLM bağlantı ayarı arayüzden değiştirilemez. SQL Server bağlantısı dağıtımdan
+  geliyorsa o da değiştirilemez; gelmiyorsa yalnız süper yönetici girer ve değiştirir.
 
 ## Sahip olunan veri
 
 PostgreSQL'de: kural kümesi taslağı ve yayımlanmış sürümleri, inceleme koşumları, kural sonuçları ve
-bulgular, LLM çağrı özetleri. İncelenen SQL metni (nesne tanımı veya yapıştırılan metin) koşumla
+bulgular, LLM çağrı özetleri, nonprod'da süper yöneticinin kaydettiği SQL Server bağlantısı (parolası
+şifreli). İncelenen SQL metni (nesne tanımı veya yapıştırılan metin) koşumla
 birlikte saklama süresi boyunca (varsayılan 90 gün) tutulur; yalnız koşumu başlatan kullanıcı ve
 `kural-yoneticisi` görür. Günlüklere yazılmaz.
 

@@ -6,15 +6,39 @@ import {Field} from '@/components/ui/Field';
 import {PageHeader} from '@/components/ui/PageHeader';
 import {ErrorState, LoadingState} from '@/components/ui/States';
 import {useResource} from '@/hooks/useResource';
-import {MANAGED_BY_DEPLOYMENT, RUNTIME_ONLY} from '@/lib/connectionText';
+import {
+  MANAGED_BY_DEPLOYMENT,
+  RUNTIME_ONLY,
+  SQL_ENCRYPTION_FIXED,
+  SQL_MANAGED_BY_SUPER_ADMIN,
+  SQL_STORED_IN_APPLICATION,
+} from '@/lib/connectionText';
 import {describeError, messageForCode} from '@/lib/errorMessages';
 import {ConnectionService} from '@/services/connections';
 import type {SqlConnectionChange, SqlConnectionTestResult, SqlConnectionView} from '@/types/sqlReview';
 
 
+const SYSTEM_DATABASES = new Set(['master', 'tempdb', 'model', 'msdb']);
+
+/** Database names typed one per line or separated by commas, without blanks or repeats. */
+function parseDatabases(text: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const part of text.split(/[\n,]/)) {
+    const name = part.trim();
+    const key = name.toLowerCase();
+    if (name === '' || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
 /**
- * SQL Server connection settings (sql-review sql-server-connection Requirement 3–5, 9). Editable
- * only when the backend says so (`local`); otherwise a read-only status.
+ * SQL Server connection settings (sql-review sql-server-connection Requirement 3–5, 9, 10).
+ * Editable only when the backend says so: the rule manager in `local` (this process only), the
+ * super admin in a `nonprod` whose deployment supplies no connection (saved in the application).
+ * Otherwise a read-only status.
  */
 export default function SqlConnectionPage() {
   const view = useResource('sql-connection', (signal) => ConnectionService.sql(signal));
@@ -48,7 +72,9 @@ function ReadOnlyStatus({view}: {view: SqlConnectionView}) {
   return (
     <Card title="Bağlantı durumu">
       <div className="stack">
-        <Alert tone="info">{MANAGED_BY_DEPLOYMENT}</Alert>
+        <Alert tone="info">
+          {view.managed_by === 'super_admin' ? SQL_MANAGED_BY_SUPER_ADMIN : MANAGED_BY_DEPLOYMENT}
+        </Alert>
         <dl className="facts">
           <div>
             <dt>Ortam</dt>
@@ -82,20 +108,37 @@ function SqlConnectionForm({
   const [removePassword, setRemovePassword] = useState(false);
   const [encrypt, setEncrypt] = useState(view.encrypt ?? true);
   const [trust, setTrust] = useState(view.trust_server_certificate ?? false);
+  // nonprod: the connection is saved in the application and the allowed databases are part of it.
+  const stored = view.managed_by === 'super_admin';
+  const [allowedText, setAllowedText] = useState((view.allowed_databases ?? []).join('\n'));
   const [busy, setBusy] = useState<'save' | 'test' | null>(null);
   const [notice, setNotice] = useState<{tone: 'success' | 'error'; text: string} | null>(null);
   const [test, setTest] = useState<SqlConnectionTestResult | null>(null);
   const portNumber = Number(port);
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535;
+  const allowed = parseDatabases(allowedText);
+  const systemDatabase = stored && allowed.some((name) => SYSTEM_DATABASES.has(name.toLowerCase()));
+  const allowedError = !stored
+    ? null
+    : systemDatabase
+      ? 'Sistem veritabanları (master, tempdb, model, msdb) incelemeye açılamaz.'
+      : allowed.length === 0
+        ? 'Kaydetmek için en az bir veritabanı adı yazın.'
+        : null;
+  const canTest = portValid && !systemDatabase;
+  const canSave = portValid && allowedError === null;
 
   function change(): SqlConnectionChange {
-    const value: SqlConnectionChange = {
-      server: server.trim(),
-      port: portNumber,
-      user: user.trim(),
-      encrypt,
-      trust_server_certificate: trust,
-    };
+    // nonprod fixes encryption and certificate verification; local takes its list from .env.
+    const value: SqlConnectionChange = stored
+      ? {server: server.trim(), port: portNumber, user: user.trim(), allowed_databases: allowed}
+      : {
+          server: server.trim(),
+          port: portNumber,
+          user: user.trim(),
+          encrypt,
+          trust_server_certificate: trust,
+        };
     // No password field keeps the stored one; an empty string removes it.
     if (removePassword) value.password = '';
     else if (password !== '') value.password = password;
@@ -104,7 +147,7 @@ function SqlConnectionForm({
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!portValid) return;
+    if (!canSave) return;
     setBusy('save');
     setNotice(null);
     try {
@@ -120,7 +163,7 @@ function SqlConnectionForm({
   }
 
   async function runTest() {
-    if (!portValid) return;
+    if (!canTest) return;
     setBusy('test');
     setNotice(null);
     setTest(null);
@@ -136,7 +179,7 @@ function SqlConnectionForm({
   return (
     <Card title="Bağlantı ayarları">
       <form className="form-grid" onSubmit={(event) => void save(event)} noValidate>
-        <Alert tone="info">{RUNTIME_ONLY}</Alert>
+        <Alert tone="info">{stored ? SQL_STORED_IN_APPLICATION : RUNTIME_ONLY}</Alert>
         {saved && notice === null && test === null && <Alert tone="success">SQL bağlantı ayarları kaydedildi.</Alert>}
         {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
         {test && <TestResult result={test} />}
@@ -203,22 +246,47 @@ function SqlConnectionForm({
             <span>Kayıtlı parolayı kaldır</span>
           </label>
         )}
-        <label className="check">
-          <input type="checkbox" checked={encrypt} onChange={(event) => setEncrypt(event.target.checked)} />
-          <span>Şifreli bağlantı (Encrypt)</span>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={trust} onChange={(event) => setTrust(event.target.checked)} />
-          <span>Sunucu sertifikasına doğrulamadan güven (TrustServerCertificate)</span>
-        </label>
-        {view.allowed_databases && view.allowed_databases.length > 0 && (
-          <p className="subtle">İzinli veritabanları: {view.allowed_databases.join(', ')}</p>
+        {stored ? (
+          <>
+            <p className="subtle">{SQL_ENCRYPTION_FIXED}</p>
+            <Field
+              id="sql-allowed-databases"
+              label="İzinli veritabanları"
+              hint="İncelemeye açılacak iş veritabanlarını her satıra bir ad gelecek biçimde yazın. Adları öğrenmek için önce bağlantıyı test edebilirsiniz."
+              error={allowedError}
+            >
+              <textarea
+                id="sql-allowed-databases"
+                className="textarea"
+                rows={5}
+                value={allowedText}
+                spellCheck={false}
+                aria-invalid={allowedError !== null || undefined}
+                aria-describedby="sql-allowed-databases-hint"
+                onChange={(event) => setAllowedText(event.target.value)}
+              />
+            </Field>
+          </>
+        ) : (
+          <>
+            <label className="check">
+              <input type="checkbox" checked={encrypt} onChange={(event) => setEncrypt(event.target.checked)} />
+              <span>Şifreli bağlantı (Encrypt)</span>
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={trust} onChange={(event) => setTrust(event.target.checked)} />
+              <span>Sunucu sertifikasına doğrulamadan güven (TrustServerCertificate)</span>
+            </label>
+            {view.allowed_databases && view.allowed_databases.length > 0 && (
+              <p className="subtle">İzinli veritabanları: {view.allowed_databases.join(', ')}</p>
+            )}
+          </>
         )}
         <div className="row">
-          <Button type="submit" variant="primary" disabled={busy !== null || !portValid} busy={busy === 'save'}>
+          <Button type="submit" variant="primary" disabled={busy !== null || !canSave} busy={busy === 'save'}>
             Kaydet
           </Button>
-          <Button onClick={() => void runTest()} disabled={busy !== null || !portValid} busy={busy === 'test'}>
+          <Button onClick={() => void runTest()} disabled={busy !== null || !canTest} busy={busy === 'test'}>
             {busy === 'test' ? 'Test ediliyor…' : 'Bağlantıyı test et'}
           </Button>
           <Button variant="ghost" onClick={onReload} disabled={busy !== null}>

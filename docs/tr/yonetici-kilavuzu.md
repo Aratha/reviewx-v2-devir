@@ -2,7 +2,8 @@
 
 Bu kılavuz üç kişi içindir:
 
-- **Süper yönetici (uygulama yöneticisi):** Kullanıcılara rol verir, hesapları kapatır.
+- **Süper yönetici (uygulama yöneticisi):** Kullanıcılara rol verir, hesapları kapatır; test
+  ortamında SQL Server bağlantısını girer.
 - **Kural yöneticisi:** İnceleme kurallarını düzenler ve yayımlar, yapay zekâ çağrılarını izler.
 - **Dağıtımı yöneten ekip:** Test ortamına (nonprod: ekibin ortak kullandığı, kurum sunucularında
   çalışan sürüm) kurulumu yapan Azure DevOps işini (kodu sunucuya kuran kurum aracı) ve gizli
@@ -142,27 +143,52 @@ Yerelde kural yöneticisi menüde **SQL bağlantısı** ve **LLM bağlantısı**
   bağlantı testi "SQL Server'a ulaşılamadı." der ve LLM sayfası `host.docker.internal` adresini
   kaydetmez.
 
-### Test ortamında: yalnız kurulumla
+### Test ortamında
 
-Test ortamında bu iki sayfa menüde görünmez; adresle açılırsa "Bu ortamda bağlantı ayarları dağıtımla
-yönetilir." yazar. Ayarlar yalnız kurulumla değişir:
+**LLM bağlantısı** sayfası test ortamında menüde görünmez; adresle açılırsa "Bu ortamda bağlantı
+ayarları dağıtımla yönetilir." yazar. Yapay zekâ modelinin adresi ve model adı depodaki
+`helm/dwhcodereview/values-project.yaml` dosyasında hazırdır ve yalnız kurulumla değişir. Bugünkü uç
+anahtar istemez.
 
-- **Yapay zekâ modeli:** Kurum içi model adresi ve model adı depodaki
-  `helm/dwhcodereview/values-project.yaml` dosyasında hazırdır. Bugünkü uç anahtar istemez.
-- **SQL Server:** Bugün tanımlı değildir; bu yüzden kullanıcılar "SQL Server bağlantısı
-  yapılandırılmamış." iletisini görür ve nesne incelemesi yapılamaz. Tanımlamak için iki şey gerekir:
-  1. Okuma hesabının kullanıcı adı ve parolası Azure'a `MSSQL_USER` ve `MSSQL_PASSWORD` gizli
-     değişkenleri olarak eklenir (aşağıdaki adımlar).
-  2. Sunucu adı, port ve incelemeye açılacak veritabanlarının listesi
-     `helm/dwhcodereview/values-project.yaml` dosyasına eklenir; aynı dosyada uygulamanın SQL Server için bağlanabileceği
-     adres aralığı (ağ çıkış kuralı) tek sunucu adresine daraltılır. Bu bir kod değişikliğidir ve PR (değişikliğin ana koda
-     alınmadan önce incelenmesi için açılan istek) ile yapılır. Kodlama asistanınızdan
-     [SQL Server bağlantısı PRD'sine](../../specs/sql-review/PRDs/002-sql-server-connection/PRD.md) göre
-     yapmasını isteyebilirsiniz.
-- Test ortamında hesap, sunucu ve parola üçü de verildiğinde uygulama ek güvenceleri zorunlu tutar:
-  veritabanı listesi boş olamaz ve `master`, `tempdb`, `model`, `msdb` içeremez; bağlantı şifreli
-  olmalı ve sunucu sertifikası doğrulanmalıdır. Biri eksikse uygulama açılmaz ve kurulum kendiliğinden
-  önceki sürüme döner.
+**SQL bağlantısı** sayfasını test ortamında yalnız süper yönetici görür ve kullanır:
+
+1. `admin` hesabıyla girin ve menüden **Yönetim → SQL bağlantısı** sayfasını açın.
+2. Sunucu adını, portu (bağlantı kapı numarası), okuma hesabının kullanıcı adını ve parolasını yazın.
+3. **Bağlantıyı test et** düğmesine basın. Test hiçbir şeyi kaydetmez; bağlantı kurulursa hesabın
+   gördüğü veritabanlarının sayısını ve ilk 8 adını gösterir.
+4. **İzinli veritabanları** alanına incelemeye açılacak veritabanlarını her satıra bir ad gelecek
+   biçimde yazın. Liste boş bırakılamaz ve `master`, `tempdb`, `model`, `msdb` yazılamaz.
+5. **Kaydet** düğmesine basın. Bağlantı hemen kullanılır; uygulamayı yeniden başlatmak gerekmez.
+
+Bilmeniz gerekenler:
+
+- Değerler uygulamanın kendi veritabanına kaydedilir. Parola şifrelenerek saklanır ve ekranda bir
+  daha gösterilmez; sayfada yalnız "Kayıtlı parola var." yazar.
+- Parola kutusunu boş bırakırsanız kayıtlı parola korunur. Sunucu, port veya kullanıcı değiştiyse
+  test için parolayı yeniden yazmanız gerekir; kayıtlı parola başka bir sunucuya gönderilmez.
+- **Kayıtlı parolayı kaldır** seçilip kaydedilirse bağlantı kapanır ve kullanıcılar "SQL Server
+  bağlantısı yapılandırılmamış." iletisini görür.
+- Test ortamında bağlantı her zaman şifrelidir ve sunucunun sertifikası (sunucunun kimliğini
+  kanıtlayan belge) doğrulanır; bu iki ayar ekranda yoktur ve değiştirilemez. Sunucunun sertifikası
+  kurumun sertifika otoritesiyle imzalı değilse test "SQL Server ile güvenli bağlantı kurulamadı."
+  der.
+- Uygulama SQL Server'a yalnız kurulumun izin verdiği adres aralığından ve 1433 numaralı porttan
+  ulaşabilir. Aralık `helm/dwhcodereview/values-project.yaml` dosyasındadır; sunucu bu aralığın
+  dışındaysa ya da başka bir port kullanıyorsa test "SQL Server'a ulaşılamadı." der ve aralığın
+  kurulumla değiştirilmesi gerekir.
+- Kural yöneticisi ve inceleyici bu sayfayı test ortamında görmez; adresle açan kural yöneticisi "Bu
+  ortamda SQL bağlantısını yalnız uygulama yöneticisi düzenleyebilir." yazısını görür.
+- Kimin ne zaman kaydettiği veritabanında tutulur; günlüğe (log: uygulamanın yaptığı işleri satır
+  satır yazdığı kayıt) yalnız hangi alanların değiştiği yazılır, değerler yazılmaz.
+
+Kurulumu yöneten ekip isterse bağlantıyı kurulumla da verebilir: okuma hesabı Azure'a `MSSQL_USER` ve
+`MSSQL_PASSWORD` gizli değişkenleri olarak, sunucu adı, port ve veritabanı listesi
+`helm/dwhcodereview/values-project.yaml` dosyasına eklenir. Sunucu, kullanıcı ve parolanın üçü de
+kurulumla verildiğinde kurulumdaki değerler geçerli olur, **SQL bağlantısı** sayfası süper yönetici
+için de kapanır ve "Bu ortamda bağlantı ayarları dağıtımla yönetilir." yazar. Bu durumda uygulama ek
+güvenceleri açılışta zorunlu tutar: veritabanı listesi boş olamaz ve `master`, `tempdb`, `model`,
+`msdb` içeremez; bağlantı şifreli olmalı ve sunucu sertifikası doğrulanmalıdır. Biri eksikse
+uygulama açılmaz ve kurulum kendiliğinden önceki sürüme döner.
 
 Kaynak: [SQL Server bağlantısı PRD'si](../../specs/sql-review/PRDs/002-sql-server-connection/PRD.md),
 [LLM bağlantısı PRD'si](../../specs/sql-review/PRDs/006-llm-connection/PRD.md).
@@ -177,8 +203,9 @@ Secret) yazar.
 | Azure değişkeni | Ne işe yarar | Verilmezse |
 |---|---|---|
 | `DWHCODEREVIEW_ADMIN_PASSWORD` | `admin` süper yöneticisinin ilk parolası | Süper yönetici açılmaz |
-| `MSSQL_USER` | SQL Server okuma hesabının kullanıcı adı | SQL Server "yapılandırılmamış" kalır |
-| `MSSQL_PASSWORD` | SQL Server okuma hesabının parolası | SQL Server "yapılandırılmamış" kalır |
+| `MSSQL_USER` | SQL Server okuma hesabının kullanıcı adı | Bağlantıyı süper yönetici uygulamadan girer |
+| `MSSQL_PASSWORD` | SQL Server okuma hesabının parolası | Bağlantıyı süper yönetici uygulamadan girer |
+| `SETTINGS_ENCRYPTION_KEY` | Uygulamaya kaydedilen SQL Server parolasını şifreleyen anahtar (rastgele 32 baytın base64 yazımı) | İlk kurulumda bir kez üretilir ve korunur |
 | `LLM_API_KEY` | Anahtar isteyen bir model ucu için anahtar | Yazılmaz; bugünkü uç anahtar istemez |
 | `JWT_PRIVATE_KEY` | Oturumları imzalayan anahtar (P-256 biçiminde) | İlk kurulumda bir kez üretilir ve korunur |
 
@@ -188,6 +215,9 @@ Kurallar:
   gönderirse "verilmedi" sayılır; kümedeki eski değer korunur.
 - Bir değer değişince uygulamanın sunucu tarafı (arka uç) kendiliğinden yeniden başlatılır.
 - `JWT_PRIVATE_KEY` değiştirmek herkesin oturumunu kapatır.
+- `SETTINGS_ENCRYPTION_KEY` değişirse ya da kümedeki gizli kayıt silinirse uygulamaya kaydedilmiş SQL
+  Server parolası açılamaz. Bağlantı "yapılandırılmamış" olur; süper yönetici **SQL bağlantısı**
+  sayfasında parolayı yeniden yazıp kaydeder. Bu değişkeni vermeniz gerekmez.
 - Değerler hiçbir zaman depoya, değer dosyalarına, komut satırına veya günlüğe yazılmaz. Günlükte
   yalnız anahtarın adı görünür.
 - Eski uygulamadan kalan `API_ACCESS_TOKEN`, `API_ADMIN_TOKEN` ve `MSSQL_CONNECTION_STRING`
@@ -235,7 +265,8 @@ beklemek istemezseniz işi **Run pipeline** ile elle başlatın. İş günlüğ�
 - `[RUNTIME] DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD not provided`: değişken tanımlı değil ya da
   adıma bağlanmamış. 2. adımı denetleyin.
 
-Aynı adımlar `MSSQL_USER`, `MSSQL_PASSWORD`, `LLM_API_KEY` ve `JWT_PRIVATE_KEY` için de geçerlidir.
+Aynı adımlar `MSSQL_USER`, `MSSQL_PASSWORD`, `LLM_API_KEY`, `JWT_PRIVATE_KEY` ve
+`SETTINGS_ENCRYPTION_KEY` için de geçerlidir.
 
 ## Günlükler ve izleme verileri
 
@@ -275,6 +306,8 @@ günlüğe, ölçüme veya ize yazılmaz. Başarısız girişte kullanıcı adı
 | `auth.super_admin.bootstrap` | Süper yönetici açılışının sonucu |
 | `rule_set.version_published` | Yeni kural sürümü yayımlandı |
 | `sql_server.call` | SQL Server çağrısı ve sonucu |
+| `sql_connection.updated` | SQL Server bağlantısı kaydedildi (değişen alanların adı ve kaydeden kullanıcı) |
+| `sql_connection.stored_unusable` | Kaydedilmiş SQL Server bağlantısı kullanılamıyor (parola açılamadı ya da veritabanı listesi geçersiz) |
 | `llm.call` | Yapay zekâ modeli çağrısı ve sonucu |
 | `review_history.retention_run` | 90 günlük saklama süresi dolan incelemeler silindi |
 
@@ -287,4 +320,4 @@ günlüğe, ölçüme veya ize yazılmaz. Başarısız girişte kullanıcı adı
 | Rol ve hesap durumu değişiklik kayıtları | Kalıcı |
 
 Uygulamanın veritabanının yedeği alınmaz; proje sahibi bu riski kabul etmiştir. Veritabanı diski
-bozulursa kurallar ve geçmiş kaybolur.
+bozulursa kurallar, geçmiş ve kaydedilmiş SQL Server bağlantısı kaybolur.

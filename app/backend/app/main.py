@@ -10,7 +10,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.integrations import close_integrations, get_review_registry
-from app.api.router import local_environment_router, router
+from app.api.router import (
+    local_environment_router,
+    router,
+    stored_sql_connection_router,
+)
 from app.core.config import Settings, get_settings
 from app.core.errors import ApplicationError, application_error_handler
 from app.core.logging import configure_logging, log_event
@@ -22,6 +26,7 @@ from app.middleware.tenant_context import TenantContextMiddleware
 from app.services.llm_call_summary_service import run_llm_call_retention
 from app.services.review_history_service import run_review_history_retention
 from app.services.review_run_service import interrupt_stale_runs
+from app.services.sql_connection_service import SqlConnectionMode, sql_connection_mode
 from app.services.startup_checks import integration_setting_errors
 from app.services.super_admin_service import run_super_admin_bootstrap
 
@@ -43,6 +48,7 @@ def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextMan
         if invalid:
             log_event(logger, "startup.integration_settings_invalid", settings=",".join(invalid))
             raise UnsafeIntegrationSettings("unsafe integration settings: " + ", ".join(invalid))
+        log_event(logger, "startup.sql_connection_mode", mode=sql_connection_mode(settings).value)
         telemetry_export = configure_telemetry(settings)
         instrument_engine(engine.sync_engine)
         # sql-review 003 Requirement 16: runs this process never finished were cut off.
@@ -103,6 +109,8 @@ def create_application(settings: Settings | None = None) -> FastAPI:
     application.include_router(router)
     if settings.runtime_environment == "local":
         application.include_router(local_environment_router(settings.api_prefix))
+    elif sql_connection_mode(settings) is SqlConnectionMode.STORED:
+        application.include_router(stored_sql_connection_router(settings.api_prefix))
     return application
 
 

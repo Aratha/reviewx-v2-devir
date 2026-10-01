@@ -1,6 +1,6 @@
 # Plan — kubernetes-delivery
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.5.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.6.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır.
 
 ## Katmanlar ve dosyalar
@@ -10,7 +10,7 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 | Chart (fabrikanın yönettiği) | `helm/dwhcodereview/Chart.yaml`, `values.yaml`, `templates/**` | Requirement 1, 2, 3, 4, 6, 8 |
 | Dağıtım betiği (fabrikanın yönettiği) | `helm/dwhcodereview/deploy.sh` | Requirement 6, 10, Decision 4 |
 | Proje değer katmanı | `helm/dwhcodereview/values-project.yaml` | Requirement 2, 5, 8, 10, Decision 9, 11, 17 |
-| Proje kancası | `helm/dwhcodereview/deploy-hooks.sh` | Requirement 5, Decision 14, 17 |
+| Proje kancası | `helm/dwhcodereview/deploy-hooks.sh` | Requirement 5, Decision 14, 17, 20 |
 | Kanca testi | `tests/helm/deploy-hooks.test.sh` | Requirement 5 |
 | Chart denetimi (fabrikanın yönettiği) | `scripts/render_charts.py`, `scripts/render-charts.sh` | Requirement 1, 8 |
 | Yayın imajı | `app/infra/Dockerfile.backend.release` (dizin CA dosyası), `.github/workflows/image-build.yml` | Requirement 9 |
@@ -47,8 +47,10 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
   kapatılan servisi `up` ile durdurmadığı için VS Code "DWH: Uygulamayı başlat" görevi ayar
   kapalıyken kalan geçidi kaldırır.
 - Kanca Secret'ı `kubectl create secret generic --dry-run=client | kubectl apply` ile yazar; yalnız
-  yönettiği beş anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
-  değer yalnız bu beş anahtar için okunur. Süper yönetici başlangıç parolası
+  yönettiği altı anahtarı gönderir, böylece eski öneksiz anahtarlar (Decision 13) silinmez. Kümedeki
+  değer yalnız bu altı anahtar için okunur. Ayar şifreleme anahtarını `openssl rand -base64 32` ile
+  üretir; pipeline'dan gelen değeri 44 karakterlik base64 biçimine (32 bayt) göre denetler ve
+  uymuyorsa hiçbir şey yazmadan durur (Decision 20). Süper yönetici başlangıç parolası
   (`DWHCODEREVIEW_ADMIN_PASSWORD` → `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD`) diğer isteğe
   bağlı değişkenlerle aynı kuralla işlenir; kanca parola politikasını denetlemez, politikanın sahibi
   backend'dir ([directory-login](../001-directory-login/PRD.md) Requirement 14).

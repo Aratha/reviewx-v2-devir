@@ -21,6 +21,10 @@ CATALOG_OBJECT_TYPES: dict[str, str] = {
     "SF": "FUNCTION_SQL_INLINE",
 }
 SYSTEM_DATABASES = frozenset({"master", "tempdb", "model", "msdb"})
+SERVER_MAX_LENGTH = 255
+USER_NAME_MAX_LENGTH = 128
+# SQL Server identifiers (sysname) hold at most 128 characters.
+DATABASE_NAME_MAX_LENGTH = 128
 
 
 class SqlServerErrorClass(StrEnum):
@@ -84,6 +88,33 @@ class SqlServerConnectionConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EffectiveSqlConnection:
+    """The connection in force together with its allow-list; both always change together.
+
+    ``allowed_databases`` keeps the names as they were entered. An empty list means every online
+    database and is possible only in the local environment (Requirement 7).
+    """
+
+    config: SqlServerConnectionConfig = field(default_factory=SqlServerConnectionConfig)
+    allowed_databases: tuple[str, ...] = ()
+    _allowed_keys: frozenset[str] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "_allowed_keys", frozenset(name.casefold() for name in self.allowed_databases)
+        )
+
+    @property
+    def configured(self) -> bool:
+        return self.config.configured
+
+    def allows(self, database: str) -> bool:
+        """Case-insensitive allow-list check."""
+
+        return not self._allowed_keys or database.casefold() in self._allowed_keys
+
+
+@dataclass(frozen=True, slots=True)
 class CatalogObject:
     schema: str
     name: str
@@ -122,8 +153,8 @@ class SqlCatalogPort(Protocol):
 
 
 class SqlConnectionProbe(Protocol):
-    """Connection test of the local environment: login to master with candidate values."""
+    """Connection test: login to master with candidate values that are not saved."""
 
-    async def probe(self, config: SqlServerConnectionConfig) -> Sequence[str]:
-        """Online databases inside the allow-list, or a raised SqlServerError."""
+    async def probe(self, connection: EffectiveSqlConnection) -> Sequence[str]:
+        """Online databases inside the candidate's allow-list, or a raised SqlServerError."""
         ...

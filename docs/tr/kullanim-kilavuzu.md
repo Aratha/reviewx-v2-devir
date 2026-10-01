@@ -62,7 +62,8 @@ Her kullanıcının tek rolü vardır. Menüde yalnız rolünüzün açabildiği
 | İnceleme | İnceleme geçmişi | Kendi incelemeleri | Herkesinki (salt okunur) | Herkesinki (salt okunur) |
 | İnceleme | Yayımlanmış kurallar | ✓ | ✓ | ✓ |
 | Yönetim | Kurallar | — | ✓ | ✓ |
-| Yönetim | SQL bağlantısı, LLM bağlantısı | — | Yalnız yerelde | Yalnız yerelde |
+| Yönetim | SQL bağlantısı | — | Yalnız yerelde | Yerelde ve test ortamında |
+| Yönetim | LLM bağlantısı | — | Yalnız yerelde | Yalnız yerelde |
 | Yönetim | LLM çağrıları | — | ✓ | ✓ |
 | Yönetim | Kullanıcılar | — | — | ✓ |
 
@@ -70,7 +71,7 @@ Her kullanıcının tek rolü vardır. Menüde yalnız rolünüzün açabildiği
 - **Kural yöneticisi:** İnceleyicinin yaptığı her şeye ek olarak kuralları düzenler ve yayımlar,
   herkesin incelemesini salt okunur görür, yapay zekâ çağrılarının özetini izler.
 - **Süper yönetici:** Rolleri atayan uygulama yöneticisidir; kural yöneticisinin yaptıklarını da
-  yapabilir.
+  yapabilir. Test ortamında SQL Server bağlantısını o girer.
 
 Menüde bir sayfanın görünmemesi tek güvence değildir; sunucu her istekte rolünüzü ayrıca denetler.
 
@@ -233,7 +234,7 @@ SQL Server'ın adresi ya da okuma hesabı bu ortamda henüz verilmemiştir. Uygu
 - Veritabanı ve nesne listesi gelmez, bu yüzden nesne incelemesi yapılamaz.
 - **SQL betiği incelemesi** SQL Server'a hiç bağlanmadığı için normal çalışır. İncelemek istediğiniz
   kodu kopyalayıp oraya yapıştırabilirsiniz.
-- Test ortamında bağlantıyı dağıtımı yöneten ekip tanımlar
+- Test ortamında bağlantıyı süper yönetici **Yönetim → SQL bağlantısı** sayfasından girer
   ([yönetici kılavuzu](yonetici-kilavuzu.md#sql-server-ve-llm-ayarları)). Yerelde kural yöneticisi
   kendi ayarını girer ([yerel kurulum](yerel-kurulum.md#sql-server-ve-yapay-zekâ-modeline-bağlanmak)).
 

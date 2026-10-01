@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.secret_cipher import decode_encryption_key
+
 _RSA_MINIMUM_KEY_BITS = 2048
 
 RuntimeEnvironment = Literal["local", "nonprod"]
@@ -144,6 +146,10 @@ class Settings(BaseSettings):
     mssql_login_timeout_seconds: Annotated[int, Field(ge=1, le=60)] = 15
     mssql_query_timeout_seconds: Annotated[int, Field(ge=1, le=300)] = 60
     mssql_max_concurrency: Annotated[int, Field(ge=1, le=16)] = 4
+    # Encrypts the SQL Server password the super admin saves in nonprod (sql-review 002 Requirement
+    # 10): standard base64 of 32 random bytes. The deployment hook generates it once into the
+    # runtime Secret; without it the connection cannot be saved from the interface.
+    settings_encryption_key: SecretStr | None = None
 
     # Approved internal LLM endpoint (sql-review 006-llm-connection).
     llm_chat_api: Literal["openai", "api_v1_chat"] = "api_v1_chat"
@@ -237,11 +243,25 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
-        "mssql_password", "llm_api_key", "bootstrap_super_admin_password", mode="before"
+        "mssql_password",
+        "llm_api_key",
+        "bootstrap_super_admin_password",
+        "settings_encryption_key",
+        mode="before",
     )
     @classmethod
     def empty_optional_secret_is_absent(cls, value: object) -> object:
         return None if value == "" else value
+
+    @field_validator("settings_encryption_key")
+    @classmethod
+    def validate_settings_encryption_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None:
+            try:
+                decode_encryption_key(value.get_secret_value())
+            except ValueError:
+                raise ValueError("settings_encryption_key must be base64 of 32 bytes") from None
+        return value
 
     @field_validator("otel_exporter_otlp_endpoint")
     @classmethod
@@ -334,6 +354,16 @@ class Settings(BaseSettings):
     @property
     def local_login_super_admin_only(self) -> bool:
         return self.runtime_environment == "nonprod" or self.local_login_super_admin_only_enforced
+
+    @property
+    def mssql_connection_complete(self) -> bool:
+        """True when the deployment itself supplies server, user and password."""
+
+        return bool(
+            self.mssql_server.strip()
+            and self.mssql_user.strip()
+            and self.mssql_password is not None
+        )
 
     @property
     def mssql_allowed_database_names(self) -> frozenset[str]:

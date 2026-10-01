@@ -1,7 +1,8 @@
 # Plan — sql-server-connection
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.2.0). Proje kipi `separated-web`;
-sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.3.0). Proje kipi `separated-web`;
+sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır. Bu PRD PostgreSQL'e
+`sql_connection_setting` tablosunu ekler.
 
 ## Katmanlar ve dosyalar
 
@@ -13,12 +14,16 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 | Bağlantı dizesi | `app/backend/app/infrastructure/sql_server/connection_string.py` | Requirement 2, Decision 1 |
 | Sorgular | `app/backend/app/infrastructure/sql_server/queries.py`, `dependency_metadata.py` (kaynaktaki `db/queries.py` ve `services/dependency_metadata.py`) | Requirement 7 |
 | Uyarlayıcı | `app/backend/app/infrastructure/sql_server/catalog_adapter.py` | Requirement 6, 7, 8 |
-| Hizmet | `app/backend/app/services/sql_connection_service.py` | Requirement 3, 4, 5, Decision 3, 8 |
-| API | `app/backend/app/api/sql_connection/router.py`, `app/backend/app/api/route_classes.py`, `app/backend/app/api/router.py` (`local_environment_router`), `app/backend/app/api/integrations.py`, `app/backend/app/schemas/sql_connection/contracts.py` | API sözleşmesi, Requirement 5 |
+| Hizmet | `app/backend/app/services/sql_connection_service.py` (durum seçimi, süreç içi depo, `StoredSqlConnection`) | Requirement 3, 4, 5, 10, 11, Decision 3, 8, 12, 14 |
+| Şifreleme | `app/backend/app/core/secret_cipher.py` | Requirement 10, Decision 13 |
+| Şema ve göç | `app/backend/app/domain/models/sql_connection.py`, `schema/alembic/versions/202610010001_sql_connection_setting.py` | Requirement 10, Veri ve geçiş |
+| Depo | `app/backend/app/infrastructure/repositories/sql_connection_setting_repository.py` | Requirement 10, 11 |
+| API | `app/backend/app/api/sql_connection/router.py`, `app/backend/app/api/route_classes.py`, `app/backend/app/api/router.py` (`local_environment_router`, `stored_sql_connection_router`), `app/backend/app/api/integrations.py`, `app/backend/app/main.py`, `app/backend/app/schemas/sql_connection/contracts.py` | API sözleşmesi, Requirement 5, 11 |
+| Dağıtım kancası | `helm/dwhcodereview/deploy-hooks.sh`, `tests/helm/deploy-hooks.test.sh` | Decision 13 |
 | İmaj | `app/infra/locks/backend-alpine-packages.lock`, `app/infra/locks/msodbcsql18-alpine-packages.lock`, `app/infra/install-backend-system-packages.sh`, `app/backend/Dockerfile.dev`, `app/infra/Dockerfile.backend.release` | Dağıtım etkisi, Decision 4, 6 |
 | Bağımlılık | `app/backend/requirements.in` (`pyodbc==5.3.0`), kilitli `requirements*.txt`, `dependency-admission.json` | Decision 4 |
 | Gözlemlenebilirlik | `app/backend/app/infrastructure/sql_server/catalog_adapter.py` (`sql_server_call`), `app/backend/app/core/telemetry.py` | Gözlemlenebilirlik |
-| Ön yüz | `app/frontend/src/pages/SqlConnectionPage.tsx`, `app/frontend/src/hooks/useConnectionMenu.ts`, `app/frontend/src/services/connections.ts` | Requirement 5, 9 |
+| Ön yüz | `app/frontend/src/pages/SqlConnectionPage.tsx`, `app/frontend/src/hooks/useConnectionMenu.ts`, `app/frontend/src/services/connections.ts`, `app/frontend/src/lib/connectionText.ts`, `app/frontend/src/lib/errorMessages.ts` | Requirement 5, 9 |
 
 ## Uygulama kararları
 
@@ -44,16 +49,41 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
   ve çevrimiçi veritabanlarında arar. 48 nesne sınırı kaynakta yalnız kuyruk adımları arasında
   denetleniyordu; burada kesin sınırdır. Kök veritabanı bağlantısı açılamazsa sınıflı hata döner,
   sonraki hatalar yalnız tipleriyle `debug` düzeyinde loglanıp atlanır.
-- `local`'de ayar değişikliği süreç içi `SqlConnectionStore`'dadır; dosyaya ve süreç ortamına
-  yazılmaz. Test, sunucu/port/kullanıcı kayıtlı değerden farklıysa ve formda parola yoksa kayıtlı
-  parolayı göndermez (`password_required`).
-- `nonprod`'da yazma ve test uçları yönlendiriciye eklenmez; `MethodScopedRoute` aynı yoldaki GET
-  ucunun 405 yerine 404 üretmesini sağlar. Başlangıç denetimi `nonprod`'da eksik sunucu, kullanıcı,
-  parola, izin listesi, izin listesinde sistem veritabanı, `ENCRYPT=false` veya
+- Yürürlükteki bağlantı ile izin listesi tek değerdir (`EffectiveSqlConnection`) ve süreç içi
+  `SqlConnectionStore`'da durur; uyarlayıcı her işlemde bu değeri bir kez okur, böylece bağlantı ile
+  izin listesi hiçbir işlemde birbirinden ayrı sürümlerden gelmez (Requirement 11).
+- Durum, `sql_connection_mode` ile ayarlardan seçilir: `local`; `nonprod`'da dağıtım tam bağlantı
+  veriyorsa ya da anahtar yoksa `deployment`; aksi hâlde `stored` (Requirement 5).
+- `local`'de ayar değişikliği yalnız süreç içi depodadır; dosyaya ve süreç ortamına yazılmaz. Test,
+  sunucu/port/kullanıcı kayıtlı değerden farklıysa ve formda parola yoksa kayıtlı parolayı göndermez
+  (`password_required`).
+- `stored` durumunda `StoredSqlConnection` kaydı kendi kısa işlemiyle yazar: kaydeden hesabı ve
+  süper yönetici rolünü veritabanından yeniden okur, kiracının satırını kilitler (`SELECT … FOR
+  UPDATE`), değişikliği doğrular, parolayı şifreler, yazar ve ancak işlem tamamlandıktan sonra süreç
+  içi depoyu günceller. Reddedilen değişiklik hiçbir şey yazmaz. Kayıt tek platform kiracısının
+  satırıdır ([directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md)
+  Decision 6).
+- Kopyalar arası güncellik: FastAPI bağımlılığı `get_sql_catalog` ve bağlantı sayfasının okuma ucu,
+  `stored` durumunda her istekte `StoredSqlConnection.refresh()` ile satırı yeniden okuyup depoya
+  koyar (Decision 14). Okuma hatası son değeri korur ve `sql_connection.refresh_failed` olayını
+  yazar.
+- Şifreleme `SecretCipher`'dadır: AES-256-GCM, değer başına `os.urandom` ile 96 bit nonce, ek
+  doğrulanan veri olarak `sql-connection-password:<kiracı public_id>`; saklanan biçim
+  `v1.<nonce>.<şifreli değer ve doğrulama etiketi>` (URL güvenli base64). Yanlış anahtar, başka
+  bağlam ve değiştirilmiş değer aynı içeriksiz hatayı verir. Anahtar ayarı tipli ayarlarda
+  doğrulanır; hata iletisi değeri yankılamaz.
+- Yazma ve test uçları iki ayrı yönlendiricide aynı işlevlerdir: `local_router` (`kural-yoneticisi`)
+  yalnız `local`'de, `stored_router` (süper yönetici) yalnız `stored` durumunda uygulamaya eklenir;
+  `deployment` durumunda hiçbiri eklenmez ve `MethodScopedRoute` aynı yoldaki GET ucunun 405 yerine
+  404 üretmesini sağlar. Hizmet aynı denetimleri yineler. Başlangıç denetimi `nonprod`'da dağıtımın
+  verdiği tam bağlantıda boş izin listesi, izin listesinde sistem veritabanı, `ENCRYPT=false` veya
   `TRUST_SERVER_CERTIFICATE=true` görürse süreci ayar adlarıyla (değer olmadan) durdurur.
+- OpenAPI dışa aktarımı uygulamayı `local` olarak kurar; yazma ve test uçları sözleşmede bir kez,
+  iki ortamın rol ve hata açıklamalarıyla yer alır.
 - Log olayları: her işlem için bir `sql_server.call` (`operation`, `database`, `outcome`,
-  `sqlstate`, `duration_ms`, `rows`; `request_id` biçimleyiciden gelir) ve `sql_connection.updated`
-  (değişen alan adları, kullanıcı `public_id`).
+  `sqlstate`, `duration_ms`, `rows`; `request_id` biçimleyiciden gelir), `sql_connection.updated`
+  (değişen alan adları, `managed_by`, kullanıcı `public_id`), `sql_connection.stored_unusable`
+  (neden), `sql_connection.refresh_failed` (hata türü) ve `startup.sql_connection_mode` (durum).
 - İmaj: Alpine v3.23 `unixodbc` ve sürücünün çalışma zamanı paketleri ile Microsoft `msodbcsql18`
   18.6.2.1-1 kilit dosyalarından SHA-256 denetimiyle ve ağsız `apk` ile kurulur; Microsoft paketinin
   imzası kabul sırasında Microsoft yayın anahtarıyla doğrulandı. Kurum kök CA'sı sistem güven
@@ -61,16 +91,19 @@ sabit yığın `python-fastapi` arka uçtur. Bu PRD PostgreSQL'e tablo eklemez.
 
 ## Dağıtım bağımlılığı
 
-Runtime Secret anahtarları (`helm/dwhcodereview/deploy-hooks.sh`), sır olmayan değerlerin
-`helm/dwhcodereview/values-project.yaml` ile chart'a taşınması ve SQL Server ağ çıkış kuralı
+Runtime Secret anahtarları (`helm/dwhcodereview/deploy-hooks.sh`; ayar şifreleme anahtarı dahil),
+sır olmayan değerlerin `helm/dwhcodereview/values-project.yaml` ile chart'a taşınması ve SQL Server
+ağ çıkış kuralı
 [Kubernetes teslim PRD'sinindir](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md).
-Adres gelene kadar değer katmanında SQL Server adresi ve izin listesi yoktur (Decision 11).
+Değer katmanında SQL Server adresi ve izin listesi yoktur; bağlantıyı süper yönetici girer
+(Decision 11, 12). Yeni tablo mevcut göç Job'uyla kurulur; ayrı dağıtım adımı gerekmez.
 
 ## Doğrulama komutları
 
 - `python3 scripts/check-config-sync.py`, `python3 scripts/check-dependency-admission.py`
 - `scripts/quality-gate.sh backend` ve devir için `scripts/quality-gate.sh all`
 - `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`
+- `scripts/db.sh validate` (şema ile göç geçmişinin uyumu), `tests/helm/deploy-hooks.test.sh`
 
 ## İzlenebilirlik
 
@@ -78,9 +111,12 @@ Adres gelene kadar değer katmanında SQL Server adresi ve izin listesi yoktur (
 |---|---|---|
 | Requirement 1 | Acceptance 1, Acceptance 5 | Task V1, Task 1 |
 | Requirement 2, 8 | Acceptance 1 | Task 2 |
-| Requirement 3, 4, 5 | Acceptance 1, Acceptance 3 | Task 4, Task 5 |
+| Requirement 3, 4, 5 | Acceptance 1, Acceptance 3 | Task 4, Task 5, Task 11 |
+| Requirement 10 | Acceptance 1, Acceptance 5 | Task 10, Task 11, Task 13 |
+| Requirement 11 | Acceptance 1, Acceptance 5 | Task 3, Task 11 |
 | Requirement 6 | Acceptance 2 | Task 3 |
 | Requirement 7 | Acceptance 1 | Task 3 |
-| Requirement 5, 9 | Acceptance 3, Acceptance 4 | Task 8, Task 9 |
+| Requirement 5, 9 | Acceptance 3, Acceptance 4, Acceptance 5 | Task 8, Task 9, Task 12 |
 | Gözlemlenebilirlik (ölçümler) | — | Task 7 |
 | Dağıtım etkisi (imaj, bağımlılık) | Acceptance 1 | Task 6 |
+| Dağıtım etkisi (Secret anahtarı, Decision 13) | Acceptance 1 | Task 13 |

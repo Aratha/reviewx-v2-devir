@@ -2,16 +2,16 @@
 
 Status: Accepted
 
-Version: 1.5.0
+Version: 1.6.0
 
-Acceptance date: 2026-09-27
+Acceptance date: 2026-10-01
 
 Domain: [application-foundation](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, Decision 17'deki sahip kararıyla ve
-directory-login PRD'sinin Decision 13'teki nonprod ilk süper yönetici kararıyla hizalanmış haliyle
-kabul etti. Aynı gün chart sürümü, nonprod'daki `0.2.0` release'inin fabrikanın `0.1.0` chart'ıyla
-sorunsuz güncellendiği gözlenerek fabrikadan gelen sürüme hizalandı (Decision 19).
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-10-01'de, Decision 17'deki sahip kararıyla,
+directory-login PRD'sinin Decision 13'teki nonprod ilk süper yönetici kararıyla, fabrikadan gelen
+chart sürümüyle (Decision 19) ve runtime Secret'a eklenen ayar şifreleme anahtarıyla (Decision 20)
+kabul etti.
 
 ## Amaç
 
@@ -19,8 +19,9 @@ Uygulamayı PostgreSQL 17 dahil tek Helm chart'ı (Kubernetes'e kurulum paketi) 
 kümesine, mevcut Azure dağıtım işinin argümansız çağırdığı `helm/dwhcodereview/deploy.sh` üzerinden
 güvenle dağıtmak. Nonprod dağıtımı işletim ekibinin ayar veya gizli değişken vermesini beklemeden
 çalışır (Decision 17): ortam adresleri ve sır olmayan ayarlar projeye ait değer katmanı
-`helm/dwhcodereview/values-project.yaml` dosyasında, oturum imza anahtarı, isteğe bağlı SQL Server
-ve LLM kimlik bilgileri ve isteğe bağlı süper yönetici başlangıç parolası projeye ait kanca
+`helm/dwhcodereview/values-project.yaml` dosyasında, oturum imza anahtarı, ayar şifreleme anahtarı,
+isteğe bağlı SQL Server ve LLM kimlik bilgileri ve isteğe bağlı süper yönetici başlangıç parolası
+projeye ait kanca
 `helm/dwhcodereview/deploy-hooks.sh`'ın hazırladığı runtime Secret'tadır (`dwhcodereview-runtime`);
 veritabanı sırlarını `deploy.sh` üretir. Kurallar
 PostgreSQL'e içe aktarım göçüyle girer.
@@ -30,7 +31,8 @@ PostgreSQL'e içe aktarım göçüyle girer.
 - **İşletim ekibi:** Azure dağıtım işini çalıştırır. Sonuç: tek komutla kurulum veya güncelleme; ek
   ayar veya gizli değişken gerekmez; yayımlanmamış imajda kümeye hiç dokunulmaz, hizmet veren sürüm
   silinmez. SQL Server hesabını vermek isterse `MSSQL_USER`/`MSSQL_PASSWORD` gizli değişkenlerini
-  tanımlar.
+  tanımlar; vermezse bağlantıyı süper yönetici uygulamadan girer
+  ([SQL Server bağlantısı](../../../sql-review/PRDs/002-sql-server-connection/PRD.md) Decision 12).
 - **Proje sahibi:** Nonprod `admin` süper yöneticisinin ilk parolasını seçer ve Azure gizli
   değişkeni `DWHCODEREVIEW_ADMIN_PASSWORD` olarak tanımlar. Sonuç: ilk dağıtımdan sonra `admin`
   girer; sonraki dağıtımlar hesaba dokunmaz
@@ -132,15 +134,16 @@ hazırlar. Anahtarları ve kaynakları:
 | Secret anahtarı | Kaynak | Hiç verilmezse |
 |---|---|---|
 | `DWHCODEREVIEW_JWT_PRIVATE_KEY` | Azure gizli değişkeni `JWT_PRIVATE_KEY` verilirse o; yoksa kümedeki değer; o da yoksa kanca P-256 anahtarını CSPRNG ile bir kez üretir (Decision 14) | Üretir |
-| `DWHCODEREVIEW_MSSQL_USER` | İsteğe bağlı Azure gizli değişkeni `MSSQL_USER`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, SQL Server alanı "yapılandırılmamış" görünür |
-| `DWHCODEREVIEW_MSSQL_PASSWORD` | İsteğe bağlı Azure gizli değişkeni `MSSQL_PASSWORD`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, SQL Server alanı "yapılandırılmamış" görünür |
+| `DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY` | Azure gizli değişkeni `SETTINGS_ENCRYPTION_KEY` verilirse o; yoksa kümedeki değer; o da yoksa kanca rastgele 32 baytı CSPRNG ile bir kez üretir ve base64 olarak yazar (Decision 20) | Üretir |
+| `DWHCODEREVIEW_MSSQL_USER` | İsteğe bağlı Azure gizli değişkeni `MSSQL_USER`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, bağlantıyı süper yönetici uygulamadan girer |
+| `DWHCODEREVIEW_MSSQL_PASSWORD` | İsteğe bağlı Azure gizli değişkeni `MSSQL_PASSWORD`; yoksa kümedeki değer | Yazılmaz; uygulama açılır, bağlantıyı süper yönetici uygulamadan girer |
 | `DWHCODEREVIEW_LLM_API_KEY` | İsteğe bağlı Azure gizli değişkeni `LLM_API_KEY`; yoksa kümedeki değer | Yazılmaz; nonprod LLM ucu anahtar istemiyor |
 | `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD` | İsteğe bağlı Azure gizli değişkeni `DWHCODEREVIEW_ADMIN_PASSWORD`; yoksa kümedeki değer | Yazılmaz; backend süper yönetici açmaz ([directory-login](../001-directory-login/PRD.md) Requirement 14) |
 
 Boş veya tanımsız değişken ve çözülmemiş Azure `$(DEĞİŞKEN)` metni verilmemiş sayılır; kümedeki
 mevcut değer korunur. Kümedeki Secret okunamazsa kanca hiçbir şeyi değiştirmeden durur; geçersiz
-`JWT_PRIVATE_KEY` veya denetim karakteri içeren `MSSQL_USER` da dağıtımı Helm değişikliğinden önce
-durdurur. Kanca Secret'taki başka anahtarlara dokunmaz. Değerler komut argümanına, Helm değerine ve
+`JWT_PRIVATE_KEY`, 32 baytın base64 yazımı olmayan `SETTINGS_ENCRYPTION_KEY` veya denetim karakteri
+içeren `MSSQL_USER` da dağıtımı Helm değişikliğinden önce durdurur. Kanca Secret'taki başka anahtarlara dokunmaz. Değerler komut argümanına, Helm değerine ve
 loga girmez, `kubectl`'e yalnız sahibine özel geçici dosyalardan geçer; logda yalnız anahtar adı
 görünür. Secret değiştiğinde kümede aynı imaj etiketiyle çalışan backend varsa (Helm pod şablonunu
 değiştirmeyeceği için) kanca onu yeniden başlatır. Anahtar adları
@@ -152,8 +155,9 @@ genel adresi ve CORS kaynağı, güvenilen ingress pod ağı `10.42.0.0/16`, diz
 (directory-login PRD'sindeki KT Verim nonprod değerleri ve imajdaki CA dosyası), süper yönetici hesap
 adı `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME=admin`, LLM biçimi, adresi ve modeli
 (llm-connection Decision 3) ve boş OpenTelemetry adresi. SQL Server adresi, portu ve izinli
-veritabanı listesi işletim ekibinden gelene kadar yazılmaz; bu sürede SQL Server alanı
-"yapılandırılmamış" kalır (sql-server-connection Decision 11).
+veritabanı listesi değer katmanında yoktur; bağlantıyı süper yönetici uygulamadan girer ve uygulama
+onu PostgreSQL'de saklar, o zamana kadar SQL Server alanı "yapılandırılmamış" kalır
+(sql-server-connection Decision 11, 12).
 
 Requirement 6: Chart içi veritabanının sırları `deploy.sh`'ın ürettiği üç Secret'tadır:
 `dwhcodereview-postgres` (sahip rolü), `dwhcodereview-migration` (sahip rolünün bağlantısı ve
@@ -251,8 +255,8 @@ Yeni ölçüm tanımlanmaz.
 ## Dağıtım etkisi
 
 Mevcut Azure işi aynı komutla çalışmaya devam eder ve yeni ayar veya gizli değişken istemez.
-`MSSQL_USER` ve `MSSQL_PASSWORD` verilirse SQL Server hesabı olarak kullanılır; `JWT_PRIVATE_KEY` ve
-`LLM_API_KEY` isteğe bağlıdır (Decision 14, 17). `DWHCODEREVIEW_ADMIN_PASSWORD` verilirse nonprod
+`MSSQL_USER` ve `MSSQL_PASSWORD` verilirse SQL Server hesabı olarak kullanılır; `JWT_PRIVATE_KEY`,
+`SETTINGS_ENCRYPTION_KEY` ve `LLM_API_KEY` isteğe bağlıdır (Decision 14, 17, 20). `DWHCODEREVIEW_ADMIN_PASSWORD` verilirse nonprod
 `admin` süper yöneticisinin ilk parolası olur. Azure gizli değişkenleri betiğe kendiliğinden
 geçmediği için her gizli değişken dağıtım adımının ortamına (`env:`) aynı adla açıkça eşlenir. `API_ACCESS_TOKEN` ve `API_ADMIN_TOKEN` artık
 okunmaz. Namespace'te 10Gi `nfs-sc` PostgreSQL diski ve üç veritabanı Secret'ı oluşur. Azure işinin
@@ -355,14 +359,24 @@ kimliği namespace'te Secret okuyup yazabilmeli ve Deployment'ı yeniden başlat
   release'te `helm upgrade` ile sorunsuz güncellendi. Sürümü projede yükseltmek fabrikanın yönettiği
   `Chart.yaml`'ı elle düzenlemek olurdu (Requirement 1).
 
+- Decision 20: Ayar şifreleme anahtarı (`DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY`) da imza anahtarı
+  gibi Azure değişkeninde taşınmaz; `deploy-hooks.sh` ilk kurulumda rastgele 32 baytı bir kez üretir
+  ve sonraki çalıştırmalarda kümedekini kullanır; pipeline değişkeni `SETTINGS_ENCRYPTION_KEY`
+  verilirse o geçerlidir (Requirement 5). Anahtarın anlamı ve değişmesinin sonucu
+  [SQL Server bağlantısı PRD'sindedir](../../../sql-review/PRDs/002-sql-server-connection/PRD.md)
+  (Decision 13).
+
 ## Teslim akışı
 
 Belirtim → Plan → Görevler → Uygulama
 
 ## Riskler
 
-- Tek kopya PostgreSQL'de disk arızası kuralları ve geçmişi kaybettirir; yedek olmadığı için (Decision
-  10) bu risk sahip tarafından kabul edilmiştir.
+- Tek kopya PostgreSQL'de disk arızası kuralları, geçmişi ve kayıtlı SQL Server bağlantısını
+  kaybettirir; yedek olmadığı için (Decision 10) bu risk sahip tarafından kabul edilmiştir.
+- Runtime Secret silinirse kanca yeni bir ayar şifreleme anahtarı üretir; PostgreSQL'deki SQL Server
+  parolası eski anahtarla şifreli kaldığı için açılamaz ve süper yöneticinin parolayı yeniden
+  girmesi gerekir. Aynı durumda imza anahtarı da yenilendiği için bütün oturumlar kapanır.
 - İlk güncelleme eski chart'tan yeni chart'a aynı release'te yapılır; beklenmeyen nesne çakışması
   `--atomic` ile eski sürüme döner ve geçiş ertelenir.
 - Geri almada şema geri inmez; genişletici olmayan göç eski sürümü bozar.

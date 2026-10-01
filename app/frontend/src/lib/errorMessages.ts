@@ -27,6 +27,11 @@ const MESSAGES: Record<string, string> = {
   rule_set_version_not_found: 'Kural sürümü bulunamadı.',
   sql_connection_not_configured: 'SQL Server bağlantısı yapılandırılmamış.',
   sql_connection_invalid: 'Sunucu veya kullanıcı adı geçersiz.',
+  sql_allowed_databases_invalid:
+    'İzinli veritabanı listesi boş olamaz ve sistem veritabanı (master, tempdb, model, msdb) içeremez.',
+  sql_setting_fixed: 'Bu ayar bu ortamda değiştirilemez.',
+  sql_connection_conflict:
+    'Bağlantı ayarı aynı anda başka biri tarafından kaydedildi; sayfayı yenileyip yeniden deneyin.',
   sql_server_unreachable: "SQL Server'a ulaşılamadı.",
   sql_login_failed: 'SQL Server girişi reddedildi.',
   sql_timeout: 'SQL Server zamanında yanıt vermedi.',

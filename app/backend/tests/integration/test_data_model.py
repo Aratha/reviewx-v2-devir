@@ -1,9 +1,9 @@
 """Migrated-schema contract of the wave-one data model against real PostgreSQL.
 
 Specs: application-foundation/PRDs/001-directory-login "Veri ve geçiş" and the data sections of
-sql-review/PRDs/001-rule-management, 003-object-review, 004-script-review,
-005-review-history-export and 006-llm-connection; rules 41 (mandatory block), 42 (references)
-and 43 (comments) are checked on the migrated database, not on source text.
+sql-review/PRDs/001-rule-management, 002-sql-server-connection, 003-object-review,
+004-script-review, 005-review-history-export and 006-llm-connection; rules 41 (mandatory block),
+42 (references) and 43 (comments) are checked on the migrated database, not on source text.
 """
 
 from datetime import UTC, datetime
@@ -32,7 +32,10 @@ WAVE_ONE_TABLES = {
     "rule_set_version",
     "rule_set_version_rule",
 }
-ALL_DOMAIN_TABLES = WAVE_ONE_TABLES | {
+# sql-review 002-sql-server-connection "Veri ve geçiş": the connection the super admin saves.
+SQL_CONNECTION_TABLES = {"sql_connection_setting"}
+CHECKED_TABLES = WAVE_ONE_TABLES | SQL_CONNECTION_TABLES
+ALL_DOMAIN_TABLES = CHECKED_TABLES | {
     "app_permission",
     "app_role",
     "app_role_permission",
@@ -89,6 +92,9 @@ COMMENTED_COLUMNS = {
     ("rule_set_version", "source"),
     ("rule_set_version", "number"),
     ("rule_set_version_rule", "priority_group"),
+    ("sql_connection_setting", "tenant_id"),
+    ("sql_connection_setting", "password_ciphertext"),
+    ("sql_connection_setting", "allowed_databases"),
 }
 
 
@@ -112,7 +118,7 @@ async def test_every_domain_table_is_commented_and_carries_the_mandatory_block(
         ).all()
         tables = {name: comment for name, comment in rows}
         assert set(tables) == ALL_DOMAIN_TABLES
-        for table in WAVE_ONE_TABLES:
+        for table in CHECKED_TABLES:
             assert tables[table], f"{table} has no table comment"
             columns = dict(
                 (
@@ -462,3 +468,43 @@ async def test_only_a_fail_verdict_has_a_severity(
             with pytest.raises(IntegrityError):
                 await connection.execute(insert, values)
         await connection.rollback()
+
+
+async def test_a_saved_sql_connection_is_one_row_per_tenant_with_a_usable_allow_list(
+    migrated_database: None,
+) -> None:
+    # sql-review 002-sql-server-connection Requirement 10 and Decision 5.
+    insert = (
+        "INSERT INTO sql_connection_setting (tenant_id, server, port, user_name, "
+        "allowed_databases) VALUES (:tenant, 'sql.corp.example.test', :port, 'okuyucu', "
+        "CAST(:allowed AS varchar[]))"
+    )
+    async with engine.connect() as connection:
+        transaction = await connection.begin()
+        try:
+            tenant_id = await _tenant_id(connection)
+            await connection.execute(text("DELETE FROM sql_connection_setting"))
+            for values in (
+                {"tenant": tenant_id, "port": 1433, "allowed": []},
+                {"tenant": tenant_id, "port": 0, "allowed": ["DWH"]},
+                {"tenant": tenant_id, "port": 65536, "allowed": ["DWH"]},
+                {"tenant": 0, "port": 1433, "allowed": ["DWH"]},
+            ):
+                savepoint = await connection.begin_nested()
+                with pytest.raises(IntegrityError):
+                    await connection.execute(text(insert), values)
+                await savepoint.rollback()
+            first = {"tenant": tenant_id, "port": 1433, "allowed": ["DWH"]}
+            await connection.execute(text(insert), first)
+            savepoint = await connection.begin_nested()
+            with pytest.raises(IntegrityError):
+                await connection.execute(text(insert), first)
+            await savepoint.rollback()
+            savepoint = await connection.begin_nested()
+            with pytest.raises(IntegrityError):
+                await connection.execute(
+                    text("DELETE FROM tenant WHERE tenant_id = :tenant"), {"tenant": tenant_id}
+                )
+            await savepoint.rollback()
+        finally:
+            await transaction.rollback()

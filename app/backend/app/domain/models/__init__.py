@@ -16,6 +16,7 @@ from app.domain.models.rule_set import (
     RuleSetVersion,
     RuleSetVersionRule,
 )
+from app.domain.models.sql_connection import SqlConnectionSetting
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User
 from app.domain.models.user_change import UserChange
@@ -36,6 +37,7 @@ __all__ = [
     "RuleSetDraftRule",
     "RuleSetVersion",
     "RuleSetVersionRule",
+    "SqlConnectionSetting",
     "Tenant",
     "User",
     "UserChange",

@@ -4,8 +4,8 @@
 # deploy-hooks.sh and deploy.sh prepare in the cluster.
 # Contract: specs/application-foundation/PRDs/002-kubernetes-delivery/PRD.md (Requirement 5, 8, 10).
 backend:
-  # Prepared by deploy-hooks.sh: session signing key, the optional SQL Server and LLM credentials
-  # and the optional super admin start-up password.
+  # Prepared by deploy-hooks.sh: session signing key, settings encryption key, the optional SQL
+  # Server and LLM credentials and the optional super admin start-up password.
   existingSecret: dwhcodereview-runtime
   config:
     # staging is the nonprod environment of application-foundation/DOMAIN.md.
@@ -31,8 +31,10 @@ backend:
     DWHCODEREVIEW_LLM_BASE_URL: https://runai.gpudtx.kuveytturk.com.tr/inference/qwen36-35b-a3b-fp8/v1
     DWHCODEREVIEW_LLM_MODEL: /data/models--Qwen--Qwen36-35B-A3B-FP8
     DWHCODEREVIEW_OTEL_EXPORTER_OTLP_ENDPOINT: ""
-    # The SQL Server address and allowed databases are not known yet, so the SQL Server area stays
-    # "not configured" (sql-review/PRDs/002-sql-server-connection Requirement 1).
+    # No SQL Server address, account or allowed databases here: the super admin enters the
+    # connection in the application, which keeps it in PostgreSQL with the password encrypted
+    # (sql-review/PRDs/002-sql-server-connection Requirement 5 and 10). Until then the SQL Server
+    # area stays "not configured".
   networkPolicy:
     egress:
       - to:

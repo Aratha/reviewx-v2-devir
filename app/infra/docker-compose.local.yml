@@ -94,6 +94,9 @@ services:
       DWHCODEREVIEW_MSSQL_LOGIN_TIMEOUT_SECONDS: "15"
       DWHCODEREVIEW_MSSQL_QUERY_TIMEOUT_SECONDS: "60"
       DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY: "4"
+      # Used only outside the development environment, where the super admin saves the SQL Server
+      # connection in PostgreSQL; here the connection page changes this process only.
+      DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY: "${DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY:-}"
       DWHCODEREVIEW_LLM_CHAT_API: "${DWHCODEREVIEW_LLM_CHAT_API:-api_v1_chat}"
       DWHCODEREVIEW_LLM_BASE_URL: "${DWHCODEREVIEW_LLM_BASE_URL:-}"
       DWHCODEREVIEW_LLM_CHAT_URL: "${DWHCODEREVIEW_LLM_CHAT_URL:-}"

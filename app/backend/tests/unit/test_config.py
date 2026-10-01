@@ -5,6 +5,7 @@ sql-review/PRDs/002-sql-server-connection (Requirement 1), 003-object-review (Re
 18), 005-review-history-export (Requirement 6) and 006-llm-connection (Requirement 1).
 """
 
+import base64
 import os
 from pathlib import Path
 from typing import Any
@@ -206,6 +207,28 @@ def test_optional_secrets_are_not_rendered() -> None:
     rendered = repr(settings) + str(settings.model_dump())
     assert "distinct-marker-secret" not in rendered
     assert "other-marker" not in rendered
+
+
+def test_the_settings_encryption_key_is_optional_and_must_be_32_bytes() -> None:
+    # sql-server-connection Requirement 10: the key that encrypts the stored SQL Server password.
+    key = base64.b64encode(os.urandom(32)).decode()
+    assert _settings().settings_encryption_key is None
+    assert _settings(settings_encryption_key="").settings_encryption_key is None
+    configured = _settings(settings_encryption_key=key)
+    assert configured.settings_encryption_key is not None
+    assert key not in repr(configured) + str(configured.model_dump())
+    for invalid in ("kisa-anahtar", base64.b64encode(os.urandom(16)).decode()):
+        with pytest.raises(ValidationError, match="settings_encryption_key") as raised:
+            _settings(settings_encryption_key=invalid)
+        assert invalid not in str(raised.value)
+
+
+def test_a_deployment_supplies_the_sql_connection_only_when_it_is_complete() -> None:
+    complete = {"mssql_server": "sql.corp.example.test", "mssql_user": "u", "mssql_password": "p"}
+    assert _settings(**complete).mssql_connection_complete is True
+    for missing in complete:
+        assert _settings(**{**complete, missing: ""}).mssql_connection_complete is False
+    assert _settings(**{**complete, "mssql_server": "  "}).mssql_connection_complete is False
 
 
 def test_llm_chat_api_accepts_only_the_two_request_formats() -> None:

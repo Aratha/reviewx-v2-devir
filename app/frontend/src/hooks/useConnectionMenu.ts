@@ -2,8 +2,9 @@ import {useResource} from '@/hooks/useResource';
 import {ConnectionService} from '@/services/connections';
 
 /**
- * Whether the SQL and LLM connection pages belong in the menu: only for the rule manager and only
- * when the backend reports the settings editable (`local`); in `nonprod` they are hidden
+ * Whether the SQL and LLM connection pages belong in the menu: only when the backend reports the
+ * settings editable for this user. That is the rule manager in `local`; in `nonprod` only the
+ * super admin, and only for a SQL connection the deployment does not supply
  * (sql-server-connection Requirement 5, llm-connection Requirement 13).
  */
 export function useConnectionMenu(enabled: boolean): {sql: boolean; llm: boolean} {

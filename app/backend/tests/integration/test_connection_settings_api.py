@@ -1,31 +1,48 @@
 """SQL Server and LLM connection settings endpoints through the real HTTP application.
 
-sql-review/PRDs/002-sql-server-connection Requirement 3, 4 and 5 and 006-llm-connection
-Requirement 13 (Acceptance 1): roles, the nonprod read view, the local write and test
-endpoints, and passwords or keys never appearing in responses or logs.
+sql-review/PRDs/002-sql-server-connection Requirement 3, 4, 5, 10 and 11 and 006-llm-connection
+Requirement 13 (Acceptance 1): roles, the nonprod read view, the local write and test endpoints,
+the nonprod connection the super admin saves in PostgreSQL, and passwords or keys never appearing
+in responses or logs.
 """
 
+import base64
 import logging
+import os
 from collections.abc import AsyncIterator, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import SecretStr
+from sqlalchemy import text
 
 from app.api.integrations import (
     get_llm_connection_store,
     get_llm_resolver,
     get_sql_catalog,
+    get_sql_catalog_adapter,
+    get_sql_connection_storage,
     get_sql_connection_store,
 )
 from app.core.config import get_settings
+from app.core.secret_cipher import SecretCipher
+from app.db.session import async_session_factory, engine
 from app.domain.models.llm_call import LlmChatApi
-from app.domain.sql_server import SqlServerConnectionConfig
+from app.domain.sql_server import EffectiveSqlConnection, SqlServerConnectionConfig
+from app.infrastructure.sql_server import queries
+from app.infrastructure.sql_server.catalog_adapter import PyodbcSqlCatalog
 from app.main import app, create_application
 from app.services.llm_connection_service import LlmConnectionConfig, LlmConnectionStore
-from app.services.sql_connection_service import SqlConnectionStore
-from tests.integration.conftest import CLIENT_ADDRESS, AuthHarness, RoleSessions
+from app.services.sql_connection_service import SqlConnectionStore, StoredSqlConnection
+from tests.integration.conftest import (
+    CLIENT_ADDRESS,
+    AuthHarness,
+    RoleSessions,
+    SuperAdmin,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -35,10 +52,10 @@ LLM_KEY = f"llm-anahtar-{uuid4().hex}"
 
 class FakeProbe:
     def __init__(self) -> None:
-        self.calls: list[SqlServerConnectionConfig] = []
+        self.calls: list[EffectiveSqlConnection] = []
 
-    async def probe(self, config: SqlServerConnectionConfig) -> list[str]:
-        self.calls.append(config)
+    async def probe(self, connection: EffectiveSqlConnection) -> list[str]:
+        self.calls.append(connection)
         return [f"DWH_{n}" for n in range(10)]
 
 
@@ -53,8 +70,10 @@ class Integrations:
 def integrations(auth: AuthHarness) -> Iterator[Integrations]:
     state = Integrations(
         SqlConnectionStore(
-            SqlServerConnectionConfig(
-                server="sql-dev.corp.example.test", user="gelistirici", password=SQL_PASSWORD
+            EffectiveSqlConnection(
+                SqlServerConnectionConfig(
+                    server="sql-dev.corp.example.test", user="gelistirici", password=SQL_PASSWORD
+                )
             )
         ),
         LlmConnectionStore(
@@ -136,9 +155,13 @@ async def test_settings_endpoints_require_the_rule_manager(
 
 
 async def test_nonprod_shows_only_the_state_and_has_no_write_endpoints(
-    auth: AuthHarness, role_sessions: RoleSessions, integrations: Integrations
+    auth: AuthHarness,
+    role_sessions: RoleSessions,
+    integrations: Integrations,
+    super_admin: SuperAdmin,
 ) -> None:
     manager = await role_sessions.rule_manager()
+    admin = await _admin_headers(auth, super_admin)
 
     sql = await auth.client.get(f"{auth.prefix}/sql-connection", headers=manager.headers)
     llm = await auth.client.get(f"{auth.prefix}/llm-connection", headers=manager.headers)
@@ -154,7 +177,22 @@ async def test_nonprod_shows_only_the_state_and_has_no_write_endpoints(
         ),
     ]
 
-    assert sql.json() == {"environment": "nonprod", "editable": False, "configured": True}
+    closed = {
+        "environment": "nonprod",
+        "editable": False,
+        "configured": True,
+        "managed_by": "deployment",
+    }
+    assert sql.json() == closed
+    # Without the settings encryption key the interface is closed to the super admin as well.
+    as_admin = await auth.client.get(f"{auth.prefix}/sql-connection", headers=admin)
+    admin_writes = [
+        await auth.client.put(f"{auth.prefix}/sql-connection", json={"port": 1}, headers=admin),
+        await auth.client.post(f"{auth.prefix}/sql-connection/test", json={}, headers=admin),
+    ]
+    assert as_admin.json() == closed
+    assert [response.status_code for response in admin_writes] == [404, 404]
+    assert integrations.probe.calls == []
     assert llm.json() == {
         "environment": "nonprod",
         "editable": False,
@@ -163,7 +201,7 @@ async def test_nonprod_shows_only_the_state_and_has_no_write_endpoints(
     }
     assert [response.status_code for response in writes] == [404, 404, 404]
     assert SQL_PASSWORD not in sql.text and LLM_KEY not in llm.text
-    assert integrations.sql_store.current().port == 1433
+    assert integrations.sql_store.current().config.port == 1433
 
 
 async def test_local_sql_settings_change_in_process_and_hide_the_password(
@@ -199,11 +237,12 @@ async def test_local_sql_settings_change_in_process_and_hide_the_password(
     assert shown.json()["password_set"] is True and "password" not in shown.json()
     assert changed.status_code == 200, changed.text
     assert changed.json()["port"] == 14330 and changed.json()["password_set"] is True
-    assert integrations.sql_store.current().password == new_password
+    assert changed.json()["managed_by"] == "local_process"
+    assert integrations.sql_store.current().config.password == new_password
     assert other_server.json()["code"] == "password_required"
     assert same_server.json()["ok"] is True
     assert same_server.json()["databases"] == [f"DWH_{n}" for n in range(10)]
-    assert [call.password for call in integrations.probe.calls] == [new_password]
+    assert [call.config.password for call in integrations.probe.calls] == [new_password]
     assert free_string.status_code == 422
     assert free_string.json()["detail"]["code"] == "invalid_request"
     for response in (shown, changed, other_server, same_server, free_string):
@@ -228,6 +267,345 @@ async def test_local_writes_still_require_the_rule_manager(
         )
         assert response.status_code == 403, path
     assert integrations.probe.calls == []
+
+
+# --- nonprod: the connection the super admin saves (002 Requirement 5, 10, 11) ------------------
+
+
+async def _admin_headers(auth: AuthHarness, admin: SuperAdmin) -> dict[str, str]:
+    response = await auth.login(admin.username, admin.password)
+    assert response.status_code == 200, response.text
+    return auth.auth_headers(response.json())
+
+
+class _Driver:
+    """pyodbc.connect stand-in: records connection strings and lists the online databases."""
+
+    def __init__(self) -> None:
+        self.connection_strings: list[str] = []
+
+    def connect(self, connection_string: str, *, timeout: int, autocommit: bool) -> _Driver:
+        self.connection_strings.append(connection_string)
+        return self
+
+    timeout = 0
+
+    def cursor(self) -> _Driver:
+        return self
+
+    def execute(self, sql: str, *params: Any) -> None:
+        assert sql == queries.LIST_DATABASES_SQL and not params
+
+    def fetchall(self) -> list[tuple[str]]:
+        return [(name,) for name in ("DWH_Risk", "DWH_Sales", "Scratch", "master", "tempdb")]
+
+    def close(self) -> None:
+        pass
+
+
+def _provide(value: Any) -> Any:
+    """A dependency without parameters that returns one object of a replica."""
+
+    return lambda: value
+
+
+@dataclass
+class StoredReplica:
+    """One nonprod backend process that keeps the connection in PostgreSQL."""
+
+    client: AsyncClient
+    store: SqlConnectionStore
+    driver: _Driver = field(default_factory=_Driver)
+
+
+@pytest.fixture
+async def stored_replicas(auth: AuthHarness) -> AsyncIterator[tuple[StoredReplica, StoredReplica]]:
+    """Two processes of the same deployment: no deployment connection, one encryption key."""
+
+    key = os.urandom(32)
+    settings = auth.settings.model_copy(
+        update={"settings_encryption_key": SecretStr(base64.b64encode(key).decode())}
+    )
+
+    async def delete() -> None:
+        async with engine.begin() as connection:
+            await connection.execute(text("DELETE FROM sql_connection_setting"))
+
+    await delete()
+    replicas: list[StoredReplica] = []
+    catalogs: list[PyodbcSqlCatalog] = []
+    clients: list[AsyncClient] = []
+    try:
+        for _ in range(2):
+            driver = _Driver()
+            store = SqlConnectionStore(EffectiveSqlConnection())
+            storage = StoredSqlConnection(
+                session_factory=async_session_factory, cipher=SecretCipher(key), store=store
+            )
+            catalog = PyodbcSqlCatalog(
+                connection=store.current,
+                login_timeout_seconds=15,
+                query_timeout_seconds=60,
+                max_concurrency=2,
+                connect=driver.connect,
+            )
+            catalogs.append(catalog)
+            replica_app = create_application(settings)
+            replica_app.dependency_overrides.update(app.dependency_overrides)
+            replica_app.dependency_overrides.update(
+                {
+                    get_settings: lambda: settings,
+                    get_sql_connection_store: _provide(store),
+                    get_sql_connection_storage: _provide(storage),
+                    get_sql_catalog_adapter: _provide(catalog),
+                }
+            )
+            client = AsyncClient(
+                transport=ASGITransport(app=replica_app, client=(CLIENT_ADDRESS, 50000)),
+                base_url="http://test",
+            )
+            clients.append(client)
+            replicas.append(StoredReplica(client, store, driver))
+        yield replicas[0], replicas[1]
+    finally:
+        for client in clients:
+            await client.aclose()
+        for catalog in catalogs:
+            catalog.close()
+        await delete()
+
+
+async def test_nonprod_super_admin_saves_tests_and_reads_the_connection(
+    auth: AuthHarness,
+    role_sessions: RoleSessions,
+    super_admin: SuperAdmin,
+    stored_replicas: tuple[StoredReplica, StoredReplica],
+    captured_logs: list[logging.LogRecord],
+) -> None:
+    saving, serving = stored_replicas
+    admin = await _admin_headers(auth, super_admin)
+    reviewer = await role_sessions.reviewer()
+    prefix = auth.prefix
+    password = f"nonprod-parola-{uuid4().hex};="
+    form = {"server": "sql-dwh.corp.example.test", "port": 1444, "user": "dwh_okuyucu"}
+
+    empty = await saving.client.get(f"{prefix}/sql-connection", headers=admin)
+    not_yet = await serving.client.get(f"{prefix}/databases", headers=reviewer.headers)
+    tested = await saving.client.post(
+        f"{prefix}/sql-connection/test", json={**form, "password": password}, headers=admin
+    )
+    untouched = await serving.client.get(f"{prefix}/databases", headers=reviewer.headers)
+    saved = await saving.client.put(
+        f"{prefix}/sql-connection",
+        json={**form, "password": password, "allowed_databases": ["DWH_Sales", "dwh_risk"]},
+        headers=admin,
+    )
+    # The other process serves the next request with the saved connection, without a restart.
+    listed = await serving.client.get(f"{prefix}/databases", headers=reviewer.headers)
+    shown = await serving.client.get(f"{prefix}/sql-connection", headers=admin)
+    narrowed = await saving.client.put(
+        f"{prefix}/sql-connection", json={"allowed_databases": ["DWH_Risk"]}, headers=admin
+    )
+    relisted = await serving.client.get(f"{prefix}/databases", headers=reviewer.headers)
+    removed = await saving.client.put(
+        f"{prefix}/sql-connection", json={"password": ""}, headers=admin
+    )
+    closed = await serving.client.get(f"{prefix}/databases", headers=reviewer.headers)
+
+    assert empty.json() == {
+        "environment": "nonprod",
+        "editable": True,
+        "configured": False,
+        "managed_by": "super_admin",
+        "server": "",
+        "port": 1433,
+        "user": "",
+        "encrypt": True,
+        "trust_server_certificate": False,
+        "password_set": False,
+        "allowed_databases": [],
+    }
+    assert not_yet.status_code == 503
+    assert not_yet.json()["detail"]["code"] == "sql_connection_not_configured"
+    assert tested.status_code == 200, tested.text
+    assert tested.json()["ok"] is True
+    assert tested.json()["databases"] == ["DWH_Risk", "DWH_Sales", "Scratch"]
+    assert untouched.status_code == 503  # a test never saves
+    assert saved.status_code == 200, saved.text
+    expected = {
+        "environment": "nonprod",
+        "editable": True,
+        "configured": True,
+        "managed_by": "super_admin",
+        "server": "sql-dwh.corp.example.test",
+        "port": 1444,
+        "user": "dwh_okuyucu",
+        "encrypt": True,
+        "trust_server_certificate": False,
+        "password_set": True,
+        "allowed_databases": ["DWH_Sales", "dwh_risk"],
+    }
+    assert saved.json() == expected and shown.json() == expected
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["items"] == ["DWH_Risk", "DWH_Sales"]
+    used = serving.driver.connection_strings[-1]
+    assert "Server=sql-dwh.corp.example.test,1444;" in used
+    assert "Encrypt=yes;TrustServerCertificate=no;" in used
+    assert narrowed.status_code == 200 and narrowed.json()["password_set"] is True
+    assert relisted.json()["items"] == ["DWH_Risk"]
+    assert removed.json()["configured"] is False and removed.json()["password_set"] is False
+    assert closed.status_code == 503
+
+    async with engine.connect() as connection:
+        row = dict(
+            (await connection.execute(text("SELECT * FROM sql_connection_setting"))).one()._mapping
+        )
+        actor = (
+            await connection.execute(
+                text("SELECT user_id FROM app_user WHERE public_id = :public_id"),
+                {"public_id": str(super_admin.public_id)},
+            )
+        ).scalar_one()
+    assert row["password_ciphertext"] is None and row["updated_by"] == actor
+    for response in (empty, tested, saved, shown, narrowed, removed, listed):
+        assert password not in response.text and "password_ciphertext" not in response.text
+    rendered = _rendered(captured_logs)
+    assert password not in rendered
+    events = [
+        r.structured_fields  # type: ignore[attr-defined]
+        for r in captured_logs
+        if r.getMessage() == "sql_connection.updated"
+    ]
+    assert [event["changed_fields"] for event in events] == [
+        "allowed_databases,password,port,server,user",
+        "allowed_databases",
+        "password",
+    ]
+    assert all(event["user_public_id"] == str(super_admin.public_id) for event in events)
+    assert all(event["managed_by"] == "super_admin" for event in events)
+
+
+async def test_nonprod_stored_password_is_ciphertext_in_postgresql(
+    auth: AuthHarness,
+    super_admin: SuperAdmin,
+    stored_replicas: tuple[StoredReplica, StoredReplica],
+) -> None:
+    saving, _ = stored_replicas
+    admin = await _admin_headers(auth, super_admin)
+    password = f"nonprod-parola-{uuid4().hex}"
+
+    saved = await saving.client.put(
+        f"{auth.prefix}/sql-connection",
+        json={
+            "server": "sql-dwh.corp.example.test",
+            "user": "dwh_okuyucu",
+            "password": password,
+            "allowed_databases": ["DWH_Sales"],
+        },
+        headers=admin,
+    )
+
+    assert saved.status_code == 200, saved.text
+    async with engine.connect() as connection:
+        dumped = (
+            await connection.execute(
+                text("SELECT row_to_json(s)::text FROM sql_connection_setting s")
+            )
+        ).scalar_one()
+    assert password not in dumped and '"password_ciphertext":"v1.' in dumped.replace(" ", "")
+
+
+async def test_nonprod_other_roles_cannot_see_or_change_the_stored_connection(
+    auth: AuthHarness,
+    role_sessions: RoleSessions,
+    super_admin: SuperAdmin,
+    stored_replicas: tuple[StoredReplica, StoredReplica],
+) -> None:
+    replica, _ = stored_replicas
+    admin = await _admin_headers(auth, super_admin)
+    manager = await role_sessions.rule_manager()
+    reviewer = await role_sessions.reviewer()
+    prefix = auth.prefix
+    tenant_only = {auth.settings.tenant_header: manager.headers[auth.settings.tenant_header]}
+    body = {
+        "server": "sql-dwh.corp.example.test",
+        "user": "dwh_okuyucu",
+        "password": f"parola-{uuid4().hex}",
+        "allowed_databases": ["DWH_Sales"],
+    }
+    assert (
+        await replica.client.put(f"{prefix}/sql-connection", json=body, headers=admin)
+    ).is_success
+
+    as_manager = await replica.client.get(f"{prefix}/sql-connection", headers=manager.headers)
+    as_reviewer = await replica.client.get(f"{prefix}/sql-connection", headers=reviewer.headers)
+    denied = [
+        await replica.client.request(method, f"{prefix}{path}", json=body, headers=headers)
+        for headers in (manager.headers, reviewer.headers)
+        for method, path in (("PUT", "/sql-connection"), ("POST", "/sql-connection/test"))
+    ]
+    anonymous = [
+        await replica.client.request(method, f"{prefix}{path}", json=body, headers=tenant_only)
+        for method, path in (
+            ("GET", "/sql-connection"),
+            ("PUT", "/sql-connection"),
+            ("POST", "/sql-connection/test"),
+        )
+    ]
+
+    assert as_manager.json() == {
+        "environment": "nonprod",
+        "editable": False,
+        "configured": True,
+        "managed_by": "super_admin",
+    }
+    assert as_reviewer.status_code == 403
+    assert [response.status_code for response in denied] == [403, 403, 403, 403]
+    assert {response.json()["detail"]["code"] for response in denied} == {"forbidden"}
+    assert [response.status_code for response in anonymous] == [401, 401, 401]
+    assert replica.driver.connection_strings == []
+    assert replica.store.current().config.server == "sql-dwh.corp.example.test"
+
+
+@pytest.mark.parametrize(
+    ("change", "code"),
+    [
+        ({"allowed_databases": ["DWH_Sales", "master"]}, "sql_allowed_databases_invalid"),
+        ({"allowed_databases": []}, "sql_allowed_databases_invalid"),
+        ({"server": "sql;Encrypt=no"}, "sql_connection_invalid"),
+        ({"user": ""}, "sql_connection_invalid"),
+        ({"encrypt": False}, "sql_setting_fixed"),
+        ({"trust_server_certificate": True}, "sql_setting_fixed"),
+        ({"connection_string": "Server=x"}, "invalid_request"),
+        ({"allowed_databases": ["x" * 129]}, "invalid_request"),
+    ],
+)
+async def test_nonprod_save_refuses_values_that_break_the_guarantees(
+    auth: AuthHarness,
+    super_admin: SuperAdmin,
+    stored_replicas: tuple[StoredReplica, StoredReplica],
+    change: dict[str, Any],
+    code: str,
+) -> None:
+    replica, _ = stored_replicas
+    admin = await _admin_headers(auth, super_admin)
+    valid = {
+        "server": "sql-dwh.corp.example.test",
+        "user": "dwh_okuyucu",
+        "password": f"parola-{uuid4().hex}",
+        "allowed_databases": ["DWH_Sales"],
+    }
+    url = f"{auth.prefix}/sql-connection"
+    assert (await replica.client.put(url, json=valid, headers=admin)).is_success
+
+    refused = await replica.client.put(url, json=change, headers=admin)
+    after = await replica.client.get(url, headers=admin)
+
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["detail"]["code"] == code
+    assert valid["password"] not in refused.text
+    assert after.json()["allowed_databases"] == ["DWH_Sales"]
+    assert after.json()["server"] == "sql-dwh.corp.example.test" and after.json()["password_set"]
 
 
 async def test_local_llm_settings_change_in_process_and_hide_the_key(

@@ -237,11 +237,6 @@ def test_llm_chat_api_accepts_only_the_two_request_formats() -> None:
         _settings(llm_chat_api="gpt_oss")
 
 
-def test_allowed_database_list_is_parsed_case_insensitively() -> None:
-    settings = _settings(mssql_allowed_databases=" DWH_Stage , dwh_core,,")
-    assert settings.mssql_allowed_database_names == frozenset({"dwh_stage", "dwh_core"})
-
-
 def test_trusted_proxy_networks_are_parsed_and_validated() -> None:
     settings = _settings(trusted_proxy_cidrs="10.42.0.0/16, 192.168.1.10")
     assert [str(network) for network in settings.trusted_proxy_networks] == [

@@ -1,9 +1,9 @@
 """Start-up refusal of unsafe integration settings.
 
-sql-review/PRDs/002-sql-server-connection Requirement 1 (Decision 5, 6 and 11) and
-006-llm-connection Requirement 1 and 2: in nonprod the SQL Server connection must be encrypted
-with a verified certificate and, once server, user and password are all set, limited to business
-databases; an incomplete connection only leaves the SQL Server area not configured. The LLM
+sql-review/PRDs/002-sql-server-connection Requirement 1 (Decision 6 and 11) and
+006-llm-connection Requirement 1 and 2: in nonprod the SQL Server connection must be encrypted;
+whether the server certificate is verified is the recorded exception of Decision 6 and does not
+stop the process. An incomplete connection only leaves the SQL Server area not configured. The LLM
 endpoint must be https with a model. In nonprod a configured OpenTelemetry collector endpoint
 must be https as well. In every environment configured values must be well formed. Only setting
 names are reported, never values.
@@ -15,7 +15,6 @@ from urllib.parse import urlsplit
 from app.core.config import Settings
 from app.domain.llm import LlmEndpointInvalid, resolve_chat_url, validate_endpoint_url
 from app.domain.models.llm_call import LlmChatApi
-from app.domain.sql_server import SYSTEM_DATABASES
 from app.infrastructure.sql_server.connection_string import (
     InvalidConnectionValue,
     validate_server,
@@ -55,15 +54,9 @@ def integration_setting_errors(settings: Settings) -> list[str]:
     if local:
         return errors
 
-    # Without server, user or password the deployment supplies no connection and the process
-    # starts (Decision 11); a usable connection is never left without the allow-list.
-    allowed = settings.mssql_allowed_database_names
-    if (settings.mssql_connection_complete and not allowed) or allowed & SYSTEM_DATABASES:
-        errors.append("DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES")
+    # Decision 6 holds whether or not the deployment supplies the connection (Decision 11).
     if not settings.mssql_encrypt:
         errors.append("DWHCODEREVIEW_MSSQL_ENCRYPT")
-    if settings.mssql_trust_server_certificate:
-        errors.append("DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE")
     resolved = resolve_chat_url(
         LlmChatApi(settings.llm_chat_api), settings.llm_base_url, settings.llm_chat_url
     )

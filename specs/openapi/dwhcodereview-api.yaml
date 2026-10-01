@@ -2170,22 +2170,6 @@
         "additionalProperties": false,
         "description": "Partial values; a missing password keeps the stored one and an empty one removes it.",
         "properties": {
-          "allowed_databases": {
-            "anyOf": [
-              {
-                "items": {
-                  "maxLength": 128,
-                  "type": "string"
-                },
-                "maxItems": 200,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Editable only in nonprod; locally the list comes from the settings file."
-          },
           "encrypt": {
             "anyOf": [
               {
@@ -2240,7 +2224,7 @@
                 "type": "null"
               }
             ],
-            "description": "Editable only locally; nonprod accepts only false."
+            "description": "True accepts the server certificate without verifying it; still encrypted."
           },
           "user": {
             "anyOf": [
@@ -2270,6 +2254,7 @@
             "description": "Failure class of Requirement 8 or password_required; empty on success."
           },
           "databases": {
+            "description": "Online databases the account can access, without system databases.",
             "items": {
               "type": "string"
             },
@@ -2293,19 +2278,6 @@
       "SqlConnectionView": {
         "description": "Only the editing caller sees server, user and options; nobody sees a password.",
         "properties": {
-          "allowed_databases": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "configured": {
             "type": "boolean"
           },
@@ -2986,7 +2958,7 @@
     },
     "/api/dwhcodereview/v1/databases": {
       "get": {
-        "description": "Online databases inside the allow-list, ordered by name (Requirement 1).",
+        "description": "Online databases the account can access, without system databases (Requirement 1).",
         "parameters": [
           {
             "in": "query",
@@ -4414,7 +4386,7 @@
             "description": "Ayn\u0131 anda ba\u015fka bir kay\u0131t yap\u0131ld\u0131"
           },
           "422": {
-            "description": "Ge\u00e7ersiz sunucu, kullan\u0131c\u0131 ad\u0131 veya izinli veritaban\u0131 listesi"
+            "description": "Ge\u00e7ersiz sunucu veya kullan\u0131c\u0131 ad\u0131 ya da bu ortamda sabit ayar"
           }
         },
         "security": [
@@ -4463,7 +4435,7 @@
             "description": "Ba\u011flant\u0131 bu ortamda da\u011f\u0131t\u0131mla y\u00f6netilir"
           },
           "422": {
-            "description": "Ge\u00e7ersiz sunucu, kullan\u0131c\u0131 ad\u0131 veya izinli veritaban\u0131 listesi"
+            "description": "Ge\u00e7ersiz sunucu veya kullan\u0131c\u0131 ad\u0131 ya da bu ortamda sabit ayar"
           }
         },
         "security": [

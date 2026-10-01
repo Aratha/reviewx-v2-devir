@@ -1,15 +1,16 @@
 """The SQL Server connection saved in PostgreSQL (sql-review/PRDs/002-sql-server-connection).
 
-Requirement 10 and 11, Decision 12 and 13 (Acceptance 1) against the migrated database: the
-password is encrypted at rest, another replica uses a save without a restart, an unreadable or
-unusable saved value leaves the connection not configured, the saving account is re-read, and the
-migration goes down and up.
+Requirement 10 and 11, Decision 6, 12 and 13 (Acceptance 1) against the migrated database: the
+password is encrypted at rest, the certificate option is saved with the connection, another
+replica uses a save without a restart, an unreadable saved password leaves the connection not
+configured, the saving account is re-read, and the migrations go down and up.
 """
 
 import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -26,7 +27,6 @@ from app.core.request_context import RequestContext
 from app.core.secret_cipher import SecretCipher
 from app.db.session import async_session_factory, engine
 from app.domain.sql_server import (
-    EffectiveSqlConnection,
     SqlServerConnectionConfig,
     SqlServerNotConfigured,
 )
@@ -38,11 +38,8 @@ from tests.integration.conftest import SuperAdmin
 pytestmark = pytest.mark.integration
 
 PASSWORD = f"sakli-parola-{uuid4().hex};=}}"
-SAVED = EffectiveSqlConnection(
-    SqlServerConnectionConfig(
-        server="sql-dwh.corp.example.test", port=1444, user="dwh_okuyucu", password=PASSWORD
-    ),
-    ("DWH_Sales", "DWH_Risk"),
+SAVED = SqlServerConnectionConfig(
+    server="sql-dwh.corp.example.test", port=1444, user="dwh_okuyucu", password=PASSWORD
 )
 
 
@@ -50,13 +47,13 @@ class Replica:
     """One backend process: its own store, storage and catalog over a fake driver."""
 
     def __init__(self, key: bytes) -> None:
-        self.store = SqlConnectionStore(EffectiveSqlConnection())
+        self.store = SqlConnectionStore(SqlServerConnectionConfig())
         self.storage = StoredSqlConnection(
             session_factory=async_session_factory, cipher=SecretCipher(key), store=self.store
         )
         self.connection_strings: list[str] = []
         self.catalog = PyodbcSqlCatalog(
-            connection=self.store.current,
+            config=self.store.current,
             login_timeout_seconds=15,
             query_timeout_seconds=60,
             max_concurrency=2,
@@ -158,13 +155,13 @@ async def test_the_password_is_encrypted_at_rest_and_the_row_records_who_saved(
         before, after = await replica.storage.save(_context(super_admin), lambda current: SAVED)
         row = await _row()
 
-        assert before == EffectiveSqlConnection() and after == SAVED
+        assert before == SqlServerConnectionConfig() and after == SAVED
         assert (row["server"], row["port"], row["user_name"]) == (
             "sql-dwh.corp.example.test",
             1444,
             "dwh_okuyucu",
         )
-        assert row["allowed_databases"] == ["DWH_Sales", "DWH_Risk"]
+        assert "allowed_databases" not in row and row["trust_server_certificate"] is False
         assert row["password_ciphertext"].startswith("v1.")
         assert PASSWORD not in repr(row) and PASSWORD.encode().hex() not in repr(row)
         actor = await _user_id(super_admin)
@@ -174,15 +171,13 @@ async def test_the_password_is_encrypted_at_rest_and_the_row_records_who_saved(
         # A second save updates the same row; the same password is sealed with a new nonce.
         await replica.storage.save(
             _context(super_admin),
-            lambda current: EffectiveSqlConnection(current.config, ("DWH_Risk",)),
+            lambda current: replace(current, port=1500),
         )
         again = await _row()
         assert again["sql_connection_setting_id"] == row["sql_connection_setting_id"]
         assert again["password_ciphertext"] != row["password_ciphertext"]
-        assert (
-            again["allowed_databases"] == ["DWH_Risk"] and again["updated_at"] > row["updated_at"]
-        )
-        assert replica.store.current().config.password == PASSWORD
+        assert again["port"] == 1500 and again["updated_at"] > row["updated_at"]
+        assert replica.store.current().password == PASSWORD
     finally:
         replica.catalog.close()
 
@@ -199,31 +194,35 @@ async def test_another_replica_uses_a_save_without_a_restart(
         await saving.storage.save(_context(super_admin), lambda current: SAVED)
         await serving.storage.refresh()
 
-        assert await serving.catalog.list_databases() == ["DWH_Risk", "DWH_Sales"]
-        assert serving.catalog.is_allowed("dwh_sales") and not serving.catalog.is_allowed("Scratch")
+        # Every database the account can access, without the system databases.
+        assert await serving.catalog.list_databases() == ["DWH_Risk", "DWH_Sales", "Scratch"]
         used = serving.connection_strings[-1]
         assert "Server=sql-dwh.corp.example.test,1444;" in used
         assert "Encrypt=yes;TrustServerCertificate=no;" in used
 
+        # Decision 6 exception: the option travels with the saved connection to every replica.
         await saving.storage.save(
             _context(super_admin),
-            lambda current: EffectiveSqlConnection(
-                SqlServerConnectionConfig(
-                    server="sql-2.corp.example.test", user="dwh_okuyucu", password=PASSWORD
-                ),
-                ("DWH_Sales",),
+            lambda current: replace(
+                current, server="sql-2.corp.example.test", port=1433, trust_server_certificate=True
             ),
         )
         await serving.storage.refresh()
-        assert await serving.catalog.list_databases() == ["DWH_Sales"]
-        assert "Server=sql-2.corp.example.test,1433;" in serving.connection_strings[-1]
+        assert await serving.catalog.list_databases() == ["DWH_Risk", "DWH_Sales", "Scratch"]
+        used = serving.connection_strings[-1]
+        assert "Server=sql-2.corp.example.test,1433;" in used
+        assert "Encrypt=yes;TrustServerCertificate=yes;" in used
+        assert (await _row())["trust_server_certificate"] is True
 
         await saving.storage.save(
-            _context(super_admin),
-            lambda current: EffectiveSqlConnection(
-                SqlServerConnectionConfig(server="sql-2.corp.example.test", user="dwh_okuyucu"),
-                current.allowed_databases,
-            ),
+            _context(super_admin), lambda current: replace(current, trust_server_certificate=False)
+        )
+        await serving.storage.refresh()
+        await serving.catalog.list_databases()
+        assert "Encrypt=yes;TrustServerCertificate=no;" in serving.connection_strings[-1]
+
+        await saving.storage.save(
+            _context(super_admin), lambda current: replace(current, password=None)
         )
         await serving.storage.refresh()
         with pytest.raises(SqlServerNotConfigured):
@@ -245,9 +244,8 @@ async def test_a_password_sealed_with_another_key_leaves_the_connection_not_conf
             await new.storage.refresh()
         current = new.store.current()
 
-        assert current.configured is False and current.config.password is None
-        assert current.config.server == SAVED.config.server
-        assert current.allowed_databases == SAVED.allowed_databases
+        assert current.configured is False and current.password is None
+        assert current.server == SAVED.server
         with pytest.raises(SqlServerNotConfigured):
             await new.catalog.list_databases()
         assert _events(sql_logs, "sql_connection.stored_unusable") == [
@@ -256,15 +254,7 @@ async def test_a_password_sealed_with_another_key_leaves_the_connection_not_conf
 
         await new.storage.save(
             _context(super_admin),
-            lambda found: EffectiveSqlConnection(
-                SqlServerConnectionConfig(
-                    server=found.config.server,
-                    port=found.config.port,
-                    user=found.config.user,
-                    password=PASSWORD,
-                ),
-                found.allowed_databases,
-            ),
+            lambda found: replace(found, password=PASSWORD),
         )
         await new.storage.refresh()
         assert new.store.current() == SAVED
@@ -274,38 +264,6 @@ async def test_a_password_sealed_with_another_key_leaves_the_connection_not_conf
     finally:
         old.catalog.close()
         new.catalog.close()
-
-
-@pytest.mark.parametrize("allowed", [["DWH_Sales", "MASTER"], ["tempdb"]])
-async def test_a_saved_allow_list_that_lost_its_guarantees_is_never_used(
-    clean: None,
-    key: bytes,
-    super_admin: SuperAdmin,
-    sql_logs: list[logging.LogRecord],
-    allowed: list[str],
-) -> None:
-    replica = Replica(key)
-    try:
-        await replica.storage.save(_context(super_admin), lambda current: SAVED)
-        async with engine.begin() as connection:
-            await connection.execute(
-                text(
-                    "UPDATE sql_connection_setting "
-                    "SET allowed_databases = CAST(:allowed AS varchar[])"
-                ),
-                {"allowed": allowed},
-            )
-
-        await replica.storage.refresh()
-
-        assert replica.store.current().configured is False
-        with pytest.raises(SqlServerNotConfigured):
-            await replica.catalog.list_databases()
-        assert _events(sql_logs, "sql_connection.stored_unusable") == [
-            {"event": "sql_connection.stored_unusable", "reason": "allowed_databases_invalid"}
-        ]
-    finally:
-        replica.catalog.close()
 
 
 async def test_only_a_current_super_admin_account_can_save(
@@ -343,7 +301,7 @@ async def test_only_a_current_super_admin_account_can_save(
             count = (
                 await connection.execute(text("SELECT count(*) FROM sql_connection_setting"))
             ).scalar_one()
-        assert count == 0 and replica.store.current() == EffectiveSqlConnection()
+        assert count == 0 and replica.store.current() == SqlServerConnectionConfig()
     finally:
         replica.catalog.close()
 
@@ -356,8 +314,8 @@ async def test_a_rejected_change_writes_nothing(
         await replica.storage.save(_context(super_admin), lambda current: SAVED)
         before = await _row()
 
-        def reject(current: EffectiveSqlConnection) -> EffectiveSqlConnection:
-            raise ApplicationError(422, "sql_allowed_databases_invalid", "x")
+        def reject(current: SqlServerConnectionConfig) -> SqlServerConnectionConfig:
+            raise ApplicationError(422, "sql_connection_invalid", "x")
 
         with pytest.raises(ApplicationError):
             await replica.storage.save(_context(super_admin), reject)
@@ -392,24 +350,58 @@ async def test_a_failed_read_keeps_the_last_connection_and_reports_the_error_typ
         replica.catalog.close()
 
 
-def test_the_migration_goes_down_and_up_again(migrated_database: None) -> None:
+def test_the_migrations_go_down_and_up_again(migrated_database: None) -> None:
     config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
 
-    async def table_exists() -> bool:
+    async def columns() -> set[str]:
         probe = create_async_engine(get_settings().database_url)
         try:
             async with probe.connect() as connection:
+                await connection.execute(text("SELECT 1"))
                 found = await connection.execute(
-                    text("SELECT to_regclass('public.sql_connection_setting') IS NOT NULL")
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'public' AND table_name = 'sql_connection_setting'"
+                    )
                 )
-                return bool(found.scalar_one())
+                return {str(name) for name in found.scalars()}
+        finally:
+            await probe.dispose()
+
+    async def execute(statement: str, **params: Any) -> None:
+        probe = create_async_engine(get_settings().database_url)
+        try:
+            async with probe.begin() as connection:
+                await connection.execute(text(statement), params)
         finally:
             await probe.dispose()
 
     try:
+        asyncio.run(execute("DELETE FROM sql_connection_setting"))
+        current = asyncio.run(columns())
+        assert "trust_server_certificate" in current and "allowed_databases" not in current
+
+        # The step that dropped the list goes back only while no connection is saved.
+        asyncio.run(
+            execute(
+                "INSERT INTO sql_connection_setting (tenant_id, server, port, user_name) "
+                "SELECT tenant_id, 'sql.corp.example.test', 1433, 'okuyucu' FROM tenant "
+                "WHERE code = 'platform'"
+            )
+        )
+        with pytest.raises(RuntimeError, match="saved connection"):
+            command.downgrade(config, "202610010001")
+        assert "allowed_databases" not in asyncio.run(columns())
+        asyncio.run(execute("DELETE FROM sql_connection_setting"))
+
+        command.downgrade(config, "202610010001")
+        previous = asyncio.run(columns())
+        assert "allowed_databases" in previous and "trust_server_certificate" not in previous
+
         command.downgrade(config, "202609260003")
-        assert asyncio.run(table_exists()) is False
+        assert asyncio.run(columns()) == set()
     finally:
         command.upgrade(config, "head")
-    assert asyncio.run(table_exists()) is True
+    final = asyncio.run(columns())
+    assert "trust_server_certificate" in final and "allowed_databases" not in final
     command.check(config)

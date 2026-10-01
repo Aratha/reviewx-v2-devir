@@ -27,8 +27,6 @@ const MESSAGES: Record<string, string> = {
   rule_set_version_not_found: 'Kural sürümü bulunamadı.',
   sql_connection_not_configured: 'SQL Server bağlantısı yapılandırılmamış.',
   sql_connection_invalid: 'Sunucu veya kullanıcı adı geçersiz.',
-  sql_allowed_databases_invalid:
-    'İzinli veritabanı listesi boş olamaz ve sistem veritabanı (master, tempdb, model, msdb) içeremez.',
   sql_setting_fixed: 'Bu ayar bu ortamda değiştirilemez.',
   sql_connection_conflict:
     'Bağlantı ayarı aynı anda başka biri tarafından kaydedildi; sayfayı yenileyip yeniden deneyin.',
@@ -38,7 +36,7 @@ const MESSAGES: Record<string, string> = {
   sql_tls_failed: 'SQL Server ile güvenli bağlantı kurulamadı.',
   sql_query_failed: 'SQL Server sorgusu tamamlanamadı.',
   password_required: 'Bağlantıyı test etmek için parolayı girin.',
-  database_not_allowed: 'Bu veritabanı inceleme için izinli değil.',
+  database_not_allowed: 'Sistem veritabanları incelenemez.',
   object_not_found: 'Tanım alınamadı (nesne yok veya yetki yok).',
   selection_empty: 'İnceleme için en az bir nesne seçin.',
   too_many_objects: 'Bir incelemede en çok 50 nesne olabilir.',

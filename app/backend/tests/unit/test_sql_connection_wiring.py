@@ -13,7 +13,7 @@ import pytest
 
 from app.api import integrations
 from app.core.config import Settings
-from app.domain.sql_server import EffectiveSqlConnection, SqlServerConnectionConfig
+from app.domain.sql_server import SqlServerConnectionConfig
 from app.services.sql_connection_service import StoredSqlConnection
 
 pytestmark = pytest.mark.unit
@@ -24,7 +24,6 @@ _DEPLOYED = {
     "mssql_server": "sql.corp.example.test",
     "mssql_user": "okuyucu",
     "mssql_password": "yalniz-test-parolasi",
-    "mssql_allowed_databases": "DWH_Sales",
 }
 _CACHED = (
     integrations.get_sql_connection_store,
@@ -75,9 +74,9 @@ def test_nothing_is_stored_locally_or_when_the_deployment_manages_the_connection
 def test_a_deployment_connection_is_in_force_from_the_start(wire: Any) -> None:
     wire(environment="staging", **_DEPLOYED)
     current = integrations.get_sql_connection_store().current()
-    assert current.configured and current.allowed_databases == ("DWH_Sales",)
-    assert integrations.get_sql_catalog_adapter().is_allowed("dwh_sales")
-    assert not integrations.get_sql_catalog_adapter().is_allowed("Scratch")
+    assert current.configured and current.server == "sql.corp.example.test"
+    catalog = integrations.get_sql_catalog_adapter()
+    assert catalog.is_allowed("AnyDatabase") and not catalog.is_allowed("master")
 
 
 def test_a_stored_nonprod_reads_through_the_store_of_the_same_process(wire: Any) -> None:
@@ -88,12 +87,9 @@ def test_a_stored_nonprod_reads_through_the_store_of_the_same_process(wire: Any)
     catalog = integrations.get_sql_catalog_adapter()
 
     assert isinstance(storage, StoredSqlConnection)
-    assert store.current() == EffectiveSqlConnection()
+    assert store.current() == SqlServerConnectionConfig()
     # What the storage puts into the store is what the catalog uses on its next call.
     assert storage._store is store
-    store.replace(
-        EffectiveSqlConnection(
-            SqlServerConnectionConfig(server="sql", user="u", password="p"), ("DWH_Risk",)
-        )
-    )
-    assert catalog.is_allowed("dwh_risk") and not catalog.is_allowed("DWH_Sales")
+    saved = SqlServerConnectionConfig(server="sql", user="u", password="p")
+    store.replace(saved)
+    assert catalog._configured() is saved

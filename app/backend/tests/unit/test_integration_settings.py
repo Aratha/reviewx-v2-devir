@@ -13,7 +13,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings
 from app.core.request_context import RequestContext
-from app.domain.sql_server import EffectiveSqlConnection
+from app.domain.sql_server import SqlServerConnectionConfig
 from app.main import UnsafeIntegrationSettings, create_application
 from app.services.sql_connection_service import (
     SqlConnectionService,
@@ -31,7 +31,6 @@ NONPROD_OK: dict[str, Any] = {
     "mssql_server": "sql-dwh.corp.example.test",
     "mssql_user": "dwh_okuyucu",
     "mssql_password": "yalniz-test-parolasi",
-    "mssql_allowed_databases": "DWH_Sales,DWH_Risk",
     "mssql_encrypt": True,
     "mssql_trust_server_certificate": False,
     "llm_chat_api": "openai",
@@ -63,7 +62,6 @@ _SQL_SERVER_CONNECTION = {
     "mssql_server": "",
     "mssql_user": "",
     "mssql_password": "",
-    "mssql_allowed_databases": "",
 }
 
 
@@ -71,7 +69,7 @@ _SQL_SERVER_CONNECTION = {
     "blank",
     [
         tuple(_SQL_SERVER_CONNECTION),
-        ("mssql_server", "mssql_allowed_databases"),
+        ("mssql_server", "mssql_user"),
         ("mssql_user", "mssql_password"),
         ("mssql_password",),
         ("mssql_server",),
@@ -86,9 +84,23 @@ def test_nonprod_without_a_complete_sql_server_connection_starts_unconfigured(
     assert integration_setting_errors(settings) == []
 
 
-def test_a_complete_nonprod_connection_still_requires_the_allow_list() -> None:
-    errors = integration_setting_errors(_settings(**{**NONPROD_OK, "mssql_allowed_databases": ""}))
-    assert errors == ["DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"]
+def test_a_complete_nonprod_connection_needs_no_database_list() -> None:
+    # Decision 5: the account's permissions decide what can be read; no list is configured, and a
+    # leftover variable of the removed setting is not a setting any more.
+    assert "mssql_allowed_databases" not in Settings.model_fields
+    assert integration_setting_errors(_settings(**NONPROD_OK)) == []
+    settings = Settings(_env_file=None, **NONPROD_OK, mssql_allowed_databases="master")
+    assert integration_setting_errors(settings) == []
+
+
+def test_nonprod_may_start_without_certificate_verification_but_never_unencrypted() -> None:
+    # Decision 6 and its recorded exception: the certificate option does not stop the process in
+    # either nonprod path; encryption always does.
+    trusting = _settings(**{**NONPROD_OK, "mssql_trust_server_certificate": True})
+    assert integration_setting_errors(trusting) == []
+    assert initial_sql_connection(trusting).trust_server_certificate is True
+    unencrypted = {**NONPROD_OK, "mssql_trust_server_certificate": True, "mssql_encrypt": False}
+    assert integration_setting_errors(_settings(**unencrypted)) == ["DWHCODEREVIEW_MSSQL_ENCRYPT"]
 
 
 async def test_nonprod_without_sql_server_credentials_reports_not_configured() -> None:
@@ -106,7 +118,7 @@ async def test_nonprod_without_sql_server_credentials_reports_not_configured() -
 
 class _UnusedProbe:
     async def probe(
-        self, connection: EffectiveSqlConnection
+        self, config: SqlServerConnectionConfig
     ) -> list[str]:  # pragma: no cover - never called
         raise AssertionError("a deployment-managed nonprod never probes")
 
@@ -114,11 +126,7 @@ class _UnusedProbe:
 @pytest.mark.parametrize(
     ("change", "setting"),
     [
-        ({"mssql_allowed_databases": ""}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),
-        ({"mssql_allowed_databases": "DWH_Sales,MASTER"}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),
-        ({"mssql_allowed_databases": "tempdb"}, "DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES"),
         ({"mssql_encrypt": False}, "DWHCODEREVIEW_MSSQL_ENCRYPT"),
-        ({"mssql_trust_server_certificate": True}, "DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE"),
         ({"llm_base_url": ""}, "DWHCODEREVIEW_LLM_BASE_URL"),
         ({"llm_base_url": "http://llm.corp.example.test/v1"}, "DWHCODEREVIEW_LLM_BASE_URL"),
         ({"llm_chat_url": "http://llm.corp.example.test/chat"}, "DWHCODEREVIEW_LLM_CHAT_URL"),

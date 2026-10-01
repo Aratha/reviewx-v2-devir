@@ -20,20 +20,17 @@ from app.core.config import Settings
 from app.core.errors import ApplicationError
 from app.core.request_context import RequestContext
 from app.domain.sql_server import (
-    EffectiveSqlConnection,
     SqlServerConnectionConfig,
     SqlServerError,
     SqlServerErrorClass,
 )
 from app.schemas.sql_connection.contracts import SqlConnectionChange
 from app.services.sql_connection_service import (
-    InvalidAllowedDatabases,
     SqlConnectionMode,
     SqlConnectionService,
     SqlConnectionStore,
     StoredSqlConnection,
     initial_sql_connection,
-    normalize_allowed_databases,
     sql_connection_mode,
 )
 
@@ -41,11 +38,8 @@ pytestmark = pytest.mark.unit
 
 BACKEND = Path(__file__).resolve().parents[2]
 STORED_PASSWORD = f"kayitli-{uuid4().hex}"
-STORED = EffectiveSqlConnection(
-    SqlServerConnectionConfig(
-        server="sql-dev.corp.example.test", port=1433, user="gelistirici", password=STORED_PASSWORD
-    ),
-    ("DWH_B", "DWH_A"),
+STORED = SqlServerConnectionConfig(
+    server="sql-dev.corp.example.test", port=1433, user="gelistirici", password=STORED_PASSWORD
 )
 CONTEXT = RequestContext(subject=uuid4(), roles=frozenset({"kural-yoneticisi"}))
 SUPER_ADMIN = RequestContext(subject=uuid4(), is_super_admin=True)
@@ -64,19 +58,19 @@ class FakeProbe:
     def __init__(self, databases: Sequence[str] = (), error: SqlServerError | None = None) -> None:
         self.databases = list(databases)
         self.error = error
-        self.calls: list[EffectiveSqlConnection] = []
+        self.calls: list[SqlServerConnectionConfig] = []
 
-    async def probe(self, connection: EffectiveSqlConnection) -> list[str]:
-        self.calls.append(connection)
+    async def probe(self, config: SqlServerConnectionConfig) -> list[str]:
+        self.calls.append(config)
         if self.error is not None:
             raise self.error
-        return [name for name in self.databases if connection.allows(name)]
+        return list(self.databases)
 
 
 class InMemoryStorage(StoredSqlConnection):
     """The storage contract without PostgreSQL: one saved value, copied into the store."""
 
-    def __init__(self, store: SqlConnectionStore, saved: EffectiveSqlConnection) -> None:
+    def __init__(self, store: SqlConnectionStore, saved: SqlServerConnectionConfig) -> None:
         self._store = store
         self.saved = saved
         self.refreshes = 0
@@ -88,8 +82,8 @@ class InMemoryStorage(StoredSqlConnection):
     async def save(
         self,
         context: RequestContext,
-        change: Callable[[EffectiveSqlConnection], EffectiveSqlConnection],
-    ) -> tuple[EffectiveSqlConnection, EffectiveSqlConnection]:
+        change: Callable[[SqlServerConnectionConfig], SqlServerConnectionConfig],
+    ) -> tuple[SqlServerConnectionConfig, SqlServerConnectionConfig]:
         before = self.saved
         self.saved = change(before)
         self._store.replace(self.saved)
@@ -111,9 +105,9 @@ def _service(
 
 
 def _stored_service(
-    probe: FakeProbe | None = None, saved: EffectiveSqlConnection = STORED
+    probe: FakeProbe | None = None, saved: SqlServerConnectionConfig = STORED
 ) -> SqlConnectionService:
-    store = SqlConnectionStore(EffectiveSqlConnection())
+    store = SqlConnectionStore(SqlServerConnectionConfig())
     return SqlConnectionService(
         settings=_settings("staging", settings_encryption_key=KEY),
         store=store,
@@ -184,24 +178,16 @@ def test_the_mode_follows_the_environment_the_deployment_and_the_key() -> None:
 
 
 def test_initial_values_come_from_the_typed_settings() -> None:
-    initial = initial_sql_connection(
-        _settings(
-            mssql_server=" sql ",
-            mssql_user="u",
-            mssql_password="p",
-            mssql_port=14330,
-            mssql_allowed_databases=" DWH_B , DWH_A,,",
-        )
+    config = initial_sql_connection(
+        _settings(mssql_server=" sql ", mssql_user="u", mssql_password="p", mssql_port=14330)
     )
-    config = initial.config
     assert (config.server, config.user, config.password, config.port) == ("sql", "u", "p", 14330)
     assert config.trust_server_certificate is False and config.encrypt is True
-    assert initial.allowed_databases == ("DWH_B", "DWH_A")
 
 
 def test_the_stored_mode_starts_empty_whatever_the_partial_deployment_values_are() -> None:
     settings = _settings("staging", mssql_user="u", mssql_password="p", settings_encryption_key=KEY)
-    assert initial_sql_connection(settings) == EffectiveSqlConnection()
+    assert initial_sql_connection(settings) == SqlServerConnectionConfig()
 
 
 # --- local -------------------------------------------------------------------------------------
@@ -214,13 +200,12 @@ async def test_local_view_shows_values_but_never_the_password() -> None:
         "editable": True,
         "configured": True,
         "managed_by": "local_process",
-        "server": STORED.config.server,
+        "server": STORED.server,
         "port": 1433,
-        "user": STORED.config.user,
+        "user": STORED.user,
         "encrypt": True,
         "trust_server_certificate": False,
         "password_set": True,
-        "allowed_databases": ["DWH_A", "DWH_B"],
     }
     assert STORED_PASSWORD not in repr(view)
 
@@ -236,13 +221,12 @@ async def test_update_keeps_a_missing_password_and_removes_an_empty_one(
         CONTEXT, SqlConnectionChange(server="sql-2.corp.example.test", port=1500)
     )
     assert kept.password_set is True
-    assert service.store.current().config.password == STORED_PASSWORD
-    assert service.store.current().config.server == "sql-2.corp.example.test"
-    assert service.store.current().allowed_databases == STORED.allowed_databases
+    assert service.store.current().password == STORED_PASSWORD
+    assert service.store.current().server == "sql-2.corp.example.test"
 
     new_password = f"yeni-{uuid4().hex}"
     await service.update(CONTEXT, SqlConnectionChange(password=new_password))
-    assert service.store.current().config.password == new_password
+    assert service.store.current().password == new_password
 
     removed = await service.update(CONTEXT, SqlConnectionChange(password=""))
     assert removed.password_set is False and removed.configured is False
@@ -275,12 +259,13 @@ async def test_control_characters_and_separators_are_rejected(change: SqlConnect
     assert service.store.current() == STORED
 
 
-async def test_the_local_allow_list_is_not_editable_from_the_interface() -> None:
-    service = _service()
-    with pytest.raises(ApplicationError) as raised:
-        await service.update(CONTEXT, SqlConnectionChange(allowed_databases=["DWH_C"]))
-    assert (raised.value.status_code, raised.value.code) == (422, "sql_setting_fixed")
-    assert service.store.current() == STORED
+async def test_no_database_list_is_accepted_anywhere() -> None:
+    # Decision 5: the field is gone from the contract, so a request that carries it is refused.
+    with pytest.raises(ValueError, match="allowed_databases"):
+        SqlConnectionChange.model_validate({"allowed_databases": ["DWH"]})
+    assert "allowed_databases" not in SqlConnectionChange.model_fields
+    view = await _service().view(CONTEXT)
+    assert "allowed_databases" not in view.model_dump()
 
 
 async def test_a_new_target_without_a_password_never_receives_the_stored_one() -> None:
@@ -303,8 +288,9 @@ async def test_the_same_target_is_tested_with_the_stored_password_without_saving
 
     result = await service.test(CONTEXT, SqlConnectionChange(encrypt=True))
 
-    assert (result.ok, result.code, result.databases) == (True, None, ["DWH_A", "DWH_B"])
-    assert probe.calls[0].config.password == STORED_PASSWORD
+    # Whatever the port reports is shown: every database the account can access.
+    assert (result.ok, result.code, result.databases) == (True, None, ["DWH_A", "DWH_B", "Scratch"])
+    assert probe.calls[0].password == STORED_PASSWORD
     assert service.store.current() == STORED
 
 
@@ -314,7 +300,7 @@ async def test_a_new_target_with_its_own_password_is_tested() -> None:
     result = await service.test(
         CONTEXT, SqlConnectionChange(server="other.corp.example.test", password="x")
     )
-    assert result.ok and probe.calls[0].config.server == "other.corp.example.test"
+    assert result.ok and probe.calls[0].server == "other.corp.example.test"
     assert service.store.current() == STORED
 
 
@@ -332,7 +318,7 @@ async def test_connection_failures_become_fixed_classes() -> None:
 async def test_a_test_without_server_or_user_is_invalid() -> None:
     service = SqlConnectionService(
         settings=_settings(),
-        store=SqlConnectionStore(EffectiveSqlConnection()),
+        store=SqlConnectionStore(SqlServerConnectionConfig()),
         probe=FakeProbe(),
     )
     with pytest.raises(ApplicationError) as raised:
@@ -367,7 +353,7 @@ async def test_a_deployment_managed_nonprod_is_closed_to_everyone(
 # --- nonprod saved by the super admin ----------------------------------------------------------
 
 
-async def test_the_super_admin_sees_the_saved_values_with_fixed_encryption() -> None:
+async def test_the_super_admin_sees_the_saved_values() -> None:
     service = _stored_service()
     view = (await service.view(SUPER_ADMIN)).model_dump(exclude_none=True)
     assert view == {
@@ -375,13 +361,12 @@ async def test_the_super_admin_sees_the_saved_values_with_fixed_encryption() -> 
         "editable": True,
         "configured": True,
         "managed_by": "super_admin",
-        "server": STORED.config.server,
+        "server": STORED.server,
         "port": 1433,
-        "user": STORED.config.user,
+        "user": STORED.user,
         "encrypt": True,
         "trust_server_certificate": False,
         "password_set": True,
-        "allowed_databases": ["DWH_A", "DWH_B"],
     }
     assert STORED_PASSWORD not in repr(view)
     assert isinstance(service.storage, InMemoryStorage) and service.storage.refreshes == 1
@@ -397,7 +382,7 @@ async def test_other_roles_see_only_the_state_and_cannot_save_or_test() -> None:
         "managed_by": "super_admin",
     }
     with pytest.raises(ApplicationError) as updated:
-        await service.update(CONTEXT, SqlConnectionChange(port=1))
+        await service.update(CONTEXT, SqlConnectionChange(trust_server_certificate=True))
     with pytest.raises(ApplicationError) as tested:
         await service.test(CONTEXT, SqlConnectionChange())
     assert (updated.value.status_code, tested.value.status_code) == (403, 403)
@@ -405,10 +390,10 @@ async def test_other_roles_see_only_the_state_and_cannot_save_or_test() -> None:
     assert isinstance(service.storage, InMemoryStorage) and service.storage.saved == STORED
 
 
-async def test_the_super_admin_saves_the_connection_and_the_allow_list(
+async def test_the_super_admin_saves_the_connection_without_any_database_list(
     records: list[logging.LogRecord],
 ) -> None:
-    service = _stored_service(saved=EffectiveSqlConnection())
+    service = _stored_service(saved=SqlServerConnectionConfig())
     password = f"yeni-{uuid4().hex}"
 
     saved = await service.update(
@@ -419,8 +404,6 @@ async def test_the_super_admin_saves_the_connection_and_the_allow_list(
             user="dwh_okuyucu",
             password=password,
             encrypt=True,
-            trust_server_certificate=False,
-            allowed_databases=[" DWH_Sales ", "dwh_sales", "DWH_Risk", ""],
         ),
     )
 
@@ -435,92 +418,99 @@ async def test_the_super_admin_saves_the_connection_and_the_allow_list(
         "encrypt": True,
         "trust_server_certificate": False,
         "password_set": True,
-        "allowed_databases": ["DWH_Risk", "DWH_Sales"],
     }
-    current = service.store.current()
-    assert current.config.password == password and current.allows("dwh_risk")
-    assert not current.allows("Scratch")
+    assert service.store.current().password == password
     (event,) = _events(records)
-    assert event["changed_fields"] == "allowed_databases,password,port,server,user"
+    assert event["changed_fields"] == "password,port,server,user"
     assert event["managed_by"] == "super_admin"
+    assert event["trust_server_certificate"] is False
     assert event["user_public_id"] == str(SUPER_ADMIN.subject)
     rendered = repr([r.__dict__ for r in records])
-    for secret in (password, "sql-dwh.corp.example.test", "dwh_okuyucu", "DWH_Sales"):
+    for secret in (password, "sql-dwh.corp.example.test", "dwh_okuyucu"):
         assert secret not in rendered
 
     kept = await service.update(SUPER_ADMIN, SqlConnectionChange(port=1433))
-    assert kept.password_set is True and service.store.current().config.password == password
+    assert kept.password_set is True and service.store.current().password == password
     removed = await service.update(SUPER_ADMIN, SqlConnectionChange(password=""))
     assert removed.password_set is False and removed.configured is False
+
+
+async def test_the_super_admin_may_turn_certificate_verification_off_and_on_again(
+    records: list[logging.LogRecord],
+) -> None:
+    # Decision 6 exception: the connection stays encrypted; only verification is a choice.
+    probe = FakeProbe(["DWH"])
+    service = _stored_service(probe)
+
+    tested = await service.test(SUPER_ADMIN, SqlConnectionChange(trust_server_certificate=True))
+    assert tested.ok and probe.calls[0].trust_server_certificate is True
+    assert probe.calls[0].encrypt is True and service.store.current() == STORED
+
+    trusting = await service.update(SUPER_ADMIN, SqlConnectionChange(trust_server_certificate=True))
+    assert (trusting.encrypt, trusting.trust_server_certificate) == (True, True)
+    assert service.store.current().trust_server_certificate is True
+    assert service.store.current().password == STORED_PASSWORD
+
+    untouched = await service.update(SUPER_ADMIN, SqlConnectionChange(port=1500))
+    assert untouched.trust_server_certificate is True
+
+    verified = await service.update(
+        SUPER_ADMIN, SqlConnectionChange(trust_server_certificate=False)
+    )
+    assert verified.trust_server_certificate is False
+    events = _events(records)
+    assert [event["changed_fields"] for event in events] == [
+        "trust_server_certificate",
+        "port",
+        "trust_server_certificate",
+    ]
+    assert [event["trust_server_certificate"] for event in events] == [True, True, False]
 
 
 @pytest.mark.parametrize(
     ("change", "code"),
     [
-        (SqlConnectionChange(allowed_databases=[]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["  "]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["DWH", "MASTER"]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["tempdb"]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["Model "]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["msdb"]), "sql_allowed_databases_invalid"),
-        (SqlConnectionChange(allowed_databases=["DW\nH"]), "sql_allowed_databases_invalid"),
         (SqlConnectionChange(server=""), "sql_connection_invalid"),
         (SqlConnectionChange(user="  "), "sql_connection_invalid"),
         (SqlConnectionChange(server="sql;Encrypt=no"), "sql_connection_invalid"),
         (SqlConnectionChange(user="okuyucu\n"), "sql_connection_invalid"),
         (SqlConnectionChange(encrypt=False), "sql_setting_fixed"),
-        (SqlConnectionChange(trust_server_certificate=True), "sql_setting_fixed"),
+        (
+            SqlConnectionChange(encrypt=False, trust_server_certificate=True),
+            "sql_setting_fixed",
+        ),
     ],
 )
 async def test_a_save_keeps_the_nonprod_guarantees(change: SqlConnectionChange, code: str) -> None:
-    # Decision 5 and 6: business databases only, encryption on, certificate verified.
+    # Decision 6: nonprod is never unencrypted, with or without certificate verification.
     service = _stored_service()
     with pytest.raises(ApplicationError) as raised:
         await service.update(SUPER_ADMIN, change)
     assert (raised.value.status_code, raised.value.code) == (422, code)
+    with pytest.raises(ApplicationError) as tested:
+        await service.test(SUPER_ADMIN, change)
+    assert tested.value.code == code
     assert isinstance(service.storage, InMemoryStorage) and service.storage.saved == STORED
 
 
-async def test_a_first_save_needs_server_user_and_allow_list() -> None:
-    service = _stored_service(saved=EffectiveSqlConnection())
-    for change, code in (
-        (SqlConnectionChange(user="u", allowed_databases=["DWH"]), "sql_connection_invalid"),
-        (SqlConnectionChange(server="sql", allowed_databases=["DWH"]), "sql_connection_invalid"),
-        (SqlConnectionChange(server="sql", user="u"), "sql_allowed_databases_invalid"),
-    ):
+async def test_a_first_save_needs_server_and_user_only() -> None:
+    service = _stored_service(saved=SqlServerConnectionConfig())
+    for change in (SqlConnectionChange(user="u"), SqlConnectionChange(server="sql")):
         with pytest.raises(ApplicationError) as raised:
             await service.update(SUPER_ADMIN, change)
-        assert raised.value.code == code
+        assert raised.value.code == "sql_connection_invalid"
+    saved = await service.update(SUPER_ADMIN, SqlConnectionChange(server="sql", user="u"))
+    assert (saved.configured, saved.password_set) == (False, False)
 
 
-async def test_a_nonprod_test_lists_what_can_be_allowed_and_never_system_databases() -> None:
-    probe = FakeProbe(["DWH_A", "DWH_B", "Scratch", "master", "TempDB"])
-    service = _stored_service(probe, saved=EffectiveSqlConnection())
+async def test_a_nonprod_test_shows_every_database_the_account_can_access() -> None:
+    probe = FakeProbe(["DWH_A", "DWH_B", "Scratch"])
+    service = _stored_service(probe, saved=SqlServerConnectionConfig())
     form = {"server": "sql.corp.example.test", "user": "u", "password": "p"}
 
-    before_choice = await service.test(SUPER_ADMIN, SqlConnectionChange(**form))
-    chosen = await service.test(
-        SUPER_ADMIN, SqlConnectionChange(**form, allowed_databases=["dwh_b"])
-    )
+    result = await service.test(SUPER_ADMIN, SqlConnectionChange(**form))
 
-    assert before_choice.databases == ["DWH_A", "DWH_B", "Scratch"]
-    assert chosen.databases == ["DWH_B"]
-    assert all(
-        call.config.encrypt and not call.config.trust_server_certificate for call in probe.calls
-    )
+    assert result.databases == ["DWH_A", "DWH_B", "Scratch"]
+    assert probe.calls[0].encrypt and not probe.calls[0].trust_server_certificate
     assert isinstance(service.storage, InMemoryStorage)
-    assert service.storage.saved == EffectiveSqlConnection()
-    with pytest.raises(ApplicationError) as raised:
-        await service.test(SUPER_ADMIN, SqlConnectionChange(**form, allowed_databases=["msdb"]))
-    assert raised.value.code == "sql_allowed_databases_invalid"
-
-
-def test_allowed_database_names_are_trimmed_and_unique_without_case() -> None:
-    assert normalize_allowed_databases([" DWH ", "dwh", "", "Risk"], required=True) == (
-        "DWH",
-        "Risk",
-    )
-    assert normalize_allowed_databases([], required=False) == ()
-    for names in ([], ["  "], ["master"], ["DWH", "MSDB"], ["a\tb"]):
-        with pytest.raises(InvalidAllowedDatabases):
-            normalize_allowed_databases(names, required=True)
+    assert service.storage.saved == SqlServerConnectionConfig()

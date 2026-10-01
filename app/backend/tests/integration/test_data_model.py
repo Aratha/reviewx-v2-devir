@@ -94,7 +94,7 @@ COMMENTED_COLUMNS = {
     ("rule_set_version_rule", "priority_group"),
     ("sql_connection_setting", "tenant_id"),
     ("sql_connection_setting", "password_ciphertext"),
-    ("sql_connection_setting", "allowed_databases"),
+    ("sql_connection_setting", "trust_server_certificate"),
 }
 
 
@@ -470,14 +470,13 @@ async def test_only_a_fail_verdict_has_a_severity(
         await connection.rollback()
 
 
-async def test_a_saved_sql_connection_is_one_row_per_tenant_with_a_usable_allow_list(
+async def test_a_saved_sql_connection_is_one_row_per_tenant(
     migrated_database: None,
 ) -> None:
-    # sql-review 002-sql-server-connection Requirement 10 and Decision 5.
+    # sql-review 002-sql-server-connection Requirement 10, Decision 5 and 6.
     insert = (
-        "INSERT INTO sql_connection_setting (tenant_id, server, port, user_name, "
-        "allowed_databases) VALUES (:tenant, 'sql.corp.example.test', :port, 'okuyucu', "
-        "CAST(:allowed AS varchar[]))"
+        "INSERT INTO sql_connection_setting (tenant_id, server, port, user_name) "
+        "VALUES (:tenant, 'sql.corp.example.test', :port, 'okuyucu')"
     )
     async with engine.connect() as connection:
         transaction = await connection.begin()
@@ -485,17 +484,33 @@ async def test_a_saved_sql_connection_is_one_row_per_tenant_with_a_usable_allow_
             tenant_id = await _tenant_id(connection)
             await connection.execute(text("DELETE FROM sql_connection_setting"))
             for values in (
-                {"tenant": tenant_id, "port": 1433, "allowed": []},
-                {"tenant": tenant_id, "port": 0, "allowed": ["DWH"]},
-                {"tenant": tenant_id, "port": 65536, "allowed": ["DWH"]},
-                {"tenant": 0, "port": 1433, "allowed": ["DWH"]},
+                {"tenant": tenant_id, "port": 0},
+                {"tenant": tenant_id, "port": 65536},
+                {"tenant": 0, "port": 1433},
             ):
                 savepoint = await connection.begin_nested()
                 with pytest.raises(IntegrityError):
                     await connection.execute(text(insert), values)
                 await savepoint.rollback()
-            first = {"tenant": tenant_id, "port": 1433, "allowed": ["DWH"]}
+            first = {"tenant": tenant_id, "port": 1433}
             await connection.execute(text(insert), first)
+            # No list of databases is stored, and the certificate is verified unless chosen.
+            columns = set(
+                (
+                    await connection.execute(
+                        text(
+                            "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_name = 'sql_connection_setting'"
+                        )
+                    )
+                ).scalars()
+            )
+            assert "allowed_databases" not in columns
+            assert (
+                await _scalar(
+                    connection, "SELECT trust_server_certificate FROM sql_connection_setting"
+                )
+            ) is False
             savepoint = await connection.begin_nested()
             with pytest.raises(IntegrityError):
                 await connection.execute(text(insert), first)

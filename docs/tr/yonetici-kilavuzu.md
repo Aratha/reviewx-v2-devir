@@ -155,10 +155,8 @@ anahtar istemez.
 1. `admin` hesabıyla girin ve menüden **Yönetim → SQL bağlantısı** sayfasını açın.
 2. Sunucu adını, portu (bağlantı kapı numarası), okuma hesabının kullanıcı adını ve parolasını yazın.
 3. **Bağlantıyı test et** düğmesine basın. Test hiçbir şeyi kaydetmez; bağlantı kurulursa hesabın
-   gördüğü veritabanlarının sayısını ve ilk 8 adını gösterir.
-4. **İzinli veritabanları** alanına incelemeye açılacak veritabanlarını her satıra bir ad gelecek
-   biçimde yazın. Liste boş bırakılamaz ve `master`, `tempdb`, `model`, `msdb` yazılamaz.
-5. **Kaydet** düğmesine basın. Bağlantı hemen kullanılır; uygulamayı yeniden başlatmak gerekmez.
+   erişebildiği veritabanlarının sayısını ve ilk 8 adını gösterir.
+4. **Kaydet** düğmesine basın. Bağlantı hemen kullanılır; uygulamayı yeniden başlatmak gerekmez.
 
 Bilmeniz gerekenler:
 
@@ -168,10 +166,20 @@ Bilmeniz gerekenler:
   test için parolayı yeniden yazmanız gerekir; kayıtlı parola başka bir sunucuya gönderilmez.
 - **Kayıtlı parolayı kaldır** seçilip kaydedilirse bağlantı kapanır ve kullanıcılar "SQL Server
   bağlantısı yapılandırılmamış." iletisini görür.
-- Test ortamında bağlantı her zaman şifrelidir ve sunucunun sertifikası (sunucunun kimliğini
-  kanıtlayan belge) doğrulanır; bu iki ayar ekranda yoktur ve değiştirilemez. Sunucunun sertifikası
-  kurumun sertifika otoritesiyle imzalı değilse test "SQL Server ile güvenli bağlantı kurulamadı."
-  der.
+- İncelemeye açılacak veritabanları ayrıca seçilmez. **Nesne incelemesi** ekranında okuma hesabının
+  erişebildiği bütün veritabanları listelenir; yalnız SQL Server'ın kendi sistem veritabanları
+  (`master`, `tempdb`, `model`, `msdb`) listelenmez. Kullanıcıların neyi okuyup yapay zekâ modeline
+  gönderebileceğini yalnız bu hesabın SQL Server'daki yetkileri belirler; bir veritabanının
+  incelenmesini istemiyorsanız hesabın o veritabanındaki yetkisini SQL Server'da kaldırtın.
+- Test ortamında bağlantı her zaman şifrelidir; bu ayar ekranda yoktur ve değiştirilemez.
+- Uygulama olağan durumda sunucunun sertifikasını (sunucunun kimliğini kanıtlayan belge) doğrular.
+  Sertifika kurumun sertifika otoritesiyle imzalı değilse test "SQL Server ile güvenli bağlantı
+  kurulamadı." der. Bu durumda **Sunucu sertifikasına doğrulamadan güven (TrustServerCertificate)**
+  kutusunu işaretleyip yeniden test edin ve kaydedin. Kutu işaretliyken bağlantı yine şifrelidir,
+  ancak sunucunun kimliği doğrulanmaz; ağdaki biri kendini bu sunucu gibi gösterebilir. Bu seçenek
+  geçicidir: veri ambarı sunucusunun (PASIFIK) sertifikası kendinden imzalı olduğu için proje sahibi
+  2026-12-31'e kadar izin vermiştir. Veritabanı ekibi sunucuya kurum imzalı sertifika kurunca kutuyu
+  kaldırıp yeniden kaydedin.
 - Uygulama SQL Server'a yalnız kurulumun izin verdiği adres aralığından ve 1433 numaralı porttan
   ulaşabilir. Aralık `helm/dwhcodereview/values-project.yaml` dosyasındadır; sunucu bu aralığın
   dışındaysa ya da başka bir port kullanıyorsa test "SQL Server'a ulaşılamadı." der ve aralığın
@@ -182,13 +190,13 @@ Bilmeniz gerekenler:
   satır yazdığı kayıt) yalnız hangi alanların değiştiği yazılır, değerler yazılmaz.
 
 Kurulumu yöneten ekip isterse bağlantıyı kurulumla da verebilir: okuma hesabı Azure'a `MSSQL_USER` ve
-`MSSQL_PASSWORD` gizli değişkenleri olarak, sunucu adı, port ve veritabanı listesi
+`MSSQL_PASSWORD` gizli değişkenleri olarak, sunucu adı ve port
 `helm/dwhcodereview/values-project.yaml` dosyasına eklenir. Sunucu, kullanıcı ve parolanın üçü de
 kurulumla verildiğinde kurulumdaki değerler geçerli olur, **SQL bağlantısı** sayfası süper yönetici
-için de kapanır ve "Bu ortamda bağlantı ayarları dağıtımla yönetilir." yazar. Bu durumda uygulama ek
-güvenceleri açılışta zorunlu tutar: veritabanı listesi boş olamaz ve `master`, `tempdb`, `model`,
-`msdb` içeremez; bağlantı şifreli olmalı ve sunucu sertifikası doğrulanmalıdır. Biri eksikse
-uygulama açılmaz ve kurulum kendiliğinden önceki sürüme döner.
+için de kapanır ve "Bu ortamda bağlantı ayarları dağıtımla yönetilir." yazar. Bu durumda da
+bağlantı şifreli olmalıdır; şifreleme kapatılırsa uygulama açılmaz ve kurulum kendiliğinden önceki
+sürüme döner. Sertifika doğrulaması aynı geçici izinle
+`DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE: true` satırıyla kapatılabilir.
 
 Kaynak: [SQL Server bağlantısı PRD'si](../../specs/sql-review/PRDs/002-sql-server-connection/PRD.md),
 [LLM bağlantısı PRD'si](../../specs/sql-review/PRDs/006-llm-connection/PRD.md).
@@ -306,8 +314,8 @@ günlüğe, ölçüme veya ize yazılmaz. Başarısız girişte kullanıcı adı
 | `auth.super_admin.bootstrap` | Süper yönetici açılışının sonucu |
 | `rule_set.version_published` | Yeni kural sürümü yayımlandı |
 | `sql_server.call` | SQL Server çağrısı ve sonucu |
-| `sql_connection.updated` | SQL Server bağlantısı kaydedildi (değişen alanların adı ve kaydeden kullanıcı) |
-| `sql_connection.stored_unusable` | Kaydedilmiş SQL Server bağlantısı kullanılamıyor (parola açılamadı ya da veritabanı listesi geçersiz) |
+| `sql_connection.updated` | SQL Server bağlantısı kaydedildi (değişen alanların adı, sertifika doğrulamasının kapalı olup olmadığı ve kaydeden kullanıcı) |
+| `sql_connection.stored_unusable` | Kaydedilmiş SQL Server bağlantısı kullanılamıyor (parola açılamadı) |
 | `llm.call` | Yapay zekâ modeli çağrısı ve sonucu |
 | `review_history.retention_run` | 90 günlük saklama süresi dolan incelemeler silindi |
 

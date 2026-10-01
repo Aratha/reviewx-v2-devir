@@ -142,7 +142,6 @@ class Settings(BaseSettings):
     mssql_password: SecretStr | None = None
     mssql_encrypt: bool = True
     mssql_trust_server_certificate: bool = False
-    mssql_allowed_databases: str = ""
     mssql_login_timeout_seconds: Annotated[int, Field(ge=1, le=60)] = 15
     mssql_query_timeout_seconds: Annotated[int, Field(ge=1, le=300)] = 60
     mssql_max_concurrency: Annotated[int, Field(ge=1, le=16)] = 4
@@ -363,14 +362,6 @@ class Settings(BaseSettings):
             self.mssql_server.strip()
             and self.mssql_user.strip()
             and self.mssql_password is not None
-        )
-
-    @property
-    def mssql_allowed_database_names(self) -> frozenset[str]:
-        return frozenset(
-            name.strip().casefold()
-            for name in self.mssql_allowed_databases.split(",")
-            if name.strip()
         )
 
     @property

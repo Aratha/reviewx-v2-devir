@@ -1,7 +1,7 @@
 # Görevler — kubernetes-delivery
 
 [Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-10-01'de yerel
-Compose yığınında geçti (arka uç 723/723, ön yüz 138/138 test; göç, OpenAPI, üretilmiş tip,
+Compose yığınında geçti (arka uç 717/717, ön yüz 136/136 test; göç, OpenAPI, üretilmiş tip,
 yönetişim sapması ve proje katmanıyla chart adımı dahil), `tests/helm/deploy-hooks.test.sh` 70 ve
 `tests/infra/local-egress.test.sh` 22 denetimi geçti. Bu, chart, kanca, yerel Compose ve arka uç
 için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Acceptance 3) yoktur.
@@ -71,7 +71,7 @@ için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Accep
   sağlıklı açıldıktan sonra Azure koşumunda (`9722faf`, 2026-09-27) tek seferlik kanca adımıyla
   silindi; kümede PVC'nin kalmadığı gözlendi ve adım kancadan ve testinden kaldırıldı.
 - [ ] Task 13 — Decision 11: SQL Server adresi belli olunca `values-project.yaml`'daki çıkış kuralı
-  `/32`'ye daraltılır. Sunucu, hesap ve izinli veritabanı listesi değer katmanına yazılmaz; süper
+  `/32`'ye daraltılır. Sunucu ve hesap değer katmanına yazılmaz; süper
   yönetici uygulamadan girer
   ([sql-server-connection](../../../sql-review/PRDs/002-sql-server-connection/PRD.md) Decision 12).
 - [ ] Task 14 — Decision 13: eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından

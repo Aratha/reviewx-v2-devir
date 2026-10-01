@@ -153,14 +153,15 @@ DWHCODEREVIEW_MSSQL_SERVER=host.docker.internal
 DWHCODEREVIEW_MSSQL_PORT=1433
 DWHCODEREVIEW_MSSQL_USER=<okuma hesabı>
 DWHCODEREVIEW_MSSQL_PASSWORD=<parola>
-DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES=<veritabanı1,veritabanı2>
 ```
 
-- `DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES` incelemeye açılacak veritabanlarının virgülle ayrılmış
-  listesidir; yerelde boş bırakılırsa bütün veritabanları listelenir.
-- Kendi bilgisayarınızdaki, kendinden imzalı sertifikalı bir geliştirici SQL Server'ı için
-  `DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true` satırını da ekleyin. Bu ayar yalnız yerelde kabul
-  edilir.
+- İnceleme ekranında bu hesabın erişebildiği bütün veritabanları listelenir; SQL Server'ın kendi
+  sistem veritabanları (`master`, `tempdb`, `model`, `msdb`) listelenmez. Ayrıca bir veritabanı
+  listesi yazılmaz.
+- Kendi bilgisayarınızdaki, kendinden imzalı sertifikalı (kurumun sertifika otoritesinin
+  onaylamadığı) bir geliştirici SQL Server'ı için
+  `DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true` satırını da ekleyin. Bağlantı yine şifrelidir,
+  ancak sunucunun kimliği doğrulanmaz.
 - Okuma hesabı yalnız okuma yetkili olmalıdır; uygulama SQL Server'da hiçbir şey yazmaz.
 
 Yapay zekâ modeli (LLM) satırları, bilgisayarınızda çalışan Ollama (katalogda varsa kurulan, modeli

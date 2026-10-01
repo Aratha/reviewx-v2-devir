@@ -41,15 +41,17 @@ OBJECTS = [
 
 async def test_databases_are_listed_in_pages(review_env: ReviewEnv) -> None:
     reviewer = await review_env.sessions.reviewer()
-    review_env.catalog.databases = ["DWH", "DWH2", "Stage"]
-    review_env.catalog.allowed = frozenset({"dwh", "dwh2"})
+    # 002 Requirement 7: every database the port reports is offered; system ones never are.
+    review_env.catalog.databases = ["DWH", "DWH2", "master", "Stage", "tempdb"]
     client, prefix = review_env.auth.client, review_env.prefix
 
     first = await client.get(f"{prefix}/databases?page_size=1", headers=reviewer.headers)
     second = await client.get(f"{prefix}/databases?page=2&page_size=1", headers=reviewer.headers)
+    everything = await client.get(f"{prefix}/databases", headers=reviewer.headers)
 
-    assert first.json() == {"items": ["DWH"], "page": 1, "page_size": 1, "total": 2}
+    assert first.json() == {"items": ["DWH"], "page": 1, "page_size": 1, "total": 3}
     assert second.json()["items"] == ["DWH2"]
+    assert everything.json()["items"] == ["DWH", "DWH2", "Stage"]
 
 
 async def test_objects_are_filtered_on_the_server_and_paged(review_env: ReviewEnv) -> None:
@@ -97,17 +99,29 @@ async def test_invalid_filters_are_rejected(review_env: ReviewEnv, query: str) -
     assert review_env.catalog.calls == []
 
 
-async def test_a_database_outside_the_allow_list_is_forbidden_without_a_call(
-    review_env: ReviewEnv,
+@pytest.mark.parametrize("database", ["master", "TempDB", "model", "msdb"])
+async def test_a_system_database_is_forbidden_without_a_call(
+    review_env: ReviewEnv, database: str
 ) -> None:
     reviewer = await review_env.sessions.reviewer()
-    review_env.catalog.allowed = frozenset({"dwh"})
     response = await review_env.auth.client.get(
-        f"{review_env.prefix}/databases/master/objects", headers=reviewer.headers
+        f"{review_env.prefix}/databases/{database}/objects", headers=reviewer.headers
     )
     assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "database_not_allowed"
+    assert response.json()["detail"] == {
+        "code": "database_not_allowed",
+        "message": "Sistem veritabanları incelenemez.",
+    }
     assert review_env.catalog.calls == []
+
+
+async def test_any_other_database_is_passed_to_the_port(review_env: ReviewEnv) -> None:
+    reviewer = await review_env.sessions.reviewer()
+    review_env.catalog.objects["Herhangi_DB"] = OBJECTS
+    response = await review_env.auth.client.get(
+        f"{review_env.prefix}/databases/Herhangi_DB/objects", headers=reviewer.headers
+    )
+    assert response.status_code == 200 and response.json()["total"] == len(OBJECTS)
 
 
 @pytest.mark.parametrize(

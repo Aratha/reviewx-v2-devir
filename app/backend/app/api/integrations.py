@@ -57,7 +57,7 @@ def get_sql_connection_storage() -> StoredSqlConnection | None:
 def get_sql_catalog_adapter() -> PyodbcSqlCatalog:
     settings = get_settings()
     return PyodbcSqlCatalog(
-        connection=get_sql_connection_store().current,
+        config=get_sql_connection_store().current,
         login_timeout_seconds=settings.mssql_login_timeout_seconds,
         query_timeout_seconds=settings.mssql_query_timeout_seconds,
         max_concurrency=settings.mssql_max_concurrency,

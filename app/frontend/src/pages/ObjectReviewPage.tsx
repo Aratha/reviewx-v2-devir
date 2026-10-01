@@ -90,7 +90,7 @@ export default function ObjectReviewPage() {
             <ErrorState message={describeError(databases.error)} onRetry={databases.reload} />
           )}
           {databases.status === 'success' && databases.data.items.length === 0 && (
-            <p className="muted">İzinli ve çevrimiçi veritabanı yok.</p>
+            <p className="muted">Bağlantı hesabının erişebildiği çevrimiçi veritabanı yok.</p>
           )}
         </div>
       </Card>

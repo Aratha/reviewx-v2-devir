@@ -453,7 +453,7 @@ export interface paths {
         };
         /**
          * List Databases
-         * @description Online databases inside the allow-list, ordered by name (Requirement 1).
+         * @description Online databases the account can access, without system databases (Requirement 1).
          */
         get: {
             parameters: {
@@ -2127,7 +2127,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Geçersiz sunucu, kullanıcı adı veya izinli veritabanı listesi */
+                /** @description Geçersiz sunucu veya kullanıcı adı ya da bu ortamda sabit ayar */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2199,7 +2199,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Geçersiz sunucu, kullanıcı adı veya izinli veritabanı listesi */
+                /** @description Geçersiz sunucu veya kullanıcı adı ya da bu ortamda sabit ayar */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2740,27 +2740,25 @@ export interface components {
         };
         /** @description Partial values; a missing password keeps the stored one and an empty one removes it. */
         SqlConnectionChange: {
-            /** @description Editable only in nonprod; locally the list comes from the settings file. */
-            allowed_databases?: string[] | null;
             /** @description Editable only locally; nonprod accepts only true. */
             encrypt?: boolean | null;
             password?: string | null;
             port?: number | null;
             server?: string | null;
-            /** @description Editable only locally; nonprod accepts only false. */
+            /** @description True accepts the server certificate without verifying it; still encrypted. */
             trust_server_certificate?: boolean | null;
             user?: string | null;
         };
         SqlConnectionTestResult: {
             /** @description Failure class of Requirement 8 or password_required; empty on success. */
             code: string | null;
+            /** @description Online databases the account can access, without system databases. */
             databases: string[];
             message: string;
             ok: boolean;
         };
         /** @description Only the editing caller sees server, user and options; nobody sees a password. */
         SqlConnectionView: {
-            allowed_databases?: string[] | null;
             configured: boolean;
             editable: boolean;
             encrypt?: boolean | null;

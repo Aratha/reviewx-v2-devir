@@ -3,7 +3,7 @@
 ``ScriptedLlm`` implements ``LlmChatPort`` exactly (run -> slot -> chat) with the run-wide and
 process-wide slot limits of the real adapter, records every request with its target, and answers
 through a responder the test installs. ``FakeCatalog`` implements ``SqlCatalogPort`` with the
-allow-list, typed failures and recorded calls.
+system database check, typed failures and recorded calls.
 """
 
 import asyncio
@@ -25,7 +25,12 @@ from app.domain.llm import (
     ProgressCallback,
 )
 from app.domain.models.llm_call import LlmCallOutcome
-from app.domain.sql_server import CatalogObject, DatabaseNotAllowed, SqlCatalogPort
+from app.domain.sql_server import (
+    CatalogObject,
+    DatabaseNotAllowed,
+    SqlCatalogPort,
+    is_system_database,
+)
 
 Responder = Callable[[LlmChatRequest], Awaitable[LlmChatResult] | LlmChatResult]
 _RULE_CODE = re.compile(
@@ -148,12 +153,11 @@ class FakeCatalog:
     metadata_errors: dict[tuple[str, str, str], Exception] = field(default_factory=dict)
     databases: list[str] = field(default_factory=list)
     objects: dict[str, list[CatalogObject]] = field(default_factory=dict)
-    allowed: frozenset[str] = frozenset()
     failure: Exception | None = None
     calls: list[tuple[str, ...]] = field(default_factory=list)
 
     def is_allowed(self, database: str) -> bool:
-        return not self.allowed or database.casefold() in self.allowed
+        return not is_system_database(database)
 
     async def list_databases(self) -> list[str]:
         self.calls.append(("list_databases",))

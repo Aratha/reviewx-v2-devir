@@ -82,15 +82,14 @@ services:
       # developer supplies them from the shell or the Git-ignored app/infra/.env. The backend
       # reaches a SQL Server or LLM on this computer only through the opt-in local-egress gate
       # below, as host.docker.internal. A developer SQL Server with a self-signed certificate needs
-      # DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true there; outside the development
-      # environment the backend refuses to start with it.
+      # DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE=true there; the connection stays encrypted
+      # but the server's identity is then not verified.
       DWHCODEREVIEW_MSSQL_SERVER: "${DWHCODEREVIEW_MSSQL_SERVER:-}"
       DWHCODEREVIEW_MSSQL_PORT: "${DWHCODEREVIEW_MSSQL_PORT:-1433}"
       DWHCODEREVIEW_MSSQL_USER: "${DWHCODEREVIEW_MSSQL_USER:-}"
       DWHCODEREVIEW_MSSQL_PASSWORD: "${DWHCODEREVIEW_MSSQL_PASSWORD:-}"
       DWHCODEREVIEW_MSSQL_ENCRYPT: "${DWHCODEREVIEW_MSSQL_ENCRYPT:-true}"
       DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE: "${DWHCODEREVIEW_MSSQL_TRUST_SERVER_CERTIFICATE:-false}"
-      DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES: "${DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES:-}"
       DWHCODEREVIEW_MSSQL_LOGIN_TIMEOUT_SECONDS: "15"
       DWHCODEREVIEW_MSSQL_QUERY_TIMEOUT_SECONDS: "60"
       DWHCODEREVIEW_MSSQL_MAX_CONCURRENCY: "4"

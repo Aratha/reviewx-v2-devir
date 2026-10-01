@@ -48,7 +48,18 @@ def _lifespan(settings: Settings) -> Callable[[FastAPI], AbstractAsyncContextMan
         if invalid:
             log_event(logger, "startup.integration_settings_invalid", settings=",".join(invalid))
             raise UnsafeIntegrationSettings("unsafe integration settings: " + ", ".join(invalid))
-        log_event(logger, "startup.sql_connection_mode", mode=sql_connection_mode(settings).value)
+        mode = sql_connection_mode(settings)
+        log_event(
+            logger,
+            "startup.sql_connection_mode",
+            mode=mode.value,
+            # In the stored mode the saved connection decides; sql_connection.updated reports it.
+            trust_server_certificate=(
+                None
+                if mode is SqlConnectionMode.STORED
+                else settings.mssql_trust_server_certificate
+            ),
+        )
         telemetry_export = configure_telemetry(settings)
         instrument_engine(engine.sync_engine)
         # sql-review 003 Requirement 16: runs this process never finished were cut off.

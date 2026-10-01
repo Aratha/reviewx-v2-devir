@@ -1,6 +1,6 @@
 # Plan — sql-server-connection
 
-[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.3.0). Proje kipi `separated-web`;
+[PRD](PRD.md) belgesinden türetildi (`Status: Accepted`, Version 1.4.0). Proje kipi `separated-web`;
 sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığıdır. Bu PRD PostgreSQL'e
 `sql_connection_setting` tablosunu ekler.
 
@@ -16,7 +16,7 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 | Uyarlayıcı | `app/backend/app/infrastructure/sql_server/catalog_adapter.py` | Requirement 6, 7, 8 |
 | Hizmet | `app/backend/app/services/sql_connection_service.py` (durum seçimi, süreç içi depo, `StoredSqlConnection`) | Requirement 3, 4, 5, 10, 11, Decision 3, 8, 12, 14 |
 | Şifreleme | `app/backend/app/core/secret_cipher.py` | Requirement 10, Decision 13 |
-| Şema ve göç | `app/backend/app/domain/models/sql_connection.py`, `schema/alembic/versions/202610010001_sql_connection_setting.py` | Requirement 10, Veri ve geçiş |
+| Şema ve göç | `app/backend/app/domain/models/sql_connection.py`, `schema/alembic/versions/202610010001_sql_connection_setting.py`, `schema/alembic/versions/202610010002_sql_connection_all_databases_and_certificate_option.py` | Requirement 10, Veri ve geçiş |
 | Depo | `app/backend/app/infrastructure/repositories/sql_connection_setting_repository.py` | Requirement 10, 11 |
 | API | `app/backend/app/api/sql_connection/router.py`, `app/backend/app/api/route_classes.py`, `app/backend/app/api/router.py` (`local_environment_router`, `stored_sql_connection_router`), `app/backend/app/api/integrations.py`, `app/backend/app/main.py`, `app/backend/app/schemas/sql_connection/contracts.py` | API sözleşmesi, Requirement 5, 11 |
 | Dağıtım kancası | `helm/dwhcodereview/deploy-hooks.sh`, `tests/helm/deploy-hooks.test.sh` | Decision 13 |
@@ -39,19 +39,20 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
   ile SSL/sertifika belirtisi `sql_tls_failed`, `28000` `sql_login_failed`, `08001`/`08S01`
   `sql_server_unreachable`, `HYT00`/`HYT01` `sql_timeout`, diğerleri `sql_query_failed`. Sürücü
   metni yalnız sınıflandırmada kullanılır; kullanıcıya, loga ve istisna zincirine geçmez.
-- İzin listesi büyük/küçük harf duyarsızdır ve her işlemden önce, bağlantı açılmadan uygulanır
-  (`DatabaseNotAllowed`; 403 eşlemesi uçların sahibi olan nesne incelemesi PRD'sindedir). Boş liste
-  `local`'de bütün çevrimiçi veritabanları demektir. `nonprod`'da boş liste yalnız bağlantı
-  yapılandırılmamışken olabilir; uyarlayıcı her çağrıda önce bağlantıyı denetlediği için çağrı izin
-  listesine gelmeden 503 `sql_connection_not_configured` alır (Decision 11).
+- Veritabanı listesi `LIST_DATABASES_SQL` ile gelir (`state = 0` ve `HAS_DBACCESS(name) = 1`);
+  uyarlayıcı sonuçtan sistem veritabanlarını çıkarır. Sistem veritabanı denetimi (`is_system_database`,
+  büyük/küçük harf duyarsız) her işlemden önce, bağlantı açılmadan uygulanır (`DatabaseNotAllowed`;
+  403 eşlemesi uçların sahibi olan nesne incelemesi PRD'sindedir). Uyarlayıcı her çağrıda önce
+  bağlantıyı denetler; yapılandırılmamış bağlantıda çağrı 503 `sql_connection_not_configured` alır
+  (Decision 11). Listeyi daraltan bir ayar, kayıt veya süzgeç yoktur (Decision 5).
 - Nesne meta verisi kaynaktaki genişlik öncelikli taramayı korur (derinlik 4, en çok 48 veritabanı
-  taraması, 95.000 karakter kesme, iç hataların atlanması); çapraz veritabanı çözümü yalnız izinli
-  ve çevrimiçi veritabanlarında arar. 48 nesne sınırı kaynakta yalnız kuyruk adımları arasında
+  taraması, 95.000 karakter kesme, iç hataların atlanması); çapraz veritabanı çözümü yalnız
+  veritabanı listesindeki veritabanlarında arar ve yerelde bulunamayan her adı bir istekte yalnız bir
+  kez tarar (toplayıcı sonucu istek boyunca saklar). 48 nesne sınırı kaynakta yalnız kuyruk adımları arasında
   denetleniyordu; burada kesin sınırdır. Kök veritabanı bağlantısı açılamazsa sınıflı hata döner,
   sonraki hatalar yalnız tipleriyle `debug` düzeyinde loglanıp atlanır.
-- Yürürlükteki bağlantı ile izin listesi tek değerdir (`EffectiveSqlConnection`) ve süreç içi
-  `SqlConnectionStore`'da durur; uyarlayıcı her işlemde bu değeri bir kez okur, böylece bağlantı ile
-  izin listesi hiçbir işlemde birbirinden ayrı sürümlerden gelmez (Requirement 11).
+- Yürürlükteki bağlantı (`SqlServerConnectionConfig`; sertifikaya güven seçeneği dahil) süreç içi
+  `SqlConnectionStore`'da durur; uyarlayıcı her işlemde bu değeri bir kez okur (Requirement 11).
 - Durum, `sql_connection_mode` ile ayarlardan seçilir: `local`; `nonprod`'da dağıtım tam bağlantı
   veriyorsa ya da anahtar yoksa `deployment`; aksi hâlde `stored` (Requirement 5).
 - `local`'de ayar değişikliği yalnız süreç içi depodadır; dosyaya ve süreç ortamına yazılmaz. Test,
@@ -75,14 +76,17 @@ sabit yığın `python-fastapi` arka uç ve `sqlalchemy-alembic` kalıcılığı
 - Yazma ve test uçları iki ayrı yönlendiricide aynı işlevlerdir: `local_router` (`kural-yoneticisi`)
   yalnız `local`'de, `stored_router` (süper yönetici) yalnız `stored` durumunda uygulamaya eklenir;
   `deployment` durumunda hiçbiri eklenmez ve `MethodScopedRoute` aynı yoldaki GET ucunun 405 yerine
-  404 üretmesini sağlar. Hizmet aynı denetimleri yineler. Başlangıç denetimi `nonprod`'da dağıtımın
-  verdiği tam bağlantıda boş izin listesi, izin listesinde sistem veritabanı, `ENCRYPT=false` veya
-  `TRUST_SERVER_CERTIFICATE=true` görürse süreci ayar adlarıyla (değer olmadan) durdurur.
+  404 üretmesini sağlar. Hizmet aynı denetimleri yineler. Başlangıç denetimi `nonprod`'da
+  `ENCRYPT=false` görürse süreci ayar adıyla (değer olmadan) durdurur; `TRUST_SERVER_CERTIFICATE=true`
+  Decision 6 istisnası gereği süreci durdurmaz.
+- Sertifikaya güven seçeneği `stored` durumunda satırın `trust_server_certificate` sütununda durur
+  ve süper yönetici tarafından değiştirilir; `encrypt` o durumda her zaman `true`'dur ve `false`
+  isteği 422 `sql_setting_fixed` alır.
 - OpenAPI dışa aktarımı uygulamayı `local` olarak kurar; yazma ve test uçları sözleşmede bir kez,
   iki ortamın rol ve hata açıklamalarıyla yer alır.
 - Log olayları: her işlem için bir `sql_server.call` (`operation`, `database`, `outcome`,
   `sqlstate`, `duration_ms`, `rows`; `request_id` biçimleyiciden gelir), `sql_connection.updated`
-  (değişen alan adları, `managed_by`, kullanıcı `public_id`), `sql_connection.stored_unusable`
+  (değişen alan adları, `managed_by`, `trust_server_certificate`, kullanıcı `public_id`), `sql_connection.stored_unusable`
   (neden), `sql_connection.refresh_failed` (hata türü) ve `startup.sql_connection_mode` (durum).
 - İmaj: Alpine v3.23 `unixodbc` ve sürücünün çalışma zamanı paketleri ile Microsoft `msodbcsql18`
   18.6.2.1-1 kilit dosyalarından SHA-256 denetimiyle ve ağsız `apk` ile kurulur; Microsoft paketinin
@@ -95,7 +99,7 @@ Runtime Secret anahtarları (`helm/dwhcodereview/deploy-hooks.sh`; ayar şifrele
 sır olmayan değerlerin `helm/dwhcodereview/values-project.yaml` ile chart'a taşınması ve SQL Server
 ağ çıkış kuralı
 [Kubernetes teslim PRD'sinindir](../../../application-foundation/PRDs/002-kubernetes-delivery/PRD.md).
-Değer katmanında SQL Server adresi ve izin listesi yoktur; bağlantıyı süper yönetici girer
+Değer katmanında SQL Server adresi yoktur; bağlantıyı süper yönetici girer
 (Decision 11, 12). Yeni tablo mevcut göç Job'uyla kurulur; ayrı dağıtım adımı gerekmez.
 
 ## Doğrulama komutları

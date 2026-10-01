@@ -3,10 +3,11 @@
 Every value travels as a ``?`` parameter; no statement is assembled from user text.
 """
 
+# Online databases the connected account can enter; its own permissions are the boundary.
 LIST_DATABASES_SQL = """
 SELECT name
 FROM sys.databases
-WHERE state = 0
+WHERE state = 0 AND HAS_DBACCESS(name) = 1
 ORDER BY name;
 """
 

@@ -95,7 +95,6 @@ describe('application shell', () => {
       configured: false,
       managed_by: 'super_admin',
       password_set: false,
-      allowed_databases: [],
     });
     renderApp('super_admin');
     await screen.findByRole('link', {name: 'SQL bağlantısı'});

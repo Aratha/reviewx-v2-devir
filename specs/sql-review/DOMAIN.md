@@ -14,7 +14,7 @@ taşır; mevcut davranış kaynak kabul edilir, farklılıklar PRD'lerde açık�
 - **Kural yöneticisi:** İnceleyicinin yapabildiklerine ek olarak kuralları düzenler ve yayımlar,
   LLM çağrı özetlerini görür.
 - **Uygulama yöneticisi (süper yönetici):** Nonprod'da, dağıtım SQL Server bağlantısını vermiyorsa
-  bağlantıyı ve izinli veritabanı listesini arayüzden girer. Kimliği ve yetkisi
+  bağlantıyı arayüzden girer. Kimliği ve yetkisi
   `application-foundation` alanındadır.
 - **İşletim ekibi:** Ortam ayarlarını, sırları ve dağıtımı yönetir; uygulama içinde bir rol değildir.
 

@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.6.0
+Version: 1.6.1
 
 Acceptance date: 2026-10-01
 
@@ -124,9 +124,13 @@ bekler, başarısız göç güncellemeyi durdurur ve `--atomic` önceki sürüm�
 yoklaması, uygulama rolü veritabanına bağlanana ve veritabanındaki Alembic sürümü imajın taşıdığı
 son göçe (`head`) gelene kadar hata metni içermeyen sabit gövdeyle 503 döner; henüz oluşmamış rolün
 reddedilen girişi 500 veya hata izi üretmez, loga dakikada en çok bir kez yalnız neden ve hata
-sınıfı düşer. Şema bir kez doğrulanınca sonraki yoklamalar yalnız bağlantıyı dener. Göçler yalnız
-genişletici yazılır (eski sürüm yeni şemayla çalışabilir), çünkü geri almada şema geri indirilmez;
-bu yüzden imajın tanımadığı daha yeni şema sürümü hazır sayılır.
+sınıfı düşer. Şema bir kez doğrulanınca sonraki yoklamalar yalnız bağlantıyı dener. Göçler
+genişletici yazılır (eski sürüm yeni şemayla çalışabilir), çünkü geri almada şema geri indirilmez.
+Tek daraltıcı göç, sahip kararıyla sütun kaldıran `202610010002`'dir; geri alınan önceki sürümde
+yalnız kayıtlı SQL Server bağlantısı kullanılamaz
+([SQL Server bağlantısı PRD'si](../../../sql-review/PRDs/002-sql-server-connection/PRD.md), Veri ve
+geçiş). Geri almada şema geri indirilmediği için imajın tanımadığı daha yeni şema sürümü hazır
+sayılır.
 
 Requirement 5: Runtime Secret `dwhcodereview-runtime`'ı `helm/dwhcodereview/deploy-hooks.sh`
 hazırlar. Anahtarları ve kaynakları:
@@ -154,8 +158,8 @@ Sır olmayan ayarlar `values-project.yaml` içindeki `backend.config` alanındad
 genel adresi ve CORS kaynağı, güvenilen ingress pod ağı `10.42.0.0/16`, dizin ayarları
 (directory-login PRD'sindeki KT Verim nonprod değerleri ve imajdaki CA dosyası), süper yönetici hesap
 adı `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_USERNAME=admin`, LLM biçimi, adresi ve modeli
-(llm-connection Decision 3) ve boş OpenTelemetry adresi. SQL Server adresi, portu ve izinli
-veritabanı listesi değer katmanında yoktur; bağlantıyı süper yönetici uygulamadan girer ve uygulama
+(llm-connection Decision 3) ve boş OpenTelemetry adresi. SQL Server adresi ve portu
+değer katmanında yoktur; bağlantıyı süper yönetici uygulamadan girer ve uygulama
 onu PostgreSQL'de saklar, o zamana kadar SQL Server alanı "yapılandırılmamış" kalır
 (sql-server-connection Decision 11, 12).
 

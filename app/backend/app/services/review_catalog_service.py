@@ -2,7 +2,7 @@
 
 The SQL Server port lists and filters (Decision 6 of 003, Requirement 7 of 002); this service
 adds the type filter and the pages, and maps port failures to the error envelope: 503 when no
-connection is configured or the server fails, 504 on a timeout, 403 outside the allow-list.
+connection is configured or the server fails, 504 on a timeout, 403 for a system database.
 """
 
 from collections.abc import Awaitable

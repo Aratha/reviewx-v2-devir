@@ -1,11 +1,13 @@
 """SQL Server connection saved by the super admin in nonprod (sql-review 002-sql-server-connection).
 
 One row per tenant. The password is stored only as authenticated ciphertext; the key lives in the
-runtime Secret, never in the database.
+runtime Secret, never in the database. Which databases can be read is decided by the permissions
+of the account.
 """
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     ForeignKey,
     Identity,
@@ -15,16 +17,11 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
 from app.domain.models.mixins import AuditSoftDeleteMixin
-from app.domain.sql_server import (
-    DATABASE_NAME_MAX_LENGTH,
-    SERVER_MAX_LENGTH,
-    USER_NAME_MAX_LENGTH,
-)
+from app.domain.sql_server import SERVER_MAX_LENGTH, USER_NAME_MAX_LENGTH
 
 
 class SqlConnectionSetting(AuditSoftDeleteMixin, Base):
@@ -36,15 +33,14 @@ class SqlConnectionSetting(AuditSoftDeleteMixin, Base):
             postgresql_where=text("is_deleted = false"),
         ),
         CheckConstraint("port BETWEEN 1 AND 65535", name="port_range"),
-        CheckConstraint("cardinality(allowed_databases) >= 1", name="allowed_databases_not_empty"),
         {
             "comment": (
                 "SQL Server catalog connection the super admin saves from the interface in the "
                 "nonprod environment; owned by the sql-review sql-server-connection capability. "
                 "At most one row per tenant. It is used only while the deployment supplies no "
-                "complete connection. Encryption and server certificate verification are always "
-                "on for it and are not stored. updated_at and updated_by are the last save time "
-                "and user."
+                "complete connection. Encryption is always on for it and is not stored. Which databases can be read is decided by the "
+                "permissions of the account, not by this row. updated_at and updated_by are the "
+                "last save time and user."
             )
         },
     )
@@ -78,12 +74,14 @@ class SqlConnectionSetting(AuditSoftDeleteMixin, Base):
             "configured. The plain password is never stored."
         ),
     )
-    allowed_databases: Mapped[list[str]] = mapped_column(
-        ARRAY(String(DATABASE_NAME_MAX_LENGTH)),
+    trust_server_certificate: Mapped[bool] = mapped_column(
+        Boolean,
         nullable=False,
+        default=False,
+        server_default=text("false"),
         comment=(
-            "Names of the business databases open to review, as entered; compared "
-            "case-insensitively. Never empty and never a system database (master, tempdb, "
-            "model, msdb)."
+            "True when the connection accepts the server certificate without verifying it "
+            "(TrustServerCertificate=yes); the connection stays encrypted. False verifies the "
+            "certificate against the trust store of the image."
         ),
     )

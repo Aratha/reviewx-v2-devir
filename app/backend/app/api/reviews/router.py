@@ -207,7 +207,7 @@ PageSize = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)]
 async def list_databases(
     service: CatalogService, page: Page = 1, page_size: PageSize = DEFAULT_PAGE_SIZE
 ) -> DatabasePage:
-    """Online databases inside the allow-list, ordered by name (Requirement 1)."""
+    """Online databases the account can access, without system databases (Requirement 1)."""
 
     return await service.databases(page=page, page_size=page_size)
 

@@ -80,8 +80,9 @@ Menüde bir sayfanın görünmemesi tek güvence değildir; sunucu her istekte r
 Veritabanındaki saklı yordam (procedure), görünüm (view) ve fonksiyonları incelemek içindir.
 
 1. Menüden **Nesne incelemesi**ni açın.
-2. **Nesne listesi için veritabanı** kutusundan bir veritabanı seçin. Listede yalnız inceleme için
-   izin verilmiş ve çalışır durumdaki veritabanları görünür.
+2. **Nesne listesi için veritabanı** kutusundan bir veritabanı seçin. Listede bağlantı hesabının
+   erişebildiği, çalışır durumdaki bütün veritabanları görünür; SQL Server'ın kendi sistem
+   veritabanları (`master`, `tempdb`, `model`, `msdb`) görünmez.
 3. Nesneleri daraltmak için **Ara** (şema, ad veya tür), **Tür** ve **Bu tarihten sonra oluşturulan
    veya değişen** alanlarını kullanın.
 4. İncelemek istediğiniz satırları işaretleyin. Başlıktaki kutu, görünen satırların tümünü seçer.
@@ -245,7 +246,7 @@ Kaynak: [SQL Server bağlantısı PRD'si](../../specs/sql-review/PRDs/002-sql-se
 | İleti | Ne yapmalı |
 |---|---|
 | Henüz yayımlanmış kural yok; inceleme başlatılamaz. | Kural yöneticisinin kuralları yayımlamasını bekleyin. |
-| Bu veritabanı inceleme için izinli değil. | Veritabanı izin listesinde yok. Eklenmesi için yöneticinize başvurun. |
+| Sistem veritabanları incelenemez. | `master`, `tempdb`, `model` ve `msdb` SQL Server'ın kendi veritabanlarıdır; inceleme için başka bir veritabanı seçin. |
 | SQL Server'a ulaşılamadı. / SQL Server zamanında yanıt vermedi. | **Listeyi yenile** ile yeniden deneyin; sürerse yöneticinize bildirin. |
 | Tanım alınamadı (nesne yok veya yetki yok). | Nesne silinmiş ya da okuma hesabının onu görme yetkisi yok. Diğer nesneler incelenmeye devam eder. |
 | Çok fazla inceleme başlattınız; biraz sonra yeniden deneyin. | Bir dakikada en çok 30 inceleme başlatılabilir. Biraz bekleyin. |

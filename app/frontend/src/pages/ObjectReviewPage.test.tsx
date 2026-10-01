@@ -35,6 +35,33 @@ describe('object review page', () => {
     );
   });
 
+  it('offers every database the server returns in the picker', async () => {
+    // sql-server-connection Requirement 7: no list narrows what the account can access.
+    const items = Array.from({length: 25}, (_, index) => `DB_${String(index + 1).padStart(2, '0')}`);
+    vi.mocked(CatalogService.databases).mockResolvedValue({items, page: 1, page_size: 500, total: 25});
+    renderWithSession(<ObjectReviewPage />);
+    const select = await screen.findByLabelText('Nesne listesi için veritabanı');
+    await waitFor(() => expect(select).toBeEnabled());
+    const offered = within(select)
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(offered).toEqual(['— Veritabanı seçin —', ...items]);
+  });
+
+  it('says so when the account can access no database', async () => {
+    vi.mocked(CatalogService.databases).mockResolvedValue({items: [], page: 1, page_size: 500, total: 0});
+    renderWithSession(<ObjectReviewPage />);
+    expect(await screen.findByText('Bağlantı hesabının erişebildiği çevrimiçi veritabanı yok.')).toBeInTheDocument();
+    expect(screen.queryByText(/İzinli/)).toBeNull();
+  });
+
+  it('shows the fixed message when a system database is requested', async () => {
+    vi.mocked(CatalogService.objects).mockRejectedValue(apiError(403, 'database_not_allowed'));
+    renderWithSession(<ObjectReviewPage />);
+    await chooseDatabase('DWH');
+    expect(await screen.findByText('Sistem veritabanları incelenemez.')).toBeInTheDocument();
+  });
+
   it('shows a Turkish error and a refresh button when SQL Server is unreachable', async () => {
     vi.mocked(CatalogService.databases).mockRejectedValue(apiError(503, 'sql_server_unreachable'));
     renderWithSession(<ObjectReviewPage />);

@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.1.1
 
 Acceptance date: 2026-09-27
 
@@ -97,8 +97,8 @@ Kaynak: `~/codes/dwhcodereview`. "Hedefte" notu olan maddeler bilinçli davranı
 
 ## İşlevsel gereksinimler
 
-Requirement 1: Veritabanı listesi yalnız izin listesindeki çevrimiçi veritabanlarını ada göre sıralı
-döndürür ([sql-server-connection](../002-sql-server-connection/PRD.md) Requirement 7). SQL Server
+Requirement 1: Veritabanı listesi bağlantı hesabının erişebildiği bütün çevrimiçi veritabanlarını,
+sistem veritabanları olmadan, ada göre sıralı döndürür ([sql-server-connection](../002-sql-server-connection/PRD.md) Requirement 7). SQL Server
 erişilemezse veya sorgu başarısızsa yanıt o PRD'nin Requirement 8 hata sınıfıdır (örneğin `503`
 `sql_server_unreachable`, zaman aşımında `504` `sql_timeout`); arayüz Türkçe ileti ve "Listeyi yenile"
 düğmesi gösterir.
@@ -112,8 +112,9 @@ olan nesneleri bırakır. Yanıt sayfalama bilgisi (sayfa, sayfa boyutu, toplam)
 Requirement 3: İnceleyici bir koşuma farklı veritabanlarından nesne ekleyebilir; veritabanı değişince
 önceki seçimler korunur ve seçim sayısı ile veritabanı sayısı gösterilir. Her seçim veritabanı, şema, ad
 ve tür kodu taşır. Bir koşumda en çok 50 nesne olur; arayüz 50. seçimden sonra ekleme yapmaz. Boş seçim,
-50'den çok nesne (`too_many_objects`) veya izinli küme dışındaki tür kodu `422` ile, izin listesi
-dışındaki veritabanı `403` `database_not_allowed` ile reddedilir (Decision 3).
+50'den çok nesne (`too_many_objects`) veya izinli küme dışındaki tür kodu `422` ile, sistem
+veritabanı (`master`, `tempdb`, `model`, `msdb`) `403` `database_not_allowed` ile reddedilir
+(Decision 3).
 
 Requirement 4: Koşum başında en son yayımlanmış kural sürümü bir kez okunur ve koşum kaydına yazılır;
 koşumdaki tüm nesneler ve tüm kurallar bu sürümle incelenir. Yayımlanmış sürüm yoksa koşum başlamaz;
@@ -351,7 +352,7 @@ erişimi yapmaz.
   [review-history-export](../005-review-history-export/PRD.md) kapsamındadır ve canlı sonuç penceresi
   de o ucu kullanır (Requirement 19).
 - Decision 6: Veritabanı ve nesne listeleme uçları ve filtreleri bu PRD'dedir; SQL Server sorguları,
-  izin listesi, hata sınıfları ve bağlantı [sql-server-connection](../002-sql-server-connection/PRD.md)
+  veritabanı listesinin kapsamı, hata sınıfları ve bağlantı [sql-server-connection](../002-sql-server-connection/PRD.md)
   PRD'sindedir.
 
 ## Teslim akışı

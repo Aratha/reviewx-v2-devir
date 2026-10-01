@@ -1,4 +1,4 @@
-"""SQL Server connection string, error classes, allow-list, catalog filters and metadata limits.
+"""SQL Server connection string, error classes, database list, catalog filters, metadata limits.
 
 sql-review/PRDs/002-sql-server-connection Requirement 2, 6, 7 and 8 (Acceptance 1 and 2). A fake
 driver replaces pyodbc; it answers the ported catalog queries from an in-memory server model.
@@ -20,7 +20,6 @@ from httpx import ASGITransport, AsyncClient
 from app.core.config import get_settings
 from app.domain.sql_server import (
     DatabaseNotAllowed,
-    EffectiveSqlConnection,
     SqlServerConnectionConfig,
     SqlServerError,
     SqlServerErrorClass,
@@ -36,6 +35,7 @@ from app.infrastructure.sql_server.connection_string import (
     build_connection_string,
 )
 from app.infrastructure.sql_server.dependency_metadata import (
+    MAX_DATABASES_TO_SCAN,
     MAX_OBJECTS_WITH_COLUMNS,
     MAX_OUTPUT_CHARS,
     format_column_type,
@@ -313,13 +313,11 @@ def _label(type_code: str) -> str:
 def _catalog(
     server: FakeServer,
     *,
-    allowed: frozenset[str] = frozenset(),
     config: SqlServerConnectionConfig = CONFIG,
     max_concurrency: int = 4,
 ) -> PyodbcSqlCatalog:
-    connection = EffectiveSqlConnection(config, tuple(sorted(allowed)))
     return PyodbcSqlCatalog(
-        connection=lambda: connection,
+        config=lambda: config,
         login_timeout_seconds=15,
         query_timeout_seconds=60,
         max_concurrency=max_concurrency,
@@ -347,37 +345,60 @@ def sql_logs() -> Iterator[list[logging.LogRecord]]:
         target.setLevel(previous)
 
 
-async def test_databases_are_the_online_allow_listed_ones_case_insensitively() -> None:
+async def test_every_online_database_is_offered_except_the_system_databases() -> None:
+    # Requirement 7 and Decision 5: no list narrows what the account can access.
     server = FakeServer(
-        databases={"DWH_Sales": [], "dwh_risk": [], "Scratch": []}, offline={"dwh_risk"}
+        databases={"DWH_Sales": [], "dwh_risk": [], "Scratch": [], "Model": [], "MSDB": []},
+        offline={"dwh_risk"},
     )
-    catalog = _catalog(server, allowed=frozenset({"dwh_sales", "DWH_RISK"}))
+    catalog = _catalog(server)
     try:
-        assert await catalog.list_databases() == ["DWH_Sales"]
+        assert await catalog.list_databases() == ["DWH_Sales", "Scratch"]
+        assert await catalog.probe(CONFIG) == ["DWH_Sales", "Scratch"]
     finally:
         catalog.close()
 
 
-async def test_an_empty_local_allow_list_returns_every_online_database() -> None:
-    catalog = _catalog(FakeServer(databases={"A": [], "B": []}))
-    try:
-        assert await catalog.list_databases() == ["A", "B", "master", "tempdb"]
-    finally:
-        catalog.close()
+def test_the_database_list_asks_only_for_online_databases_the_account_can_enter() -> None:
+    sql = " ".join(queries.LIST_DATABASES_SQL.split())
+    assert (
+        sql
+        == "SELECT name FROM sys.databases WHERE state = 0 AND HAS_DBACCESS(name) = 1 ORDER BY name;"
+    )
 
 
-async def test_databases_outside_the_allow_list_never_reach_sql_server() -> None:
-    server = FakeServer(databases={"Secret": [FakeObject(1, "dbo", "p", "P", "select 1")]})
-    catalog = _catalog(server, allowed=frozenset({"dwh"}))
+@pytest.mark.parametrize("database", ["master", "TempDB", "model", " msdb "])
+async def test_system_databases_never_reach_sql_server(database: str) -> None:
+    server = FakeServer(databases={"DWH": [FakeObject(1, "dbo", "p", "P", "select 1")]})
+    catalog = _catalog(server)
     try:
+        assert catalog.is_allowed("DWH") and catalog.is_allowed("AnyOtherDatabase")
+        assert not catalog.is_allowed(database)
         for call in (
-            catalog.list_objects("Secret"),
-            catalog.fetch_definition("Secret", "dbo", "p", "P"),
-            catalog.fetch_object_metadata("Secret", "dbo", "p"),
+            catalog.list_objects(database),
+            catalog.fetch_definition(database, "dbo", "p", "P"),
+            catalog.fetch_object_metadata(database, "dbo", "p"),
         ):
             with pytest.raises(DatabaseNotAllowed):
                 await call
         assert server.connections == []
+    finally:
+        catalog.close()
+
+
+async def test_a_database_the_account_cannot_open_fails_with_a_fixed_class() -> None:
+    # No allow-list stands in front of the account's own permissions: the driver answers.
+    server = FakeServer(
+        databases={"DWH": []},
+        error=pyodbc.ProgrammingError(
+            "42000", "[42000] Cannot open database requested by the login. (4060)"
+        ),
+    )
+    catalog = _catalog(server)
+    try:
+        with pytest.raises(SqlServerError) as raised:
+            await catalog.list_objects("Closed")
+        assert raised.value.error_class is SqlServerErrorClass.QUERY_FAILED
     finally:
         catalog.close()
 
@@ -393,48 +414,42 @@ async def test_calls_without_configuration_are_refused_before_connecting() -> No
         catalog.close()
 
 
-async def test_a_changed_connection_and_allow_list_are_used_on_the_next_call() -> None:
-    # Requirement 11: a save takes effect without a restart, for the connection and the
-    # allow-list together.
-    server = FakeServer(databases={"DWH_Old": [], "DWH_New": [FakeObject(1, "dbo", "p", "P")]})
-    current = [EffectiveSqlConnection(CONFIG, ("DWH_Old",))]
+async def test_a_changed_connection_is_used_on_the_next_call() -> None:
+    # Requirement 11: a save takes effect without a restart.
+    server = FakeServer(databases={"DWH": [FakeObject(1, "dbo", "p", "P")]})
+    current = [CONFIG]
     catalog = PyodbcSqlCatalog(
-        connection=lambda: current[0],
+        config=lambda: current[0],
         login_timeout_seconds=15,
         query_timeout_seconds=60,
         max_concurrency=2,
         connect=server.connect,
     )
     try:
-        assert await catalog.list_databases() == ["DWH_Old"]
-        assert catalog.is_allowed("dwh_old") and not catalog.is_allowed("DWH_New")
-        with pytest.raises(DatabaseNotAllowed):
-            await catalog.list_objects("DWH_New")
-
-        saved = SqlServerConnectionConfig(
-            server="sql-2.corp.example.test", port=1500, user="yeni", password="yeni-parola"
+        assert await catalog.list_databases() == ["DWH"]
+        first = parse_connection_string(server.connection_strings[-1])
+        assert (first["Server"], first["TrustServerCertificate"]) == (
+            "sql.corp.example.test,1433",
+            "no",
         )
-        current[0] = EffectiveSqlConnection(saved, ("DWH_New",))
 
-        assert await catalog.list_databases() == ["DWH_New"]
-        assert not catalog.is_allowed("DWH_Old")
-        assert [item.name for item in await catalog.list_objects("DWH_New")] == ["p"]
+        current[0] = SqlServerConnectionConfig(
+            server="sql-2.corp.example.test",
+            port=1500,
+            user="yeni",
+            password="yeni-parola",
+            trust_server_certificate=True,
+        )
+
+        assert [item.name for item in await catalog.list_objects("DWH")] == ["p"]
         last = parse_connection_string(server.connection_strings[-1])
         assert (last["Server"], last["UID"]) == ("sql-2.corp.example.test,1500", "yeni")
+        # Decision 6 exception: still encrypted, the certificate is not verified.
+        assert (last["Encrypt"], last["TrustServerCertificate"]) == ("yes", "yes")
 
-        current[0] = EffectiveSqlConnection()
+        current[0] = SqlServerConnectionConfig()
         with pytest.raises(SqlServerNotConfigured):
             await catalog.list_databases()
-    finally:
-        catalog.close()
-
-
-async def test_a_connection_test_uses_the_candidate_allow_list_not_the_saved_one() -> None:
-    server = FakeServer(databases={"DWH_A": [], "DWH_B": []})
-    catalog = _catalog(server, allowed=frozenset({"DWH_A"}))
-    try:
-        assert await catalog.probe(EffectiveSqlConnection(CONFIG, ("dwh_b",))) == ["DWH_B"]
-        assert await catalog.list_databases() == ["DWH_A"]
     finally:
         catalog.close()
 
@@ -587,7 +602,7 @@ async def test_metadata_is_capped_at_48_objects_and_95000_characters() -> None:
     assert "- dbo.tbl_048 (TABLE)" not in tables
 
 
-async def test_cross_database_lookup_scans_only_allowed_databases() -> None:
+async def test_cross_database_lookup_scans_accessible_databases_but_never_system_ones() -> None:
     root = FakeObject(
         1, "dbo", "usp_Root", "P", references=[("dbo", "Shared", None), ("dbo", "Hidden", None)]
     )
@@ -595,12 +610,12 @@ async def test_cross_database_lookup_scans_only_allowed_databases() -> None:
         databases={
             "DWH": [root],
             "Ref": [FakeObject(7, "dbo", "Shared", "U", columns=[("id", "int", 4, 10, 0, False)])],
-            "Other": [
+            "msdb": [
                 FakeObject(8, "dbo", "Hidden", "U", columns=[("gizli", "int", 4, 10, 0, False)])
             ],
         }
     )
-    catalog = _catalog(server, allowed=frozenset({"DWH", "Ref"}))
+    catalog = _catalog(server)
     try:
         text = await catalog.fetch_object_metadata("DWH", "dbo", "usp_Root")
     finally:
@@ -608,7 +623,29 @@ async def test_cross_database_lookup_scans_only_allowed_databases() -> None:
 
     assert "### Veritabanı: [Ref]" in text and "- dbo.Shared (TABLE)" in text
     assert "Hidden" not in text and "gizli" not in text
-    assert "Other" not in server.connections
+    # master is opened only to list the databases; no system database is scanned for objects.
+    assert set(server.connections) == {"DWH", "Ref", "master"}
+
+
+async def test_cross_database_search_is_bounded_per_name_and_per_request() -> None:
+    # Without an allow-list the bounds are the collector's own: at most 48 databases per missing
+    # name, and each missing name is searched once however many objects refer to it.
+    references = [("dbo", "Missing", None), ("dbo", "Missing", None), ("dbo", "Child", None)]
+    child = FakeObject(2, "dbo", "Child", "V", references=[("dbo", "Missing", None)])
+    databases: dict[str, list[FakeObject]] = {
+        "AAA": [FakeObject(1, "dbo", "usp_Root", "P", references=references), child]
+    }
+    databases.update({f"DB{number:03d}": [] for number in range(60)})
+    server = FakeServer(databases=databases)
+    catalog = _catalog(server)
+    try:
+        await catalog.fetch_object_metadata("AAA", "dbo", "usp_Root")
+    finally:
+        catalog.close()
+
+    scanned = [name for name in server.connections if name.startswith("DB")]
+    assert len(scanned) == len(set(scanned)) == MAX_DATABASES_TO_SCAN - 1
+    assert "DB059" not in scanned
 
 
 async def test_a_three_part_reference_resolves_its_id_in_the_named_database() -> None:
@@ -640,9 +677,10 @@ async def test_a_three_part_reference_resolves_its_id_in_the_named_database() ->
             "Other": [
                 FakeObject(8, "CON", "Secret", "U", columns=[("gizli", "int", 4, 10, 0, False)])
             ],
-        }
+        },
+        offline={"Other"},
     )
-    catalog = _catalog(server, allowed=frozenset({"EDWDM", "EDW"}))
+    catalog = _catalog(server)
     try:
         text = await catalog.fetch_object_metadata("EDWDM", "CON", "ins_Summary")
     finally:
@@ -723,7 +761,7 @@ async def test_a_slow_catalog_call_never_blocks_the_event_loop() -> None:
         assert response.status_code == 200
         assert elapsed < 0.2
         assert not slow.done()
-        assert await slow == ["DWH", "master", "tempdb"]
+        assert await slow == ["DWH"]
     finally:
         catalog.close()
 

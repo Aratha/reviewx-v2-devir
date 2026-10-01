@@ -46,7 +46,7 @@ _WRITE_RESPONSES: dict[int | str, dict[str, str]] = {
     404: {"description": "Bağlantı bu ortamda dağıtımla yönetilir"},
 }
 _INVALID: dict[int | str, dict[str, str]] = {
-    422: {"description": "Geçersiz sunucu, kullanıcı adı veya izinli veritabanı listesi"}
+    422: {"description": "Geçersiz sunucu veya kullanıcı adı ya da bu ortamda sabit ayar"}
 }
 
 

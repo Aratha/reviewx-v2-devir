@@ -15,7 +15,7 @@ Responses carry ``password_set``, never the password; logs carry field names, ne
 
 import logging
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import replace
 from enum import StrEnum
 
@@ -32,8 +32,6 @@ from app.domain.models.role import SUPER_ADMIN_ROLE
 from app.domain.models.sql_connection import SqlConnectionSetting
 from app.domain.models.tenant import PLATFORM_TENANT_CODE
 from app.domain.sql_server import (
-    SYSTEM_DATABASES,
-    EffectiveSqlConnection,
     SqlConnectionProbe,
     SqlServerConnectionConfig,
     SqlServerError,
@@ -77,38 +75,33 @@ def sql_connection_mode(settings: Settings) -> SqlConnectionMode:
     return SqlConnectionMode.STORED
 
 
-def initial_sql_connection(settings: Settings) -> EffectiveSqlConnection:
+def initial_sql_connection(settings: Settings) -> SqlServerConnectionConfig:
     """The connection at process start; the stored mode is empty until its first read."""
 
     if sql_connection_mode(settings) is SqlConnectionMode.STORED:
-        return EffectiveSqlConnection()
+        return SqlServerConnectionConfig()
     password = settings.mssql_password
-    return EffectiveSqlConnection(
-        config=SqlServerConnectionConfig(
-            server=settings.mssql_server.strip(),
-            port=settings.mssql_port,
-            user=settings.mssql_user.strip(),
-            password=password.get_secret_value() if password is not None else None,
-            encrypt=settings.mssql_encrypt,
-            trust_server_certificate=settings.mssql_trust_server_certificate,
-        ),
-        allowed_databases=tuple(
-            name.strip() for name in settings.mssql_allowed_databases.split(",") if name.strip()
-        ),
+    return SqlServerConnectionConfig(
+        server=settings.mssql_server.strip(),
+        port=settings.mssql_port,
+        user=settings.mssql_user.strip(),
+        password=password.get_secret_value() if password is not None else None,
+        encrypt=settings.mssql_encrypt,
+        trust_server_certificate=settings.mssql_trust_server_certificate,
     )
 
 
 class SqlConnectionStore:
     """The effective connection of this process; the catalog adapter reads it on every call."""
 
-    def __init__(self, initial: EffectiveSqlConnection) -> None:
+    def __init__(self, initial: SqlServerConnectionConfig) -> None:
         self._connection = initial
         self._lock = threading.Lock()
 
-    def current(self) -> EffectiveSqlConnection:
+    def current(self) -> SqlServerConnectionConfig:
         return self._connection
 
-    def replace(self, connection: EffectiveSqlConnection) -> None:
+    def replace(self, connection: SqlServerConnectionConfig) -> None:
         with self._lock:
             self._connection = connection
 
@@ -118,15 +111,6 @@ def _invalid() -> ApplicationError:
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         "sql_connection_invalid",
         "Sunucu veya kullanıcı adı geçersiz.",
-    )
-
-
-def _allowed_databases_invalid() -> ApplicationError:
-    return ApplicationError(
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
-        "sql_allowed_databases_invalid",
-        "İzinli veritabanı listesi boş olamaz ve sistem veritabanı (master, tempdb, model, msdb) "
-        "içeremez.",
     )
 
 
@@ -144,30 +128,6 @@ def _forbidden() -> ApplicationError:
 
 def _not_found() -> ApplicationError:
     return ApplicationError(status.HTTP_404_NOT_FOUND, "not_found", "Bulunamadı.")
-
-
-class InvalidAllowedDatabases(ValueError):
-    """The allow-list is empty or names a system database or a control character."""
-
-
-def normalize_allowed_databases(names: Iterable[str], *, required: bool) -> tuple[str, ...]:
-    """Trimmed names without case-insensitive repeats; system databases are never accepted."""
-
-    result: list[str] = []
-    seen: set[str] = set()
-    for raw in names:
-        name = raw.strip()
-        if not name:
-            continue
-        key = name.casefold()
-        if key in SYSTEM_DATABASES or any(ord(char) < 32 or ord(char) == 127 for char in name):
-            raise InvalidAllowedDatabases()
-        if key not in seen:
-            seen.add(key)
-            result.append(name)
-    if required and not result:
-        raise InvalidAllowedDatabases()
-    return tuple(result)
 
 
 def _password_context(tenant_public_id: str) -> str:
@@ -201,7 +161,7 @@ class StoredSqlConnection:
                 found = await SqlConnectionSettingRepository(session).get_by_tenant_code(
                     PLATFORM_TENANT_CODE
                 )
-                loaded = EffectiveSqlConnection() if found is None else self._read(*found)
+                loaded = SqlServerConnectionConfig() if found is None else self._read(*found)
         except Exception as error:  # noqa: BLE001 - the last known connection stays in force
             log_event(logger, "sql_connection.refresh_failed", error_type=type(error).__name__)
             return
@@ -210,8 +170,8 @@ class StoredSqlConnection:
     async def save(
         self,
         context: RequestContext,
-        change: Callable[[EffectiveSqlConnection], EffectiveSqlConnection],
-    ) -> tuple[EffectiveSqlConnection, EffectiveSqlConnection]:
+        change: Callable[[SqlServerConnectionConfig], SqlServerConnectionConfig],
+    ) -> tuple[SqlServerConnectionConfig, SqlServerConnectionConfig]:
         """Apply ``change`` to the saved row in one transaction; returns before and after."""
 
         async with self._session_factory() as session:
@@ -228,9 +188,11 @@ class StoredSqlConnection:
                 )
             settings = SqlConnectionSettingRepository(session)
             row = await settings.lock(tenant.tenant_id)
-            before = EffectiveSqlConnection() if row is None else self._read(row, tenant.public_id)
+            before = (
+                SqlServerConnectionConfig() if row is None else self._read(row, tenant.public_id)
+            )
             after = change(before)
-            password = after.config.password
+            password = after.password
             ciphertext = (
                 self._cipher.encrypt(password, context=_password_context(tenant.public_id))
                 if password
@@ -241,21 +203,21 @@ class StoredSqlConnection:
                     await settings.add(
                         SqlConnectionSetting(
                             tenant_id=tenant.tenant_id,
-                            server=after.config.server,
-                            port=after.config.port,
-                            user_name=after.config.user,
+                            server=after.server,
+                            port=after.port,
+                            user_name=after.user,
                             password_ciphertext=ciphertext,
-                            allowed_databases=list(after.allowed_databases),
+                            trust_server_certificate=after.trust_server_certificate,
                             created_by=actor.user_id,
                             updated_by=actor.user_id,
                         )
                     )
                 else:
-                    row.server = after.config.server
-                    row.port = after.config.port
-                    row.user_name = after.config.user
+                    row.server = after.server
+                    row.port = after.port
+                    row.user_name = after.user
                     row.password_ciphertext = ciphertext
-                    row.allowed_databases = list(after.allowed_databases)
+                    row.trust_server_certificate = after.trust_server_certificate
                     row.updated_by = actor.user_id
                 await session.commit()
             except IntegrityError:
@@ -269,15 +231,10 @@ class StoredSqlConnection:
         self._store.replace(after)
         return before, after
 
-    def _read(self, row: SqlConnectionSetting, tenant_public_id: str) -> EffectiveSqlConnection:
+    def _read(self, row: SqlConnectionSetting, tenant_public_id: str) -> SqlServerConnectionConfig:
         password: str | None = None
         problem: str | None = None
-        try:
-            allowed = normalize_allowed_databases(row.allowed_databases, required=True)
-        except InvalidAllowedDatabases:
-            # Never use a row whose allow-list lost its guarantees (Decision 5).
-            allowed, problem = (), "allowed_databases_invalid"
-        if problem is None and row.password_ciphertext is not None:
+        if row.password_ciphertext is not None:
             try:
                 password = self._cipher.decrypt(
                     row.password_ciphertext, context=_password_context(tenant_public_id)
@@ -285,16 +242,13 @@ class StoredSqlConnection:
             except SecretUnreadable:
                 problem = "password_unreadable"
         self._report(problem, row.password_ciphertext)
-        return EffectiveSqlConnection(
-            config=SqlServerConnectionConfig(
-                server=row.server,
-                port=row.port,
-                user=row.user_name,
-                password=password,
-                encrypt=True,
-                trust_server_certificate=False,
-            ),
-            allowed_databases=allowed,
+        return SqlServerConnectionConfig(
+            server=row.server,
+            port=row.port,
+            user=row.user_name,
+            password=password,
+            encrypt=True,
+            trust_server_certificate=row.trust_server_certificate,
         )
 
     def _report(self, problem: str | None, ciphertext: str | None) -> None:
@@ -307,61 +261,42 @@ class StoredSqlConnection:
 
 
 def _merge(
-    current: EffectiveSqlConnection, change: SqlConnectionChange, mode: SqlConnectionMode
-) -> EffectiveSqlConnection:
-    stored = mode is SqlConnectionMode.STORED
-    config = current.config
-    if stored:
-        # Decision 6: encryption and certificate verification are fixed outside local.
-        if change.encrypt is False or change.trust_server_certificate is True:
+    current: SqlServerConnectionConfig, change: SqlConnectionChange, mode: SqlConnectionMode
+) -> SqlServerConnectionConfig:
+    if mode is SqlConnectionMode.STORED:
+        # Decision 6: encryption is fixed outside local; only the certificate exception is a choice.
+        if change.encrypt is False:
             raise _setting_fixed()
-        encrypt, trust = True, False
+        encrypt = True
     else:
-        # Locally the allow-list comes from the settings file (Requirement 7).
-        if change.allowed_databases is not None:
-            raise _setting_fixed()
-        encrypt = change.encrypt if change.encrypt is not None else config.encrypt
-        trust = (
-            change.trust_server_certificate
-            if change.trust_server_certificate is not None
-            else config.trust_server_certificate
-        )
+        encrypt = change.encrypt if change.encrypt is not None else current.encrypt
+    trust = (
+        change.trust_server_certificate
+        if change.trust_server_certificate is not None
+        else current.trust_server_certificate
+    )
     try:
-        server = validate_server(change.server) if change.server is not None else config.server
-        user = validate_user(change.user) if change.user is not None else config.user
+        server = validate_server(change.server) if change.server is not None else current.server
+        user = validate_user(change.user) if change.user is not None else current.user
     except InvalidConnectionValue:
         raise _invalid() from None
-    password = config.password
+    password = current.password
     if change.password is not None:
         password = change.password or None
-    allowed = current.allowed_databases
-    if change.allowed_databases is not None:
-        try:
-            allowed = normalize_allowed_databases(change.allowed_databases, required=False)
-        except InvalidAllowedDatabases:
-            raise _allowed_databases_invalid() from None
-    return EffectiveSqlConnection(
-        config=SqlServerConnectionConfig(
-            server=server,
-            port=change.port if change.port is not None else config.port,
-            user=user,
-            password=password,
-            encrypt=encrypt,
-            trust_server_certificate=trust,
-        ),
-        allowed_databases=allowed,
+    return SqlServerConnectionConfig(
+        server=server,
+        port=change.port if change.port is not None else current.port,
+        user=user,
+        password=password,
+        encrypt=encrypt,
+        trust_server_certificate=trust,
     )
 
 
-def _changed_fields(before: EffectiveSqlConnection, after: EffectiveSqlConnection) -> str:
-    changed = [
-        name
-        for name in _CHANGE_FIELDS
-        if getattr(before.config, name) != getattr(after.config, name)
-    ]
-    if before.allowed_databases != after.allowed_databases:
-        changed.append("allowed_databases")
-    return ",".join(sorted(changed))
+def _changed_fields(before: SqlServerConnectionConfig, after: SqlServerConnectionConfig) -> str:
+    return ",".join(
+        sorted(name for name in _CHANGE_FIELDS if getattr(before, name) != getattr(after, name))
+    )
 
 
 class SqlConnectionService:
@@ -394,14 +329,11 @@ class SqlConnectionService:
     ) -> SqlConnectionView:
         mode = self._require_editable(context)
 
-        def apply(current: EffectiveSqlConnection) -> EffectiveSqlConnection:
+        def apply(current: SqlServerConnectionConfig) -> SqlServerConnectionConfig:
             updated = _merge(current, change, mode)
-            if mode is SqlConnectionMode.STORED:
-                # A saved connection always names its server, account and business databases.
-                if not updated.config.server or not updated.config.user:
-                    raise _invalid()
-                if not updated.allowed_databases:
-                    raise _allowed_databases_invalid()
+            # A saved connection always names its server and account.
+            if mode is SqlConnectionMode.STORED and not (updated.server and updated.user):
+                raise _invalid()
             return updated
 
         if mode is SqlConnectionMode.STORED and self.storage is not None:
@@ -415,6 +347,7 @@ class SqlConnectionService:
             "sql_connection.updated",
             changed_fields=_changed_fields(before, after),
             managed_by=self._managed_by(mode),
+            trust_server_certificate=after.trust_server_certificate,
             user_public_id=str(context.subject) if context.subject else None,
         )
         return self._view(context, after)
@@ -427,17 +360,17 @@ class SqlConnectionService:
             await self.storage.refresh()
         current = self.store.current()
         candidate = _merge(current, change, mode)
-        if not candidate.config.server or not candidate.config.user:
+        if not candidate.server or not candidate.user:
             raise _invalid()
-        same_target = (candidate.config.server, candidate.config.port, candidate.config.user) == (
-            current.config.server,
-            current.config.port,
-            current.config.user,
+        same_target = (candidate.server, candidate.port, candidate.user) == (
+            current.server,
+            current.port,
+            current.user,
         )
         if not same_target and not change.password:
             # Requirement 4: the stored password is never sent to another server or user.
-            candidate = replace(candidate, config=replace(candidate.config, password=None))
-        if candidate.config.password is None:
+            candidate = replace(candidate, password=None)
+        if candidate.password is None:
             return SqlConnectionTestResult(
                 ok=False,
                 code="password_required",
@@ -452,14 +385,13 @@ class SqlConnectionService:
             )
         except SqlServerNotConfigured:
             raise _invalid() from None
-        if mode is SqlConnectionMode.STORED:
-            # Before the allow-list is chosen the test lists what can be allowed (Decision 5).
-            databases = [name for name in databases if name.casefold() not in SYSTEM_DATABASES]
         return SqlConnectionTestResult(
             ok=True, code=None, message="Bağlantı başarılı.", databases=databases
         )
 
-    def _view(self, context: RequestContext, current: EffectiveSqlConnection) -> SqlConnectionView:
+    def _view(
+        self, context: RequestContext, config: SqlServerConnectionConfig
+    ) -> SqlConnectionView:
         mode = self.mode
         environment: EnvironmentValue = "local" if mode is SqlConnectionMode.LOCAL else "nonprod"
         managed_by = self._managed_by(mode)
@@ -467,14 +399,13 @@ class SqlConnectionService:
             return SqlConnectionView(
                 environment=environment,
                 editable=False,
-                configured=current.configured,
+                configured=config.configured,
                 managed_by=managed_by,
             )
-        config = current.config
         return SqlConnectionView(
             environment=environment,
             editable=True,
-            configured=current.configured,
+            configured=config.configured,
             managed_by=managed_by,
             server=config.server,
             port=config.port,
@@ -482,7 +413,6 @@ class SqlConnectionService:
             encrypt=config.encrypt,
             trust_server_certificate=config.trust_server_certificate,
             password_set=config.password is not None,
-            allowed_databases=sorted(current.allowed_databases),
         )
 
     @staticmethod

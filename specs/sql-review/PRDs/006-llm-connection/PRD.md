@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.1
+Version: 1.1.2
 
 Acceptance date: 2026-09-27
 
@@ -161,7 +161,7 @@ Decision 6: LLM çağrı özetleri 90 gün saklanır ve süresi dolan satırlar 
 
 Decision 7: Koşum başına sınıra ek olarak süreç geneli bir LLM çağrı sınırı vardır (Requirement 7); RunAI ucu başka ürünlerle paylaşılır. `nonprod` değeri RunAI kapasite sahibiyle belirlenen dağıtım girdisidir.
 
-Decision 8: SQL kodu, Nesne tanımı ve katalog/sütun meta verisinin kurum ağındaki LLM ve çıkarım (model çalıştırma) servislerine, Decision 3'teki RunAI ucu dahil, gönderilmesine proje sahibi 2026-09-26'da izin verdi. LLM veri hassasiyeti nedeniyle incelenebilecek veritabanları sınırlanmaz; SQL Server izin listesinin gerekçesi [SQL Server bağlantısı PRD'sinin](../002-sql-server-connection/PRD.md) Decision 5'indedir.
+Decision 8: SQL kodu, Nesne tanımı ve katalog/sütun meta verisinin kurum ağındaki LLM ve çıkarım (model çalıştırma) servislerine, Decision 3'teki RunAI ucu dahil, gönderilmesine proje sahibi 2026-09-26'da izin verdi. LLM veri hassasiyeti nedeniyle incelenebilecek veritabanları sınırlanmaz; hangi veritabanlarının okunabileceğini bağlantı hesabının SQL Server yetkileri belirler ([SQL Server bağlantısı PRD'si](../002-sql-server-connection/PRD.md) Decision 5).
 
 ## Teslim akışı
 

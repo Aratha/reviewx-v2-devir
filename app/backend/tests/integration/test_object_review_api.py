@@ -317,7 +317,6 @@ async def test_checks_before_the_stream_answer_json_and_create_no_run(
     review_env: ReviewEnv,
 ) -> None:
     reviewer, _, _ = await _ready(review_env)
-    review_env.catalog.allowed = frozenset({"dwh"})
     too_many = [
         {"database": "DWH", "schema": "dbo", "name": f"p{n}", "type_code": "P"} for n in range(51)
     ]
@@ -326,7 +325,7 @@ async def test_checks_before_the_stream_answer_json_and_create_no_run(
         ({"selections": too_many}, 422, "too_many_objects"),
         ({"selections": [SELECTION_A | {"type_code": "U"}]}, 422, "object_type_invalid"),
         ({"selections": [SELECTION_A | {"database": ""}]}, 422, "invalid_request"),
-        ({"selections": [SELECTION_B]}, 403, "database_not_allowed"),
+        ({"selections": [SELECTION_A | {"database": "msdb"}]}, 403, "database_not_allowed"),
     ]
     for body, status_code, code in cases:
         response = await review_env.auth.client.post(

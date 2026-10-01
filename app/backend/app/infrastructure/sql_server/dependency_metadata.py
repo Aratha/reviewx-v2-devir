@@ -3,10 +3,11 @@
 ``sys.dm_sql_referenced_entities`` is walked breadth first in each object's own database, at most
 4 levels deep and up to 48 objects; column summaries come from ``sys.columns`` and ``sys.types``
 of the database that holds the object; the text is cut at 95,000 characters. A three-part
-reference is resolved only in the database it names, and only when that database is allowed; a
-two-part name that is not found locally is searched in at most 48 databases, and only in the
-allowed databases (sql-review/PRDs/002-sql-server-connection Requirement 7). This module runs in a worker thread;
-it never logs SQL, names or driver messages.
+reference is resolved only in the database it names, and only when that database is one of the
+online databases the account can access, system databases excluded; a two-part name that is not
+found locally is searched in at most 48 of those databases, once per name in a request
+(sql-review/PRDs/002-sql-server-connection Requirement 7). This module runs in a worker thread; it
+never logs SQL, names or driver messages.
 """
 
 import logging
@@ -155,7 +156,7 @@ def try_parse_three_part(ref_schema: str, ref_name: str) -> tuple[str, str, str]
 
 
 class DependencyMetadataCollector:
-    """One metadata request: the root database and the allowed databases it may scan."""
+    """One metadata request: the root database and the databases it may scan."""
 
     def __init__(
         self,
@@ -163,9 +164,11 @@ class DependencyMetadataCollector:
         connect: Connect,
         database_names: Sequence[str],
     ) -> None:
-        # tempdb never holds reviewable objects; the caller already applied the allow-list.
+        # The caller passes the online databases the account can access, without system databases.
         self.database_names = [name for name in database_names if name.lower() != "tempdb"]
         self._connect = connect
+        # A name is searched across databases once per request, whatever number of objects use it.
+        self._found_elsewhere: dict[tuple[str, str], tuple[str, int, str] | None] = {}
 
     def _open(self, database: str) -> AbstractContextManager[Connection]:
         return closing(self._connect(database))
@@ -204,6 +207,12 @@ class DependencyMetadataCollector:
         rn = (object_name or "").strip()
         if not rn:
             return None
+        key = (rs.lower(), rn.lower())
+        if key not in self._found_elsewhere:
+            self._found_elsewhere[key] = self._scan_databases(rs, rn)
+        return self._found_elsewhere[key]
+
+    def _scan_databases(self, rs: str, rn: str) -> tuple[str, int, str] | None:
         for db_name in self.database_names[:MAX_DATABASES_TO_SCAN]:
             try:
                 with self._open(db_name) as connection:
@@ -221,7 +230,7 @@ class DependencyMetadataCollector:
 
         db_key = next((d for d in self.database_names if d.lower() == ref_db.lower()), None)
         if db_key is None:
-            # Outside the allow-list or offline: the named database is never opened or scanned.
+            # Offline, not accessible or a system database: it is never opened or scanned.
             return None, None, ""
         with self._open(db_key) as connection:
             cursor = connection.cursor()

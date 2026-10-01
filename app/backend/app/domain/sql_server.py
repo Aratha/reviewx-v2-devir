@@ -20,11 +20,14 @@ CATALOG_OBJECT_TYPES: dict[str, str] = {
     "TF": "FUNCTION_TABLE",
     "SF": "FUNCTION_SQL_INLINE",
 }
+# SQL Server's own databases are never review subjects (Requirement 7).
 SYSTEM_DATABASES = frozenset({"master", "tempdb", "model", "msdb"})
 SERVER_MAX_LENGTH = 255
 USER_NAME_MAX_LENGTH = 128
-# SQL Server identifiers (sysname) hold at most 128 characters.
-DATABASE_NAME_MAX_LENGTH = 128
+
+
+def is_system_database(database: str) -> bool:
+    return database.strip().casefold() in SYSTEM_DATABASES
 
 
 class SqlServerErrorClass(StrEnum):
@@ -60,7 +63,7 @@ class SqlServerError(Exception):
 NOT_CONFIGURED_CODE = "sql_connection_not_configured"
 NOT_CONFIGURED_MESSAGE = "SQL Server bağlantısı yapılandırılmamış."
 DATABASE_NOT_ALLOWED_CODE = "database_not_allowed"
-DATABASE_NOT_ALLOWED_MESSAGE = "Bu veritabanı inceleme için izinli değil."
+DATABASE_NOT_ALLOWED_MESSAGE = "Sistem veritabanları incelenemez."
 
 
 class SqlServerNotConfigured(Exception):
@@ -68,7 +71,7 @@ class SqlServerNotConfigured(Exception):
 
 
 class DatabaseNotAllowed(Exception):
-    """The database is outside the allow-list; rejected before any SQL Server call."""
+    """A SQL Server system database; rejected before any SQL Server call."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,33 +91,6 @@ class SqlServerConnectionConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class EffectiveSqlConnection:
-    """The connection in force together with its allow-list; both always change together.
-
-    ``allowed_databases`` keeps the names as they were entered. An empty list means every online
-    database and is possible only in the local environment (Requirement 7).
-    """
-
-    config: SqlServerConnectionConfig = field(default_factory=SqlServerConnectionConfig)
-    allowed_databases: tuple[str, ...] = ()
-    _allowed_keys: frozenset[str] = field(init=False, repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self, "_allowed_keys", frozenset(name.casefold() for name in self.allowed_databases)
-        )
-
-    @property
-    def configured(self) -> bool:
-        return self.config.configured
-
-    def allows(self, database: str) -> bool:
-        """Case-insensitive allow-list check."""
-
-        return not self._allowed_keys or database.casefold() in self._allowed_keys
-
-
-@dataclass(frozen=True, slots=True)
 class CatalogObject:
     schema: str
     name: str
@@ -125,14 +101,14 @@ class CatalogObject:
 
 
 class SqlCatalogPort(Protocol):
-    """The four read-only SQL Server operations of Decision 2 and the allow-list check."""
+    """The four read-only SQL Server operations of Decision 2 and the system database check."""
 
     def is_allowed(self, database: str) -> bool:
-        """Requirement 7 allow-list (case-insensitive); checked before any SQL Server call."""
+        """False for a system database (Requirement 7); checked before any SQL Server call."""
         ...
 
     async def list_databases(self) -> list[str]:
-        """Online databases inside the allow-list, ordered by name."""
+        """Online databases the account can access, without system databases, ordered by name."""
         ...
 
     async def list_objects(
@@ -155,6 +131,6 @@ class SqlCatalogPort(Protocol):
 class SqlConnectionProbe(Protocol):
     """Connection test: login to master with candidate values that are not saved."""
 
-    async def probe(self, connection: EffectiveSqlConnection) -> Sequence[str]:
-        """Online databases inside the candidate's allow-list, or a raised SqlServerError."""
+    async def probe(self, config: SqlServerConnectionConfig) -> Sequence[str]:
+        """Online databases the candidate account can access, or a raised SqlServerError."""
         ...

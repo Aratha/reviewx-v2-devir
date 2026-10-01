@@ -1,18 +1,13 @@
 """SQL Server connection settings contracts (sql-review 002-sql-server-connection)."""
 
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
-from app.domain.sql_server import (
-    DATABASE_NAME_MAX_LENGTH,
-    SERVER_MAX_LENGTH,
-    USER_NAME_MAX_LENGTH,
-)
+from app.domain.sql_server import SERVER_MAX_LENGTH, USER_NAME_MAX_LENGTH
 
 EnvironmentValue = Literal["local", "nonprod"]
 ManagedByValue = Literal["local_process", "deployment", "super_admin"]
-ALLOWED_DATABASES_MAX_ITEMS = 200
 
 
 class SqlConnectionView(BaseModel):
@@ -33,7 +28,6 @@ class SqlConnectionView(BaseModel):
     encrypt: bool | None = None
     trust_server_certificate: bool | None = None
     password_set: bool | None = None
-    allowed_databases: list[str] | None = None
 
 
 class SqlConnectionChange(BaseModel):
@@ -49,14 +43,8 @@ class SqlConnectionChange(BaseModel):
         default=None, description="Editable only locally; nonprod accepts only true."
     )
     trust_server_certificate: StrictBool | None = Field(
-        default=None, description="Editable only locally; nonprod accepts only false."
-    )
-    allowed_databases: list[Annotated[str, Field(max_length=DATABASE_NAME_MAX_LENGTH)]] | None = (
-        Field(
-            default=None,
-            max_length=ALLOWED_DATABASES_MAX_ITEMS,
-            description="Editable only in nonprod; locally the list comes from the settings file.",
-        )
+        default=None,
+        description="True accepts the server certificate without verifying it; still encrypted.",
     )
 
 
@@ -66,4 +54,6 @@ class SqlConnectionTestResult(BaseModel):
         description="Failure class of Requirement 8 or password_required; empty on success."
     )
     message: str
-    databases: list[str]
+    databases: list[str] = Field(
+        description="Online databases the account can access, without system databases."
+    )

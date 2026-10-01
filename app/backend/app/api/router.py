@@ -13,6 +13,7 @@ from app.api.reviews.router import router as reviews_router
 from app.api.rule_set.router import router as rule_set_router
 from app.api.sql_connection.router import local_router as sql_connection_local_router
 from app.api.sql_connection.router import router as sql_connection_router
+from app.api.sql_connection.router import stored_router as sql_connection_stored_router
 from app.core.config import get_settings
 
 # kt-scaffold:router-imports
@@ -34,10 +35,23 @@ def local_environment_router(api_prefix: str) -> APIRouter:
     """Settings write and test endpoints that exist only in the local environment.
 
     sql-review 002-sql-server-connection Requirement 5 and 006-llm-connection Requirement 13:
-    nonprod never registers them, so such a request finds no route.
+    nonprod never registers this router, so such a request finds no route there.
     """
 
     local = APIRouter(prefix=api_prefix)
     local.include_router(sql_connection_local_router)
     local.include_router(llm_local_router)
     return local
+
+
+def stored_sql_connection_router(api_prefix: str) -> APIRouter:
+    """SQL connection write and test endpoints of a nonprod that stores the connection.
+
+    sql-review 002-sql-server-connection Requirement 5: registered only when the deployment
+    supplies no complete connection and the settings encryption key exists; the super admin alone
+    passes their guard.
+    """
+
+    stored = APIRouter(prefix=api_prefix)
+    stored.include_router(sql_connection_stored_router)
+    return stored

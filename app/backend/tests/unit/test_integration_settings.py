@@ -4,6 +4,7 @@ sql-review/PRDs/002-sql-server-connection Requirement 1 and 5 (Decision 5, 6, 10
 006-llm-connection Requirement 1, 2 and 13 (Acceptance 1).
 """
 
+import base64
 import os
 from typing import Any
 
@@ -11,7 +12,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import Settings
-from app.domain.sql_server import SqlServerConnectionConfig
+from app.core.request_context import RequestContext
+from app.domain.sql_server import EffectiveSqlConnection
 from app.main import UnsafeIntegrationSettings, create_application
 from app.services.sql_connection_service import (
     SqlConnectionService,
@@ -23,6 +25,7 @@ from app.services.startup_checks import integration_setting_errors
 pytestmark = pytest.mark.unit
 
 _KEPT_VARIABLES = {"DWHCODEREVIEW_JWT_PRIVATE_KEY", "DWHCODEREVIEW_DATABASE_URL"}
+_KEY = base64.b64encode(os.urandom(32)).decode()
 NONPROD_OK: dict[str, Any] = {
     "environment": "staging",
     "mssql_server": "sql-dwh.corp.example.test",
@@ -92,19 +95,20 @@ async def test_nonprod_without_sql_server_credentials_reports_not_configured() -
     settings = _settings(**{**NONPROD_OK, **_SQL_SERVER_CONNECTION})
     application = create_application(settings)
     async with application.router.lifespan_context(application):
-        view = SqlConnectionService(
+        view = await SqlConnectionService(
             settings=settings,
             store=SqlConnectionStore(initial_sql_connection(settings)),
             probe=_UnusedProbe(),
-        ).view()
+        ).view(RequestContext(is_super_admin=True))
     assert (view.environment, view.editable, view.configured) == ("nonprod", False, False)
+    assert view.managed_by == "deployment"
 
 
 class _UnusedProbe:
     async def probe(
-        self, config: SqlServerConnectionConfig
+        self, connection: EffectiveSqlConnection
     ) -> list[str]:  # pragma: no cover - never called
-        raise AssertionError("nonprod never probes")
+        raise AssertionError("a deployment-managed nonprod never probes")
 
 
 @pytest.mark.parametrize(
@@ -178,13 +182,10 @@ def _routes(application: Any) -> set[tuple[str, str]]:
     }
 
 
-def test_write_and_test_endpoints_exist_only_locally() -> None:
+def test_write_and_test_endpoints_exist_only_where_the_connection_is_editable() -> None:
     prefix = _settings().api_prefix
-    local_only = {
-        ("PUT", f"{prefix}/sql-connection"),
-        ("POST", f"{prefix}/sql-connection/test"),
-        ("PUT", f"{prefix}/llm-connection"),
-    }
+    sql_writes = {("PUT", f"{prefix}/sql-connection"), ("POST", f"{prefix}/sql-connection/test")}
+    local_only = sql_writes | {("PUT", f"{prefix}/llm-connection")}
     readable = {
         ("GET", f"{prefix}/sql-connection"),
         ("GET", f"{prefix}/llm-connection"),
@@ -197,11 +198,27 @@ def test_write_and_test_endpoints_exist_only_locally() -> None:
         )
         assert not local_only & nonprod
         assert readable <= nonprod
+        # 002 Requirement 5: without a complete deployment connection and with the encryption key
+        # the SQL connection endpoints exist for the super admin; the LLM endpoint never does.
+        stored = {**NONPROD_OK, **_SQL_SERVER_CONNECTION, "environment": environment}
+        with_key = _routes(create_application(_settings(**stored, settings_encryption_key=_KEY)))
+        without_key = _routes(create_application(_settings(**stored)))
+        assert local_only & with_key == sql_writes
+        assert not local_only & without_key
     assert local_only | readable <= local
 
 
-async def test_nonprod_write_requests_find_no_route() -> None:
-    settings = _settings(**NONPROD_OK)
+@pytest.mark.parametrize(
+    "values",
+    [
+        NONPROD_OK,
+        {**NONPROD_OK, "settings_encryption_key": _KEY},
+        {**NONPROD_OK, **_SQL_SERVER_CONNECTION},
+    ],
+    ids=["deployment-connection", "deployment-connection-and-key", "no-connection-no-key"],
+)
+async def test_nonprod_write_requests_find_no_route(values: dict[str, Any]) -> None:
+    settings = _settings(**values)
     application = create_application(settings)
     headers = {settings.tenant_header: "00000000-0000-4000-8000-000000000010"}
     async with AsyncClient(transport=ASGITransport(app=application), base_url="http://t") as client:
@@ -214,3 +231,19 @@ async def test_nonprod_write_requests_find_no_route() -> None:
                 method, f"{settings.api_prefix}{path}", json={}, headers=headers
             )
             assert response.status_code == 404, path
+
+
+async def test_a_stored_nonprod_asks_for_a_session_before_it_saves_or_tests() -> None:
+    settings = _settings(
+        **{**NONPROD_OK, **_SQL_SERVER_CONNECTION, "settings_encryption_key": _KEY}
+    )
+    application = create_application(settings)
+    headers = {settings.tenant_header: "00000000-0000-4000-8000-000000000010"}
+    async with AsyncClient(transport=ASGITransport(app=application), base_url="http://t") as client:
+        for method, path in (("PUT", "/sql-connection"), ("POST", "/sql-connection/test")):
+            response = await client.request(
+                method, f"{settings.api_prefix}{path}", json={}, headers=headers
+            )
+            assert response.status_code == 401, path
+        llm = await client.put(f"{settings.api_prefix}/llm-connection", json={}, headers=headers)
+        assert llm.status_code == 404

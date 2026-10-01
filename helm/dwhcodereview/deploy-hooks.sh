@@ -5,6 +5,11 @@
 # so a nonprod deployment needs no operator-supplied secret:
 #   DWHCODEREVIEW_JWT_PRIVATE_KEY  pipeline JWT_PRIVATE_KEY, else the cluster value, else a P-256
 #                                  key generated once
+#   DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY
+#                                  pipeline SETTINGS_ENCRYPTION_KEY, else the cluster value, else
+#                                  32 random bytes in base64 generated once; it encrypts the SQL
+#                                  Server password the super admin saves in the application
+#                                  (specs/sql-review/PRDs/002-sql-server-connection Requirement 10)
 #   DWHCODEREVIEW_MSSQL_USER       pipeline MSSQL_USER, else the cluster value, else absent
 #   DWHCODEREVIEW_MSSQL_PASSWORD   pipeline MSSQL_PASSWORD, else the cluster value, else absent
 #   DWHCODEREVIEW_LLM_API_KEY      pipeline LLM_API_KEY, else the cluster value, else absent
@@ -67,26 +72,41 @@ valid_signing_key() {
   [[ "$text" == *prime256v1* || "$text" == *P-256* ]]
 }
 
+# A usable settings encryption key: standard base64 of exactly 32 bytes (44 characters). The value
+# is compared inside the shell only; nothing is printed.
+valid_encryption_key() {
+  local value
+  value="$(cat "$1")" || return 1
+  [[ "$value" =~ ^[A-Za-z0-9+/]{43}=$ ]]
+}
+
 changed=()
-# settle <secret key> <pipeline variable> <generate|optional>
+# settle <secret key> <pipeline variable> <signing-key|encryption-key|optional>
 settle() {
   local key="$1" variable="$2" kind="$3" target="$work/keys/$1" current="$work/current-$1" state
   local present=false
   if cluster_value "$key" "$current"; then present=true; fi
   if pipeline_provides "$variable"; then
     printf '%s' "${!variable}" > "$target"
-    if [[ "$kind" == generate ]]; then
+    if [[ "$kind" == signing-key ]]; then
       command -v openssl >/dev/null || fail 'openssl is required to check JWT_PRIVATE_KEY'
       valid_signing_key "$target" || fail "$variable must be a PEM P-256 private key"
+    elif [[ "$kind" == encryption-key ]]; then
+      valid_encryption_key "$target" || fail "$variable must be base64 of exactly 32 bytes"
     fi
     state="set from $variable"
   elif [[ "$present" == true ]]; then
     cp "$current" "$target"
     state=kept
-  elif [[ "$kind" == generate ]]; then
+  elif [[ "$kind" == signing-key ]]; then
     command -v openssl >/dev/null || fail 'openssl is required to generate the signing key'
     openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$target" 2>/dev/null \
       || fail 'the signing key could not be generated'
+    state=generated
+  elif [[ "$kind" == encryption-key ]]; then
+    command -v openssl >/dev/null || fail 'openssl is required to generate the encryption key'
+    openssl rand -base64 32 2>/dev/null | tr -d '\n' > "$target"
+    valid_encryption_key "$target" || fail 'the encryption key could not be generated'
     state=generated
   else
     echo "[RUNTIME] $key not provided; $variable is absent"
@@ -96,7 +116,8 @@ settle() {
   echo "[RUNTIME] $key $state"
 }
 
-settle DWHCODEREVIEW_JWT_PRIVATE_KEY JWT_PRIVATE_KEY generate
+settle DWHCODEREVIEW_JWT_PRIVATE_KEY JWT_PRIVATE_KEY signing-key
+settle DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY SETTINGS_ENCRYPTION_KEY encryption-key
 settle DWHCODEREVIEW_MSSQL_USER MSSQL_USER optional
 settle DWHCODEREVIEW_MSSQL_PASSWORD MSSQL_PASSWORD optional
 settle DWHCODEREVIEW_LLM_API_KEY LLM_API_KEY optional

@@ -2170,6 +2170,22 @@
         "additionalProperties": false,
         "description": "Partial values; a missing password keeps the stored one and an empty one removes it.",
         "properties": {
+          "allowed_databases": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Editable only in nonprod; locally the list comes from the settings file."
+          },
           "encrypt": {
             "anyOf": [
               {
@@ -2178,7 +2194,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Editable only locally; nonprod accepts only true."
           },
           "password": {
             "anyOf": [
@@ -2222,7 +2239,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Editable only locally; nonprod accepts only false."
           },
           "user": {
             "anyOf": [
@@ -2273,7 +2291,7 @@
         "type": "object"
       },
       "SqlConnectionView": {
-        "description": "Nonprod returns only environment, editable and configured; never a password.",
+        "description": "Only the editing caller sees server, user and options; nobody sees a password.",
         "properties": {
           "allowed_databases": {
             "anyOf": [
@@ -2308,6 +2326,15 @@
             "enum": [
               "local",
               "nonprod"
+            ],
+            "type": "string"
+          },
+          "managed_by": {
+            "description": "Where the connection is managed: local_process = this process only (local), deployment = values of the deployment, super_admin = saved by the super admin.",
+            "enum": [
+              "local_process",
+              "deployment",
+              "super_admin"
             ],
             "type": "string"
           },
@@ -2365,7 +2392,8 @@
         "required": [
           "environment",
           "editable",
-          "configured"
+          "configured",
+          "managed_by"
         ],
         "type": "object"
       },
@@ -4320,7 +4348,7 @@
     },
     "/api/dwhcodereview/v1/sql-connection": {
       "get": {
-        "description": "Environment and state; server, user and options only in the local environment.",
+        "description": "Environment and state; server, user and options only for the caller who may edit them.",
         "responses": {
           "200": {
             "content": {
@@ -4351,7 +4379,7 @@
         ]
       },
       "put": {
-        "description": "Change the values of this process only; nothing is written to a file (local only).",
+        "description": "Save the connection: locally in this process only, in nonprod in PostgreSQL.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4377,10 +4405,16 @@
             "description": "Oturum yok"
           },
           "403": {
-            "description": "Kural y\u00f6neticisi de\u011fil"
+            "description": "Yerelde kural y\u00f6neticisi, nonprod'da s\u00fcper y\u00f6netici de\u011fil"
+          },
+          "404": {
+            "description": "Ba\u011flant\u0131 bu ortamda da\u011f\u0131t\u0131mla y\u00f6netilir"
+          },
+          "409": {
+            "description": "Ayn\u0131 anda ba\u015fka bir kay\u0131t yap\u0131ld\u0131"
           },
           "422": {
-            "description": "Ge\u00e7ersiz sunucu veya kullan\u0131c\u0131 ad\u0131"
+            "description": "Ge\u00e7ersiz sunucu, kullan\u0131c\u0131 ad\u0131 veya izinli veritaban\u0131 listesi"
           }
         },
         "security": [
@@ -4397,7 +4431,7 @@
     },
     "/api/dwhcodereview/v1/sql-connection/test": {
       "post": {
-        "description": "Log in to master with the form values without saving them (local only).",
+        "description": "Log in to master with the form values without saving them.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4423,10 +4457,13 @@
             "description": "Oturum yok"
           },
           "403": {
-            "description": "Kural y\u00f6neticisi de\u011fil"
+            "description": "Yerelde kural y\u00f6neticisi, nonprod'da s\u00fcper y\u00f6netici de\u011fil"
+          },
+          "404": {
+            "description": "Ba\u011flant\u0131 bu ortamda da\u011f\u0131t\u0131mla y\u00f6netilir"
           },
           "422": {
-            "description": "Ge\u00e7ersiz sunucu veya kullan\u0131c\u0131 ad\u0131"
+            "description": "Ge\u00e7ersiz sunucu, kullan\u0131c\u0131 ad\u0131 veya izinli veritaban\u0131 listesi"
           }
         },
         "security": [

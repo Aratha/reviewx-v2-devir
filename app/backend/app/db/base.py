@@ -19,6 +19,7 @@ from app.domain.models.rule_set import (  # noqa: F401
     RuleSetVersion,
     RuleSetVersionRule,
 )
+from app.domain.models.sql_connection import SqlConnectionSetting  # noqa: F401
 from app.domain.models.tenant import Tenant  # noqa: F401
 from app.domain.models.user import User  # noqa: F401
 from app.domain.models.user_change import UserChange  # noqa: F401

@@ -1,8 +1,8 @@
 # Görevler — kubernetes-delivery
 
-[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-27'de yerel
-Compose yığınında geçti (arka uç 654/654, ön yüz 130/130 test; göç, OpenAPI, üretilmiş tip,
-yönetişim sapması ve proje katmanıyla chart adımı dahil), `tests/helm/deploy-hooks.test.sh` 51 ve
+[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-10-01'de yerel
+Compose yığınında geçti (arka uç 723/723, ön yüz 138/138 test; göç, OpenAPI, üretilmiş tip,
+yönetişim sapması ve proje katmanıyla chart adımı dahil), `tests/helm/deploy-hooks.test.sh` 70 ve
 `tests/infra/local-egress.test.sh` 22 denetimi geçti. Bu, chart, kanca, yerel Compose ve arka uç
 için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Acceptance 3) yoktur.
 
@@ -21,6 +21,10 @@ için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Accep
   `DWHCODEREVIEW_BOOTSTRAP_SUPER_ADMIN_PASSWORD` anahtarına dosyayla yazılır, yokken kümedeki değer
   korunur ve yeniden yazılmaz, `$(...)` saklanmaz, değer çıktıya ve argümana düşmez; değeri log
   satırına ekleyen ve değişken adını değiştiren iki bilinçli bozmada test kırmızıya döndü.
+  Ayar şifreleme anahtarı (Decision 20) aynı testte sınanır: ilk koşuda 32 baytlık anahtar üretilir,
+  sonraki koşularda ve kimlik bilgisi değişiminde korunur, `SETTINGS_ENCRYPTION_KEY` verilince o
+  yazılır, `$(...)` kümedeki anahtarı korur, biçimsiz değer hiçbir şey yazmadan durdurur, değer
+  çıktıya ve argümana düşmez.
 - [x] Task 3 — Requirement 2, 5, 8, 10, Decision 9, 11 / Acceptance 1:
   `helm/dwhcodereview/values-project.yaml` (ingress, runtime Secret adı, 10Gi `nfs-sc`, çıkış eşleri,
   sır olmayan `staging` ayarları, süper yönetici hesap adı `admin`). Kanıt: `scripts/render-charts.sh`.
@@ -66,8 +70,10 @@ için L1 (otomatik testlerden geçti) kanıtıdır. Canlı küme kanıtı (Accep
 - [x] Task 12 — Requirement 7, Decision 13: eski PVC `dwhcodereview-backend-data`, yeni sürüm
   sağlıklı açıldıktan sonra Azure koşumunda (`9722faf`, 2026-09-27) tek seferlik kanca adımıyla
   silindi; kümede PVC'nin kalmadığı gözlendi ve adım kancadan ve testinden kaldırıldı.
-- [ ] Task 13 — Decision 11: işletim ekibi SQL Server adresini verince `values-project.yaml`'a
-  sunucu ve izinli veritabanı listesi yazılır ve çıkış `/32`'ye daraltılır.
+- [ ] Task 13 — Decision 11: SQL Server adresi belli olunca `values-project.yaml`'daki çıkış kuralı
+  `/32`'ye daraltılır. Sunucu, hesap ve izinli veritabanı listesi değer katmanına yazılmaz; süper
+  yönetici uygulamadan girer
+  ([sql-server-connection](../../../sql-review/PRDs/002-sql-server-connection/PRD.md) Decision 12).
 - [ ] Task 14 — Decision 13: eski Secret anahtarları ve eski Azure değişkenleri sahip tarafından
   elle silinir.
 - [x] Task 15 — Requirement 11, Decision 15 / Acceptance 2: yerelde SQL Server ve LLM erişimi ayrıca

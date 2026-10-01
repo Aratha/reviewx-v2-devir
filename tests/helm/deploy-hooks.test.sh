@@ -110,6 +110,15 @@ valid_p256_key() {
   [[ "$text" == *prime256v1* || "$text" == *P-256* ]]
 }
 
+# The settings encryption key: standard base64 of exactly 32 bytes.
+valid_encryption_key() {
+  local value bytes
+  value="$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)" || return 1
+  [[ "$value" =~ ^[A-Za-z0-9+/]{43}=$ ]] || return 1
+  bytes="$(printf '%s' "$value" | openssl base64 -d -A | wc -c)"
+  [[ "${bytes//[[:space:]]/}" == 32 ]]
+}
+
 user='dwh_okuyucu_test'
 password='Parola;=}{ with spaces 42'
 llm_key='test-llm-key-not-real'
@@ -131,11 +140,20 @@ check 'first run reports the generated key by name' grep -q 'DWHCODEREVIEW_JWT_P
 check 'no private key material is printed' never_printed 'PRIVATE KEY'
 check 'no private key material reaches kubectl arguments' never_printed "$(sed -n 2p "$current/secrets/dwhcodereview-runtime/DWHCODEREVIEW_JWT_PRIVATE_KEY")"
 first_key="$(stored DWHCODEREVIEW_JWT_PRIVATE_KEY)"
+check 'first run generates a 32-byte settings encryption key' valid_encryption_key
+check 'first run reports the generated encryption key by name' \
+  grep -q 'DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY generated' "$current/stdout"
+first_encryption_key="$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)"
+check 'the encryption key is never printed or passed as an argument' never_printed "$first_encryption_key"
+check 'the encryption key reaches kubectl only as a file' \
+  grep -q -- '--from-file=DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY=/' "$current/argv.log"
 
 : > "$current/apply.log"
 run_hook
 check 'second run succeeds' test "$status" -eq 0
 check 'second run reuses the signing key from the cluster' test "$(stored DWHCODEREVIEW_JWT_PRIVATE_KEY)" = "$first_key"
+check 'second run reuses the encryption key from the cluster' \
+  test "$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)" = "$first_encryption_key"
 check 'second run leaves the Secret unchanged' grep -q 'unchanged' "$current/stdout"
 check 'second run writes nothing' test ! -s "$current/apply.log"
 
@@ -145,6 +163,8 @@ check 'MSSQL_USER maps to DWHCODEREVIEW_MSSQL_USER' test "$(stored DWHCODEREVIEW
 check 'MSSQL_PASSWORD maps to DWHCODEREVIEW_MSSQL_PASSWORD' test "$(stored DWHCODEREVIEW_MSSQL_PASSWORD)" = "$password"
 check 'LLM_API_KEY maps to DWHCODEREVIEW_LLM_API_KEY' test "$(stored DWHCODEREVIEW_LLM_API_KEY)" = "$llm_key"
 check 'the signing key survives a credential change' test "$(stored DWHCODEREVIEW_JWT_PRIVATE_KEY)" = "$first_key"
+check 'the encryption key survives a credential change' \
+  test "$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)" = "$first_encryption_key"
 check 'the SQL Server user is never printed or passed as an argument' never_printed "$user"
 check 'the SQL Server password is never printed or passed as an argument' never_printed "$password"
 check 'the LLM key is never printed or passed as an argument' never_printed "$llm_key"
@@ -204,6 +224,29 @@ new_state pipeline-key
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$scratch/pipeline.pem" 2>/dev/null
 run_hook JWT_PRIVATE_KEY="$(cat "$scratch/pipeline.pem")"
 check 'a pipeline JWT_PRIVATE_KEY is used' test "$(stored DWHCODEREVIEW_JWT_PRIVATE_KEY)" = "$(cat "$scratch/pipeline.pem")"
+
+new_state pipeline-encryption-key
+pipeline_encryption_key="$(openssl rand -base64 32 | tr -d '\n')"
+run_hook SETTINGS_ENCRYPTION_KEY="$pipeline_encryption_key"
+check 'a pipeline SETTINGS_ENCRYPTION_KEY is accepted' test "$status" -eq 0
+check 'a pipeline SETTINGS_ENCRYPTION_KEY is used' \
+  test "$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)" = "$pipeline_encryption_key"
+check 'a pipeline SETTINGS_ENCRYPTION_KEY is never printed or passed as an argument' \
+  never_printed "$pipeline_encryption_key"
+run_hook SETTINGS_ENCRYPTION_KEY='$(SETTINGS_ENCRYPTION_KEY)'
+check 'an unresolved SETTINGS_ENCRYPTION_KEY macro keeps the cluster key' \
+  test "$(stored DWHCODEREVIEW_SETTINGS_ENCRYPTION_KEY)" = "$pipeline_encryption_key"
+
+for invalid_encryption_key in 'not-a-key-value' "$(openssl rand -base64 16 | tr -d '\n')" \
+  "$(openssl rand -base64 48 | tr -d '\n')"; do
+  new_state "invalid-encryption-key-${#invalid_encryption_key}"
+  : > "$current/apply.log"
+  run_hook SETTINGS_ENCRYPTION_KEY="$invalid_encryption_key"
+  check "an invalid SETTINGS_ENCRYPTION_KEY (${#invalid_encryption_key} characters) stops the hook" \
+    test "$status" -ne 0
+  check 'an invalid SETTINGS_ENCRYPTION_KEY is never written' test ! -s "$current/apply.log"
+  check 'an invalid SETTINGS_ENCRYPTION_KEY is not echoed' never_printed "$invalid_encryption_key"
+done
 
 new_state control-character
 run_hook MSSQL_USER="$(printf 'user\tname')"

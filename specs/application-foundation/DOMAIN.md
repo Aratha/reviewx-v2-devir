@@ -19,7 +19,8 @@ Rancher kümesinde tek chart ile çalışır.
 - **Rol:** `inceleyici` veya `kural-yoneticisi`.
 - **Runtime Secret:** Nonprod'da uygulama sırlarını taşıyan Kubernetes Secret'ı
   (`dwhcodereview-runtime`); `helm/dwhcodereview/deploy-hooks.sh` hazırlar: oturum imza anahtarını
-  bir kez üretir, verilmişse isteğe bağlı Azure gizli değişkenlerini yazar.
+  ve ayar şifreleme anahtarını bir kez üretir, verilmişse isteğe bağlı Azure gizli değişkenlerini
+  yazar.
 - **Ortam:** `local` (geliştirici makinesi, `DWHCODEREVIEW_ENVIRONMENT=development`) veya `nonprod`
   (KT Rancher kümesi, `DWHCODEREVIEW_ENVIRONMENT=staging`). Başka ya da okunamayan değer `nonprod`
   gibi davranır.

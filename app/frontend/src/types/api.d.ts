@@ -2037,7 +2037,7 @@ export interface paths {
         };
         /**
          * Read Sql Connection
-         * @description Environment and state; server, user and options only in the local environment.
+         * @description Environment and state; server, user and options only for the caller who may edit them.
          */
         get: {
             parameters: {
@@ -2075,7 +2075,7 @@ export interface paths {
         };
         /**
          * Update Sql Connection
-         * @description Change the values of this process only; nothing is written to a file (local only).
+         * @description Save the connection: locally in this process only, in nonprod in PostgreSQL.
          */
         put: {
             parameters: {
@@ -2106,14 +2106,28 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Kural yöneticisi değil */
+                /** @description Yerelde kural yöneticisi, nonprod'da süper yönetici değil */
                 403: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Geçersiz sunucu veya kullanıcı adı */
+                /** @description Bağlantı bu ortamda dağıtımla yönetilir */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Aynı anda başka bir kayıt yapıldı */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz sunucu, kullanıcı adı veya izinli veritabanı listesi */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2140,7 +2154,7 @@ export interface paths {
         put?: never;
         /**
          * Test Sql Connection
-         * @description Log in to master with the form values without saving them (local only).
+         * @description Log in to master with the form values without saving them.
          */
         post: {
             parameters: {
@@ -2171,14 +2185,21 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Kural yöneticisi değil */
+                /** @description Yerelde kural yöneticisi, nonprod'da süper yönetici değil */
                 403: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Geçersiz sunucu veya kullanıcı adı */
+                /** @description Bağlantı bu ortamda dağıtımla yönetilir */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Geçersiz sunucu, kullanıcı adı veya izinli veritabanı listesi */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2719,10 +2740,14 @@ export interface components {
         };
         /** @description Partial values; a missing password keeps the stored one and an empty one removes it. */
         SqlConnectionChange: {
+            /** @description Editable only in nonprod; locally the list comes from the settings file. */
+            allowed_databases?: string[] | null;
+            /** @description Editable only locally; nonprod accepts only true. */
             encrypt?: boolean | null;
             password?: string | null;
             port?: number | null;
             server?: string | null;
+            /** @description Editable only locally; nonprod accepts only false. */
             trust_server_certificate?: boolean | null;
             user?: string | null;
         };
@@ -2733,7 +2758,7 @@ export interface components {
             message: string;
             ok: boolean;
         };
-        /** @description Nonprod returns only environment, editable and configured; never a password. */
+        /** @description Only the editing caller sees server, user and options; nobody sees a password. */
         SqlConnectionView: {
             allowed_databases?: string[] | null;
             configured: boolean;
@@ -2741,6 +2766,11 @@ export interface components {
             encrypt?: boolean | null;
             /** @enum {string} */
             environment: "local" | "nonprod";
+            /**
+             * @description Where the connection is managed: local_process = this process only (local), deployment = values of the deployment, super_admin = saved by the super admin.
+             * @enum {string}
+             */
+            managed_by: "local_process" | "deployment" | "super_admin";
             password_set?: boolean | null;
             port?: number | null;
             server?: string | null;

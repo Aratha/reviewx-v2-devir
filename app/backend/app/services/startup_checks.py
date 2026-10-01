@@ -55,15 +55,10 @@ def integration_setting_errors(settings: Settings) -> list[str]:
     if local:
         return errors
 
-    # Without server, user or password the SQL Server area is not configured and the process
+    # Without server, user or password the deployment supplies no connection and the process
     # starts (Decision 11); a usable connection is never left without the allow-list.
-    connection_complete = bool(
-        settings.mssql_server.strip()
-        and settings.mssql_user.strip()
-        and settings.mssql_password is not None
-    )
     allowed = settings.mssql_allowed_database_names
-    if (connection_complete and not allowed) or allowed & SYSTEM_DATABASES:
+    if (settings.mssql_connection_complete and not allowed) or allowed & SYSTEM_DATABASES:
         errors.append("DWHCODEREVIEW_MSSQL_ALLOWED_DATABASES")
     if not settings.mssql_encrypt:
         errors.append("DWHCODEREVIEW_MSSQL_ENCRYPT")

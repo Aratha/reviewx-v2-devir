@@ -20,6 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from app.core.config import get_settings
 from app.domain.sql_server import (
     DatabaseNotAllowed,
+    EffectiveSqlConnection,
     SqlServerConnectionConfig,
     SqlServerError,
     SqlServerErrorClass,
@@ -316,9 +317,9 @@ def _catalog(
     config: SqlServerConnectionConfig = CONFIG,
     max_concurrency: int = 4,
 ) -> PyodbcSqlCatalog:
+    connection = EffectiveSqlConnection(config, tuple(sorted(allowed)))
     return PyodbcSqlCatalog(
-        config=lambda: config,
-        allowed_databases=allowed,
+        connection=lambda: connection,
         login_timeout_seconds=15,
         query_timeout_seconds=60,
         max_concurrency=max_concurrency,
@@ -388,6 +389,52 @@ async def test_calls_without_configuration_are_refused_before_connecting() -> No
         with pytest.raises(SqlServerNotConfigured):
             await catalog.list_databases()
         assert server.connections == []
+    finally:
+        catalog.close()
+
+
+async def test_a_changed_connection_and_allow_list_are_used_on_the_next_call() -> None:
+    # Requirement 11: a save takes effect without a restart, for the connection and the
+    # allow-list together.
+    server = FakeServer(databases={"DWH_Old": [], "DWH_New": [FakeObject(1, "dbo", "p", "P")]})
+    current = [EffectiveSqlConnection(CONFIG, ("DWH_Old",))]
+    catalog = PyodbcSqlCatalog(
+        connection=lambda: current[0],
+        login_timeout_seconds=15,
+        query_timeout_seconds=60,
+        max_concurrency=2,
+        connect=server.connect,
+    )
+    try:
+        assert await catalog.list_databases() == ["DWH_Old"]
+        assert catalog.is_allowed("dwh_old") and not catalog.is_allowed("DWH_New")
+        with pytest.raises(DatabaseNotAllowed):
+            await catalog.list_objects("DWH_New")
+
+        saved = SqlServerConnectionConfig(
+            server="sql-2.corp.example.test", port=1500, user="yeni", password="yeni-parola"
+        )
+        current[0] = EffectiveSqlConnection(saved, ("DWH_New",))
+
+        assert await catalog.list_databases() == ["DWH_New"]
+        assert not catalog.is_allowed("DWH_Old")
+        assert [item.name for item in await catalog.list_objects("DWH_New")] == ["p"]
+        last = parse_connection_string(server.connection_strings[-1])
+        assert (last["Server"], last["UID"]) == ("sql-2.corp.example.test,1500", "yeni")
+
+        current[0] = EffectiveSqlConnection()
+        with pytest.raises(SqlServerNotConfigured):
+            await catalog.list_databases()
+    finally:
+        catalog.close()
+
+
+async def test_a_connection_test_uses_the_candidate_allow_list_not_the_saved_one() -> None:
+    server = FakeServer(databases={"DWH_A": [], "DWH_B": []})
+    catalog = _catalog(server, allowed=frozenset({"DWH_A"}))
+    try:
+        assert await catalog.probe(EffectiveSqlConnection(CONFIG, ("dwh_b",))) == ["DWH_B"]
+        assert await catalog.list_databases() == ["DWH_A"]
     finally:
         catalog.close()
 

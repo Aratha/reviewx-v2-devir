@@ -4,7 +4,7 @@
   "kind": "PromptIngressPolicy",
   "metadata": {
     "id": "policy:prompt-ingress",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "owner": "team:data-protection",
     "lifecycle": "phase-1-partial"
   },
@@ -49,7 +49,7 @@
         "engine": "python-re",
         "pattern": "\\b(?:api[_-]?key|apikey|secret|password|passwd|token|access[_-]?token|auth[_-]?key)\\b\\s*[:=]\\s*(?:\\\"(?:\\\\.|[^\\\"\\\\\\r\\n]){8,}\\\"|'(?:\\\\.|[^'\\\\\\r\\n]){8,}'|[^\\s]{8,})",
         "flags": ["IGNORECASE"],
-        "validator": null
+        "validator": "secret-value-shape"
       }
     },
     {
@@ -85,7 +85,7 @@
         "engine": "python-re",
         "pattern": "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(?![A-Za-z0-9.-])",
         "flags": [],
-        "validator": null
+        "validator": "email-address-shape"
       }
     },
     {
@@ -119,7 +119,7 @@
       "implementation": {
         "kind": "regex",
         "engine": "python-re",
-        "pattern": "(?<!\\d)(?:\\d[ -]?){12,18}\\d(?!\\d)",
+        "pattern": "(?<!\\w)(?<!\\d[.,-])(?:\\d{13,19}|\\d{4}([ -])\\d{4}\\1\\d{4}\\1\\d{4}|3[47]\\d{2}([ -])\\d{6}\\2\\d{5})(?!\\w)(?![.,-]\\d)",
         "flags": [],
         "validator": "luhn-checksum"
       }
@@ -131,7 +131,7 @@
       "implementation": {
         "kind": "regex",
         "engine": "python-re",
-        "pattern": "(?<![\\d+])(?:\\+?90[ .-]?)?0?5\\d{2}[ .-]?\\d{3}[ .-]?\\d{2}[ .-]?\\d{2}(?!\\d)",
+        "pattern": "(?<![\\w+])(?<!\\d\\.)(?:(?:\\+?90[ .-]?0?|0)5\\d{2}[ .-]?\\d{3}[ .-]?\\d{2}[ .-]?\\d{2}|5\\d{2}[ -]\\d{3}[ -]\\d{2}[ -]\\d{2})(?!\\w)",
         "flags": [],
         "validator": null
       }

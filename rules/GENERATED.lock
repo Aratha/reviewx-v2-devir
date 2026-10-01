@@ -1,5 +1,5 @@
 {
-  "corpus_digest": "7f9b16d6195ce89c342e034e4d319757191f07b9c60176e5756719b36ae390bb",
+  "corpus_digest": "e280c4a12e8ad7e09ca8a60b72d2a16dc5da0fb9697c8b13f25b4fbd9b1fb53d",
   "files": {
     ".agents/skills/governed-review/SKILL.md": "370a600be7e789090295cd9764d0cb4e4275d29e1303d02a55eb836c1ec2b499",
     ".agents/skills/kt-alan/SKILL.md": "11016f2dae2bf4c6736c1262ff9a743faff5fce2dbc875eb75d6541aae9820a0",
@@ -50,10 +50,10 @@
     ".claude/skills/kt-tamamla/SKILL.md": "4f6d64bde467deca3089af81b6b99d26e795c19884e1ed9e1cfbd748751ebcaf",
     ".claude/skills/kt-test-kosumu-raporu/SKILL.md": "b2e287b73b0c995751c6d48196d497620529ac9074c2957c8594f246c25b81da",
     ".claude/skills/kt-yansit/SKILL.md": "73959cfda88fd791855c47f499f978c8bdf0a4166a9a13d262b3d17acb1b1c79",
-    ".codex/config.toml": "b6242149edf648abf11e079289accf5fd053d89be0024d138b2d39b8ae6c16a7",
+    ".codex/config.toml": "ba1196cb545ce7049ad0b5a8dbd4b081a57e86624b7ce9154e1675d5616cd980",
     ".codex/hooks.json": "48709671d6c4526167aebd25ff48605525435fa8937b1a97b78d7418833d3135",
-    ".specify/memory/constitution.md": "42eeba8182f9a5bbb971725cf9f10114577cc5bc50ff226c4f1c5e0ef2371743",
-    "AGENTS.md": "7385e35a825c10e4c100cd908f93c30f2f1781d52a752d4b10310ba497b7a266",
+    ".specify/memory/constitution.md": "3abdc81aa7919e7ed6d1fb83154bb6b3b555746a2c54a94faf96f775cf4d4731",
+    "AGENTS.md": "205376a06366b9fc190c07b4df744aa57446f0c69386ffb6da198cb3e0339943",
     "CLAUDE.md": "297eea46ac254aec8dbb671437c47a10b4062da9181d3d05c434c8cbf93db8c1",
     "app/backend/AGENTS.md": "482cfe4d24bb3d926244846250e6db28234973b8aa276dda6c4dd9768e532dee",
     "app/frontend/AGENTS.md": "482cfe4d24bb3d926244846250e6db28234973b8aa276dda6c4dd9768e532dee",

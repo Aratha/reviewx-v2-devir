@@ -27,7 +27,6 @@ from app.db.base_class import Base
 from app.domain.models.mixins import AuditSoftDeleteMixin, new_public_id
 from app.domain.models.rule_set import RULE_CODE_PATTERN
 
-MAX_OBJECTS_PER_RUN = 50
 REVIEWED_SQL_MAX_LENGTH = 120_000
 RULE_RESULT_TEXT_MAX_LENGTH = 500
 FINDING_TEXT_MAX_LENGTH = 4000
@@ -99,9 +98,7 @@ class ReviewRun(AuditSoftDeleteMixin, Base):
             "status IN ('running', 'completed', 'failed', 'cancelled', 'interrupted')",
             name="status_allowed",
         ),
-        CheckConstraint(
-            f"object_count BETWEEN 1 AND {MAX_OBJECTS_PER_RUN}", name="object_count_range"
-        ),
+        CheckConstraint("object_count >= 1", name="object_count_positive"),
         CheckConstraint(
             "kind = 'script' OR label IS NULL",
             name="label_only_for_script",
@@ -173,7 +170,7 @@ class ReviewRun(AuditSoftDeleteMixin, Base):
     object_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        comment="Number of selected objects, 1 to 50; always 1 for a script run.",
+        comment="Number of selected objects, at least 1; always 1 for a script run.",
     )
     status: Mapped[str] = mapped_column(
         String(16),

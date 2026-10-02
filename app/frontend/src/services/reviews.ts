@@ -67,8 +67,12 @@ export const ReviewService = {
   runs(scope: 'mine' | 'all', page: number, pageSize: number, signal?: AbortSignal): Promise<ReviewRunPage> {
     return apiRequest<ReviewRunPage>(`/review-runs?scope=${scope}&page=${page}&page_size=${pageSize}`, {signal});
   },
-  run(runId: string, signal?: AbortSignal): Promise<ReviewRunDetail> {
-    return apiRequest<ReviewRunDetail>(`/review-runs/${encodeURIComponent(runId)}`, {signal});
+  /** One page of the stored objects of a run with their results. */
+  run(runId: string, page: number, pageSize: number, signal?: AbortSignal): Promise<ReviewRunDetail> {
+    return apiRequest<ReviewRunDetail>(
+      `/review-runs/${encodeURIComponent(runId)}?page=${page}&page_size=${pageSize}`,
+      {signal},
+    );
   },
   deleteRun(runId: string): Promise<void> {
     return apiRequest<void>(`/review-runs/${encodeURIComponent(runId)}`, {method: 'DELETE'});

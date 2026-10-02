@@ -15,7 +15,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select, text, update
+from sqlalchemy import event, func, select, text, update
 
 from app.db.session import async_session_factory, engine
 from app.domain.llm import LlmChatRequest
@@ -562,3 +562,131 @@ async def test_other_tenants_never_see_a_run(
     assert run["run_id"] not in [item["id"] for item in everyone["items"]]
     assert (await _get(review_env, f"/{run['run_id']}", manager)).status_code == 404
     assert (await _get(review_env, f"/{run['run_id']}/exports/csv", manager)).status_code == 404
+
+
+# --- runs without an object limit (003 Decision 3, 005 Requirement 2, 3, 7 and 8) --------------
+
+
+def _many(count: int) -> list[dict[str, str]]:
+    return [
+        {
+            "database": "DWH" if n % 2 == 0 else "DWH2",
+            "schema": "dbo",
+            "name": f"usp_{n:04d}",
+            "type_code": "P",
+        }
+        for n in range(count)
+    ]
+
+
+async def _large_run(env: ReviewEnv, session: RoleSession, count: int) -> str:
+    for item in _many(count):
+        env.catalog.definitions[(item["database"], "dbo", item["name"])] = SCRIPT
+    events = sse_events((await env.object_review(session, _many(count))).text)
+    assert events[-1]["phase"] == "complete", events[-1]
+    return str(events[-1]["run_id"])
+
+
+async def test_the_detail_of_a_large_run_is_read_page_by_page(review_env: ReviewEnv) -> None:
+    await _setup(review_env)
+    reviewer = await review_env.sessions.reviewer()
+    run_id = await _large_run(review_env, reviewer, 120)
+
+    first = (await _get(review_env, f"/{run_id}", reviewer)).json()
+    third = (await _get(review_env, f"/{run_id}?page=3&page_size=50", reviewer)).json()
+    whole = (await _get(review_env, f"/{run_id}?page_size=200", reviewer)).json()
+    beyond = (await _get(review_env, f"/{run_id}?page=9", reviewer)).json()
+    invalid = [
+        await _get(review_env, f"/{run_id}?page_size=201", reviewer),
+        await _get(review_env, f"/{run_id}?page=0", reviewer),
+    ]
+
+    assert (first["object_count"], first["results_page"], first["results_page_size"]) == (
+        120,
+        1,
+        50,
+    )
+    assert [item["name"] for item in first["results"]] == [f"usp_{n:04d}" for n in range(50)]
+    assert all(len(item["rule_results"]) == 2 and item["findings"] for item in first["results"])
+    assert (third["results_page"], third["results_page_size"]) == (3, 50)
+    assert [item["name"] for item in third["results"]] == [f"usp_{n:04d}" for n in range(100, 120)]
+    assert len(whole["results"]) == 120 and beyond["results"] == []
+    assert first["title"] == "2 veritabanı (DWH, DWH2) · 120 nesne"
+    assert first["subtitle"] == (
+        "[DWH] dbo.usp_0000 (P), [DWH2] dbo.usp_0001 (P), [DWH] dbo.usp_0002 (P) +117"
+    )
+    assert first["finding_count"] == 120 * 3
+    assert [response.status_code for response in invalid] == [422, 422]
+    assert MARKER not in json.dumps(whole)
+
+
+async def test_the_history_list_never_reads_the_objects_or_the_sql_text_of_a_run(
+    review_env: ReviewEnv,
+) -> None:
+    await _setup(review_env)
+    reviewer = await review_env.sessions.reviewer()
+    await _large_run(review_env, reviewer, 60)
+    statements: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_: Any) -> None:
+        statements.append(statement)
+
+    event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        listed = (await _get(review_env, "?scope=mine", reviewer)).json()
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+    (run,) = listed["items"]
+    assert run["title"] == "2 veritabanı (DWH, DWH2) · 60 nesne"
+    assert run["subtitle"].endswith("+57") and run["object_count"] == 60
+    object_reads = [
+        statement for statement in statements if re.search(r"FROM review_run_object\b", statement)
+    ]
+    assert object_reads and all("source_sql" not in statement for statement in object_reads)
+    # The title needs the databases and the first objects only, never a row per object.
+    assert all("GROUP BY" in statement or "position <" in statement for statement in object_reads)
+
+
+async def test_a_run_larger_than_the_driver_parameter_limit_is_read_and_exported(
+    review_env: ReviewEnv, history_logs: list[logging.LogRecord]
+) -> None:
+    # 1,100 objects x 30 rules = 33,000 rule results: more identifiers than one PostgreSQL
+    # statement accepts as parameters (32,767), so nothing may be loaded through an IN list.
+    manager = await review_env.sessions.rule_manager()
+    await review_env.publish(
+        manager,
+        [("Yıldız kullanma.", False)],
+        [(f"Ek kural {number}.", False) for number in range(29)],
+    )
+    review_env.llm.responder = _reply
+    reviewer = await review_env.sessions.reviewer()
+    count = 1_100
+    run_id = await _large_run(review_env, reviewer, count)
+
+    page = await _get(review_env, f"/{run_id}?page=22&page_size=50", reviewer)
+    csv = await _get(review_env, f"/{run_id}/exports/csv", reviewer)
+    sql = await _get(review_env, f"/{run_id}/exports/sql", reviewer)
+
+    assert page.status_code == 200, page.text
+    assert [item["name"] for item in page.json()["results"]] == [
+        f"usp_{n:04d}" for n in range(1050, 1100)
+    ]
+    assert csv.status_code == 200, csv.text
+    rows = csv.text.split("\r\n")
+    # One row per finding of the failed rule (two per object) and one per other rule result.
+    assert len(rows) == 1 + count * (2 + 29)
+    assert rows[1].split(",")[2:4] == ["dbo", "usp_0000"]
+    assert rows[-1].split(",")[2:4] == ["dbo", "usp_1099"]
+    assert sql.status_code == 200, sql.text
+    assert sql.text.count("\n\nGO\n\n") == count - 1
+    assert sql.text.count("-- [DWH] dbo.usp_") == count // 2
+    exported = [
+        record.structured_fields  # type: ignore[attr-defined]
+        for record in history_logs
+        if record.getMessage() == "review_history.exported"
+    ]
+    assert [(item["format"], item.get("rows"), item.get("objects")) for item in exported] == [
+        ("csv", count * 31, None),
+        ("sql", None, count),
+    ]

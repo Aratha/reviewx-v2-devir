@@ -89,29 +89,128 @@ describe('object review page', () => {
     );
   });
 
-  it('keeps selections across databases, counts databases and stops at 50 objects', async () => {
+  it('keeps selections across databases, counts databases and has no object limit', async () => {
     const stream = vi.spyOn(ReviewService, 'streamObjectReview').mockResolvedValue(undefined);
     renderWithSession(<ObjectReviewPage />);
     await chooseDatabase('DWH');
     await screen.findByText('dwh_01');
     fireEvent.click(screen.getByLabelText('Görünen nesnelerin tümünü seç'));
-    expect(screen.getByText('40 / 50 seçili · 1 veritabanı')).toBeInTheDocument();
+    expect(screen.getByText('40 seçili · 1 veritabanı')).toBeInTheDocument();
 
     await chooseDatabase('MART');
     await screen.findByText('mart_01');
     fireEvent.click(screen.getByLabelText('Görünen nesnelerin tümünü seç'));
-    expect(screen.getByText('50 / 50 seçili · 2 veritabanı')).toBeInTheDocument();
-    expect(screen.getByText(/En çok 50 nesne seçilebilir/)).toBeInTheDocument();
-    expect(screen.getByLabelText('dbo.mart_11 seç')).toBeDisabled();
+    // object-review Decision 3: the 51st and every later object is selected like the first.
+    expect(screen.getByText('70 seçili · 2 veritabanı')).toBeInTheDocument();
+    expect(screen.queryByText(/En çok/)).toBeNull();
+    expect(screen.queryByText(/\/ 50/)).toBeNull();
+    expect(screen.getByLabelText('dbo.mart_30 seç')).toBeChecked();
+    expect(screen.getByLabelText('dbo.mart_30 seç')).toBeEnabled();
     fireEvent.click(screen.getByText('mart_12'));
     expect(screen.getByLabelText('dbo.mart_12 seç')).not.toBeChecked();
+    expect(screen.getByText('69 seçili · 2 veritabanı')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', {name: 'Seçilen 50 nesneyi incele'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Seçilen 69 nesneyi incele'}));
     await waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
     const selections = stream.mock.calls[0][0];
-    expect(selections).toHaveLength(50);
+    expect(selections).toHaveLength(69);
     expect(selections[0]).toEqual({database: 'DWH', schema: 'dbo', name: 'dwh_01', type_code: 'P'});
-    expect(selections.at(-1)).toEqual({database: 'MART', schema: 'dbo', name: 'mart_10', type_code: 'P'});
+    expect(selections.at(-1)).toEqual({database: 'MART', schema: 'dbo', name: 'mart_30', type_code: 'P'});
+  });
+
+  it('selects every object matching the filter across all pages without rendering them', async () => {
+    const total = 1_234;
+    const all = objects('big', total);
+    vi.mocked(CatalogService.objects).mockImplementation(async (_database, query) => ({
+      items: all.slice((query.page - 1) * query.pageSize, query.page * query.pageSize),
+      page: query.page,
+      page_size: query.pageSize,
+      total,
+    }));
+    const stream = vi.spyOn(ReviewService, 'streamObjectReview').mockResolvedValue(undefined);
+    renderWithSession(<ObjectReviewPage />);
+    await chooseDatabase('DWH');
+    await screen.findByText('big_01');
+    fireEvent.change(screen.getByLabelText('Tür'), {target: {value: 'P'}});
+    const selectAll = await screen.findByRole('button', {name: 'Süzgece uyan 1.234 nesnenin tümünü seç'});
+
+    fireEvent.click(selectAll);
+
+    expect(await screen.findByText('Süzgece uyan 1.234 nesne seçildi.')).toBeInTheDocument();
+    expect(screen.getByText('1.234 seçili · 1 veritabanı')).toBeInTheDocument();
+    // Pages of 500 with the filter of the list; the table still shows one page of 100 rows.
+    const gathered = vi
+      .mocked(CatalogService.objects)
+      .mock.calls.filter(([, query]) => query.pageSize === 500)
+      .map(([database, query]) => [database, query.page, query.type]);
+    expect(gathered).toEqual([
+      ['DWH', 1, 'P'],
+      ['DWH', 2, 'P'],
+      ['DWH', 3, 'P'],
+    ]);
+    expect(screen.getAllByRole('row')).toHaveLength(101);
+    expect(screen.getByText(/Büyük seçim/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Seçilen 1234 nesneyi incele'}));
+    await waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
+    expect(stream.mock.calls[0][0]).toHaveLength(total);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Seçimi temizle'}));
+    expect(screen.getByText('0 seçili · 0 veritabanı')).toBeInTheDocument();
+    expect(screen.queryByText(/nesne seçildi\./)).toBeNull();
+    expect(screen.queryByText(/Büyük seçim/)).toBeNull();
+  });
+
+  it('adds the matching objects to an existing selection and can be stopped', async () => {
+    const total = 1_200;
+    const all = objects('big', total);
+    let release: (() => void) | null = null;
+    vi.mocked(CatalogService.objects).mockImplementation(async (_database, query, signal) => {
+      if (query.pageSize === 500 && query.page === 2) {
+        await new Promise<void>((resolve, reject) => {
+          release = resolve;
+          signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        });
+      }
+      return {
+        items: all.slice((query.page - 1) * query.pageSize, query.page * query.pageSize),
+        page: query.page,
+        page_size: query.pageSize,
+        total,
+      };
+    });
+    renderWithSession(<ObjectReviewPage />);
+    await chooseDatabase('DWH');
+    fireEvent.click(await screen.findByText('big_03'));
+    expect(screen.getByText('1 seçili · 1 veritabanı')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Süzgece uyan 1.200 nesnenin tümünü seç'}));
+    expect(await screen.findByText(/Süzgece uyan nesneler seçiliyor… 500 \/ 1\.200/)).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Seçilen 1 nesneyi incele'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', {name: 'Vazgeç'}));
+
+    // Stopping keeps the earlier selection and adds nothing.
+    expect(screen.getByText('1 seçili · 1 veritabanı')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Süzgece uyan 1.200 nesnenin tümünü seç'})).toBeEnabled();
+    expect(release).not.toBeNull();
+  });
+
+  it('names the technical request bound instead of a product limit', async () => {
+    const total = 10_001;
+    const all = objects('big', total);
+    vi.mocked(CatalogService.objects).mockImplementation(async (_database, query) => ({
+      items: all.slice((query.page - 1) * query.pageSize, query.page * query.pageSize),
+      page: query.page,
+      page_size: query.pageSize,
+      total,
+    }));
+    renderWithSession(<ObjectReviewPage />);
+    await chooseDatabase('DWH');
+    fireEvent.click(await screen.findByRole('button', {name: 'Süzgece uyan 10.001 nesnenin tümünü seç'}));
+    expect(await screen.findByText('10.001 seçili · 1 veritabanı')).toBeInTheDocument();
+    expect(screen.getByText(/teknik olarak en çok 10\.000 nesne/)).toBeInTheDocument();
+    expect(screen.getByText(/Bu bir ürün sınırı değil/)).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Seçilen 10001 nesneyi incele'})).toBeDisabled();
   });
 
   it('toggles a row by clicking it and by its checkbox, and clears the selection', async () => {
@@ -124,7 +223,7 @@ describe('object review page', () => {
     expect(within(row!).getByRole('checkbox')).not.toBeChecked();
     fireEvent.click(row!);
     fireEvent.click(screen.getByRole('button', {name: 'Seçimi temizle'}));
-    expect(screen.getByText('0 / 50 seçili · 0 veritabanı')).toBeInTheDocument();
+    expect(screen.getByText('0 seçili · 0 veritabanı')).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'İnceleme için en az bir nesne seçin'})).toBeDisabled();
   });
 });

@@ -47,7 +47,7 @@ export function objectRunEvents(results: LiveObjectResult[] = [liveResult()]): R
       total_chars: null,
     },
     {...base, phase: 'object_done'},
-    {phase: 'complete', run_id: 'run-1', results},
+    {phase: 'complete', run_id: 'run-1', results, results_omitted: false},
   ];
 }
 

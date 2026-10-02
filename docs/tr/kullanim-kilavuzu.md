@@ -85,10 +85,26 @@ Veritabanındaki saklı yordam (procedure), görünüm (view) ve fonksiyonları 
    veritabanları (`master`, `tempdb`, `model`, `msdb`) görünmez.
 3. Nesneleri daraltmak için **Ara** (şema, ad veya tür), **Tür** ve **Bu tarihten sonra oluşturulan
    veya değişen** alanlarını kullanın.
-4. İncelemek istediğiniz satırları işaretleyin. Başlıktaki kutu, görünen satırların tümünü seçer.
-5. Başka bir veritabanı seçip işaretlemeye devam edebilirsiniz; önceki seçimleriniz korunur. Sayaç
-   "n / 50 seçili · m veritabanı" biçiminde toplamı gösterir. Bir incelemede en çok 50 nesne olur.
-6. **Seçilenleri incele** düğmesine basın.
+4. İncelemek istediğiniz satırları işaretleyin. Başlıktaki kutu yalnız o sayfada görünen satırları
+   seçer.
+5. Süzgece uyan bütün nesneleri tek adımda seçmek için tablonun üstündeki **Süzgece uyan N nesnenin
+   tümünü seç** düğmesine basın. Uygulama, o veritabanında arama, tür ve tarih süzgecine uyan bütün
+   nesneleri diğer sayfalardakilerle birlikte seçime ekler; ilerlemeyi "x / y" olarak gösterir,
+   **Vazgeç** ile yarıda bırakabilirsiniz. Bitince "Süzgece uyan N nesne seçildi." yazar.
+6. Başka bir veritabanı seçip işaretlemeye devam edebilirsiniz; önceki seçimleriniz korunur. Sayaç
+   "n seçili · m veritabanı" biçiminde toplamı gösterir. **Seçimi temizle** bütün seçimi kaldırır.
+7. **Seçilenleri incele** düğmesine basın.
+
+Bir incelemedeki nesne sayısı için sınır yoktur. Büyük seçimde şunları bilin:
+
+- İnceleme her nesne için her kuralı yapay zekâ modeline ayrı sorar. 25 kural ve 1.000 nesne 25.000
+  soru demektir; böyle bir inceleme saatler sürer.
+- Sonuç ancak inceleme bitince saklanır. Sekmeyi kapatırsanız, bağlantı koparsa ya da uygulama yeniden
+  başlatılırsa (her yeni sürüm kurulumunda başlatılır) inceleme kaybolur ve baştan başlatmanız gerekir.
+- Büyük incelemeniz sürerken yapay zekâ modelinin size ayrılan payını doldurur; aynı anda çalışan
+  diğer incelemeler yavaşlar.
+- Tek seferde teknik olarak en çok 10.000 nesne gönderilebilir. Bu bir ürün sınırı değil, isteğin
+  boyut sınırıdır; daha fazlası için seçimi bölüp ayrı incelemeler başlatın.
 
 İnceleme her zaman **en son yayımlanmış kural sürümüyle** yapılır. Hiç yayımlanmış kural yoksa
 inceleme başlamaz ve "Henüz yayımlanmış kural yok; inceleme başlatılamaz." iletisi görünür.
@@ -123,7 +139,10 @@ Kaynak: [SQL betiği incelemesi PRD'si](../../specs/sql-review/PRDs/004-script-r
 
 İnceleme başlayınca **Canlı inceleme** penceresi açılır:
 
-- Üstte ilerleme çubuğu ve "x / y nesne tamamlandı" sayacı vardır.
+- Üstte ilerleme çubuğu ve "x / y nesne tamamlandı" sayacı vardır; hata alan nesne varsa sayısı da
+  yazar.
+- Pencere yalnız o anda incelenen nesneleri ve son biten 20 nesneyi listeler; diğerleri sayaçta
+  toplanır.
 - Her nesne için aşama görünür: Tanım okunuyor, Meta veri alınıyor, İnceleniyor, Tamamlandı veya Hata.
 - Her kural için kural kimliği (örneğin `Kural05`), **Kritik** ya da **Normal** grubu ve modelin o
   ana kadar ürettiği metin miktarı görünür. Bir kurala yanıt alınamazsa **Yanıt alınamadı** yazar.
@@ -136,7 +155,8 @@ koparsa inceleme durur.
 saklanmaz ve pencerede "İnceleme durduruldu." yazar.
 
 İnceleme bitince pencerenin altında **CSV indir**, **SQL indir**, **Sonuçları göster** ve **Kapat**
-düğmeleri çıkar.
+düğmeleri çıkar. 50 nesneden büyük incelemede **Sonuçları göster** yerine **Sonuçları geçmişte aç**
+düğmesi çıkar; sonuçlar **İnceleme geçmişi** sayfasında açılır.
 
 ## Sonuçları okumak
 
@@ -186,6 +206,9 @@ girin aynı kayıtları görürsünüz.
 
 - Solda kayıt listesi vardır: tür (**Nesne** ya da **SQL**), durum, başlangıç zamanı, başlık ve
   "Kural sürümü n · x nesne · y bulgu" özeti. Bir kayda tıklayınca sağda sonuçları açılır.
+- 50 nesneden büyük incelemenin sonuçları sayfa başına 50 nesne gösterilir; sayfalar arasında
+  **Önceki** ve **Sonraki** ile gezersiniz. Sonuç süzgeci yalnız açık sayfadaki nesnelere uygulanır;
+  bütün sonuçlar için CSV dosyasını indirin.
 - Durumlar: **Tamamlandı**, **Hata**, **Durduruldu** (siz durdurdunuz), **Yarıda kesildi** (uygulama
   inceleme sürerken yeniden başladı) ve **Sürüyor**. Durdurulan ve yarıda kesilen incelemenin sonucu
   saklanmaz.

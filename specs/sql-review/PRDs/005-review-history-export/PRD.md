@@ -2,14 +2,15 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.2.0
 
-Acceptance date: 2026-09-27
+Acceptance date: 2026-10-02
 
 Domain: [sql-review](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
-benimseyerek kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-10-02'de, bir koşumdaki nesne sayısı sınırını kaldıran
+kararının ([nesne incelemesi](../003-object-review/PRD.md) Decision 3) geçmiş ve dışa aktarıma
+etkisiyle (Requirement 3 ve 12) ve önceki sahip kararlarıyla kabul etti.
 
 ## Amaç
 
@@ -83,7 +84,10 @@ adı da yazar.
 
 Requirement 3: Koşum ayrıntısı, canlı sonuç ekranıyla aynı sonuç görünümünü (nesneler, kural
 sonuçları, bulgular, nesne hatası ve ayrıştırma uyarısı) yanlış pozitif işaretleriyle birlikte
-gösterir. Ayrıntı yanıtı SQL metnini içermez.
+gösterir. Ayrıntı yanıtı SQL metnini içermez. Ayrıntı nesne nesne sayfalıdır (varsayılan 50, en çok
+200 nesne; nesneler koşumdaki seçim sırasıyla gelir); ekran sayfalar arasında gezinir ve toplam nesne
+sayısını gösterir. Canlı ekran, sonuçlarını taşımayan büyük koşumu
+([nesne incelemesi](../003-object-review/PRD.md) Requirement 14) bu ayrıntıda açar.
 
 Requirement 4: Koşumun sahibi bir bulguyu veya bulgusu olmayan başarısız kural sonucunu yanlış pozitif
 olarak işaretler veya işareti kaldırır; işaret hem canlı sonuç ekranında hem geçmişte aynı kayda
@@ -127,6 +131,13 @@ yapmıyordu.
 Requirement 11: Tarayıcıdaki eski geçmiş taşınmaz ve yeni uygulama `localStorage` geçmişini okumaz.
 Tüm ekran metinleri Türkçedir.
 
+Requirement 12: Geçmiş, nesne sınırı olmayan koşumlarla da çalışır. Liste, başlık ve alt başlık için
+koşumun nesnelerini ve SQL metnini okumaz; yalnız veritabanı adlarını ve ilk dört nesnenin adını
+okur. Ayrıntı ve dışa aktarımlar koşumu nesne konumu aralığıyla parça parça okur (dışa aktarımda
+200'er nesne); nesne kimliklerini sorgu parametresi olarak listelemez, böylece veritabanı sürücüsünün
+sorgu başına parametre sınırı (32.767) koşumun büyüklüğünü kısıtlamaz. CSV ve SQL dosyaları büyük
+koşumda da Requirement 7 ve 8'deki içerikle, tek dosya olarak üretilir.
+
 ## API sözleşmesi
 
 Tüm uçlar `/api/dwhcodereview/v1` altındadır, geçerli oturum ister ve hatayı
@@ -136,7 +147,7 @@ Tüm uçlar `/api/dwhcodereview/v1` altındadır, geçerli oturum ister ve hatay
 | Yöntem ve yol | Rol | İstek → yanıt |
 |---|---|---|
 | `GET /review-runs` | inceleyici, kural-yoneticisi | `scope=mine\|all`, `page`, `page_size` → satırlar ve sayfa bilgisi |
-| `GET /review-runs/{run_id}` | sahip; kural-yoneticisi | → koşum ayrıntısı (Requirement 3) |
+| `GET /review-runs/{run_id}` | sahip; kural-yoneticisi | `page`, `page_size` (nesne sayfası; varsayılan 50, en çok 200) → koşum ayrıntısı, o sayfanın sonuçları, `results_page` ve `results_page_size`; toplam `object_count` alanıdır (Requirement 3) |
 | `PUT /review-runs/{run_id}/findings/{finding_id}/false-positive` | sahip | `{false_positive: bool}` → güncel işaret |
 | `PUT /review-runs/{run_id}/rule-results/{rule_result_id}/false-positive` | sahip | `{false_positive: bool}` → güncel işaret |
 | `DELETE /review-runs/{run_id}` | sahip | → 204 |
@@ -206,9 +217,12 @@ istekten dosya olarak kaydedilir.
   vermesi, formül koruması, SQL yorum bloğu ve satır eşlemesi (nesne ve metin koşumu), işaretli
   bulgunun yorumdan çıkması.
 - Gerçek PostgreSQL testleri: sahiplik ve rol başına 401/403/404, sayfalama, işaret tekrarı, silme
-  kapsamı, süren koşumda 409, saklama işinin yalnız süresi dolanı ve iki kopyada tek kez silmesi.
-- Ön yüz testleri (Vitest): liste, ayrıntı, onaylar, indirme düğmeleri, pasif SQL düğmesi,
-  `localStorage` geçmişinin yazılmaması.
+  kapsamı, süren koşumda 409, saklama işinin yalnız süresi dolanı ve iki kopyada tek kez silmesi;
+  büyük koşumun ayrıntısının sayfa sayfa okunması, listenin nesne satırlarını ve SQL metnini okumaması,
+  sürücü parametre sınırından büyük koşumun (1.100 nesne × 30 kural) okunup dışa aktarılması.
+- Ön yüz testleri (Vitest): liste, ayrıntı, ayrıntıda nesne sayfaları arasında gezinme, bağlantıdaki
+  koşumun seçili açılması, onaylar, indirme düğmeleri, pasif SQL düğmesi, `localStorage` geçmişinin
+  yazılmaması.
 
 ## Vektör ve gömme sözleşmesi (uygulanabilirse)
 
@@ -222,8 +236,8 @@ istekten dosya olarak kaydedilir.
 
 ## Kabul kriterleri
 
-- [ ] Acceptance 1: L1 — Otomatik testlerden geçti: arka uç testleri Requirement 1–6 ve 10'u gerçek
-  PostgreSQL ile doğrular; OpenAPI (API tanım dosyası) kayıtlı yapıtla aynıdır.
+- [ ] Acceptance 1: L1 — Otomatik testlerden geçti: arka uç testleri Requirement 1–6, 10 ve 12'yi
+  gerçek PostgreSQL ile doğrular; OpenAPI (API tanım dosyası) kayıtlı yapıtla aynıdır.
 - [ ] Acceptance 2: L1 — Otomatik testlerden geçti: dışa aktarım testleri Requirement 7–9'u sabit
   örnek koşumlarla bayt düzeyinde doğrular.
 - [ ] Acceptance 3: L1 — Otomatik testlerden geçti: ön yüz testleri Requirement 3, 4, 5, 10 ve 11'i
@@ -272,3 +286,7 @@ Belirtim → Plan → Görevler → Uygulama ([Plan](plan.md), [Görevler](tasks
 - CSV formül koruması, `-` ile başlayan kod parçalarının (örneğin `-- yorum`) önüne `'` ekler; bu
   hücre içeriğini görünür biçimde değiştirir.
 - Eski tarayıcı geçmişi kaybolur; geçişte kullanıcılara duyurulmalıdır.
+- Nesne sınırı olmayan koşumda CSV ve SQL dosyası sunucu belleğinde bütün olarak kurulur; SQL dosyası
+  koşumun bütün SQL metnini taşır. Binlerce nesnelik koşumun dışa aktarımı backend podunun bellek
+  sınırını (512 MiB) zorlayabilir ([nesne incelemesi](../003-object-review/PRD.md) Riskler). Dosyanın
+  parça parça akıtılması yapılmamıştır.

@@ -1,7 +1,8 @@
 # Görevler — review-history-export
 
-[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerden geçti) kanıtıdır.
+[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-10-02'de yerel
+Compose yığınında geçti (arka uç 726/726, ön yüz 144/144 test). Bu, L1 (otomatik testlerden geçti)
+kanıtıdır.
 
 - [x] Task V1 — Requirement 4, 5, 6 / Acceptance 1: yanlış pozitif sütunları, fiziksel silme
   basamaklaması, `finished_at` dizini ve saklama süresi ayarı. Kanıt:
@@ -47,3 +48,10 @@ Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerde
   saklama işiyle silinmesinin gözlenmesi; açık. 2026-09-27'de yerel yığında varsayılan 90 günle, bitişi
   91 gün öncesine çekilen koşum ve başlangıcı 91 gün öncesine çekilen LLM çağrı özeti arka uç
   açılışındaki saklama işiyle silindi; 1 günlük ayarla koşum ve Excel gözlemi yapılmadı.
+- [x] Task 7 — Requirement 3, 12 / Acceptance 1, Acceptance 3: nesne sınırı olmayan koşumlarda geçmiş.
+  Büyük koşumun ayrıntısı sayfa sayfa okunur; liste nesne satırlarını ve SQL metnini okumaz (çalışan
+  SQL komutları yakalanarak doğrulandı); sürücü parametre sınırından büyük koşum (1.100 nesne × 30
+  kural) okunur, CSV ve SQL olarak dışa aktarılır. Kanıt:
+  `app/backend/tests/integration/test_review_history_api.py`. Ön yüz: ayrıntıda nesne sayfaları
+  arasında gezinme ve bağlantıdaki koşumun seçili açılması. Kanıt:
+  `app/frontend/src/pages/ReviewHistoryPage.test.tsx`. Bu, L1 (otomatik testlerden geçti) kanıtıdır.

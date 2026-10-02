@@ -5,6 +5,10 @@ sql-review/PRDs/003-object-review Requirement 16, 004-script-review Requirement 
 with its selection rows; results and the reviewed SQL text are written only when the run
 completes, in the caller's single transaction. Deletion is physical: the foreign keys cascade to
 objects, results and findings, and empty the run link of LLM call summaries.
+
+A run has no object limit, so no read loads a whole run at once unless the caller asks for it
+chunk by chunk: results are read by object position range and joined to their run, never through
+a list of identifiers, which a single PostgreSQL statement limits to 32,767 parameters.
 """
 
 from collections.abc import Sequence
@@ -13,6 +17,7 @@ from datetime import datetime
 
 from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.domain.models.mixins import new_public_id
 from app.domain.models.review import (
@@ -26,6 +31,8 @@ from app.domain.models.rule_set import RuleSetVersion
 from app.domain.models.user import User
 from app.domain.review import ObjectOutcome
 
+# Objects whose outcomes are written, flushed and released together when a run completes.
+_STORE_CHUNK_OBJECTS = 100
 # pg_try_advisory_xact_lock key of the history retention job: one running copy deletes at a time.
 RETENTION_LOCK_KEY = 0x6477_6863_7276_6801  # "dwhcrvh" + 1
 
@@ -61,6 +68,26 @@ class RunResults:
     objects: list[ReviewRunObject]
     rule_results: dict[int, list[ReviewRuleResult]]
     findings: dict[int, list[ReviewFinding]]
+
+
+@dataclass(frozen=True, slots=True)
+class RunObjectName:
+    database: str | None
+    schema: str
+    name: str
+    type_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class RunHeading:
+    """What the title of a run needs: its databases in selection order and its first objects."""
+
+    databases: list[str]
+    first_objects: list[RunObjectName]
+
+
+# Objects named in the subtitle of a run.
+HEADING_OBJECTS = 4
 
 
 def _finding_count() -> Select[tuple[int]]:
@@ -135,18 +162,42 @@ class ReviewRepository:
         owner_user_id: int,
         finished_at: datetime,
         outcomes: Sequence[ObjectOutcome],
+        collect_identifiers: bool = True,
     ) -> list[StoredResult] | None:
-        """Write every outcome and mark the run completed; None when it no longer runs."""
+        """Write every outcome and mark the run completed; None when it no longer runs.
+
+        The outcomes are written chunk by chunk in the caller's transaction and each chunk leaves
+        the session again, so a run of thousands of objects never holds all its rows as ORM
+        objects. Without ``collect_identifiers`` the returned list is empty.
+        """
 
         run = await self.session.scalar(
             select(ReviewRun).where(ReviewRun.review_run_id == run_id).with_for_update()
         )
         if run is None or run.status != ReviewRunStatus.RUNNING.value:
             return None
+        stored: list[StoredResult] = []
+        for start in range(0, len(outcomes), _STORE_CHUNK_OBJECTS):
+            chunk = outcomes[start : start + _STORE_CHUNK_OBJECTS]
+            identifiers = await self._store_outcomes(run_id, owner_user_id, chunk)
+            if collect_identifiers:
+                stored.extend(identifiers)
+        run.status = ReviewRunStatus.COMPLETED.value
+        run.finished_at = finished_at
+        run.updated_by = owner_user_id
+        await self.session.flush()
+        return stored
+
+    async def _store_outcomes(
+        self, run_id: int, owner_user_id: int, outcomes: Sequence[ObjectOutcome]
+    ) -> list[StoredResult]:
         objects = {
             item.position: item
             for item in await self.session.scalars(
-                select(ReviewRunObject).where(ReviewRunObject.review_run_id == run_id)
+                select(ReviewRunObject).where(
+                    ReviewRunObject.review_run_id == run_id,
+                    ReviewRunObject.position.in_([outcome.position for outcome in outcomes]),
+                )
             )
         }
         stored: list[StoredResult] = []
@@ -202,10 +253,13 @@ class ReviewRepository:
             for finding in findings:
                 finding.review_rule_result_id = result.review_rule_result_id
             self.session.add_all(findings)
-        run.status = ReviewRunStatus.COMPLETED.value
-        run.finished_at = finished_at
-        run.updated_by = owner_user_id
         await self.session.flush()
+        for row in objects.values():
+            self.session.expunge(row)
+        for result, findings in pending:
+            self.session.expunge(result)
+            for finding in findings:
+                self.session.expunge(finding)
         return stored
 
     async def finish_run(
@@ -292,49 +346,107 @@ class ReviewRepository:
         ).first()
         return None if row is None else RunRow(*row)
 
-    async def objects_of_runs(self, run_ids: Sequence[int]) -> dict[int, list[ReviewRunObject]]:
+    async def headings_of_runs(self, run_ids: Sequence[int]) -> dict[int, RunHeading]:
+        """Titles of the listed runs without reading a row per object or any SQL text."""
+
+        headings = {run_id: RunHeading([], []) for run_id in run_ids}
         if not run_ids:
-            return {}
-        grouped: dict[int, list[ReviewRunObject]] = {run_id: [] for run_id in run_ids}
-        for item in await self.session.scalars(
-            select(ReviewRunObject)
+            return headings
+        first_position = func.min(ReviewRunObject.position)
+        for run_id, database in await self.session.execute(
+            select(ReviewRunObject.review_run_id, ReviewRunObject.database_name)
             .where(
                 ReviewRunObject.review_run_id.in_(run_ids),
                 ReviewRunObject.is_deleted.is_(False),
             )
+            .group_by(ReviewRunObject.review_run_id, ReviewRunObject.database_name)
+            .order_by(ReviewRunObject.review_run_id, first_position)
+        ):
+            headings[run_id].databases.append(database or "")
+        for run_id, database, schema, name, type_code in await self.session.execute(
+            select(
+                ReviewRunObject.review_run_id,
+                ReviewRunObject.database_name,
+                ReviewRunObject.schema_name,
+                ReviewRunObject.object_name,
+                ReviewRunObject.type_code,
+            )
+            .where(
+                ReviewRunObject.review_run_id.in_(run_ids),
+                ReviewRunObject.position < HEADING_OBJECTS,
+                ReviewRunObject.is_deleted.is_(False),
+            )
             .order_by(ReviewRunObject.review_run_id, ReviewRunObject.position)
         ):
-            grouped[item.review_run_id].append(item)
-        return grouped
+            headings[run_id].first_objects.append(RunObjectName(database, schema, name, type_code))
+        return headings
 
-    async def results_of_run(self, run_id: int) -> RunResults:
-        objects = (await self.objects_of_runs([run_id]))[run_id]
-        object_ids = [item.review_run_object_id for item in objects]
-        rule_results: dict[int, list[ReviewRuleResult]] = {item: [] for item in object_ids}
+    async def results_of_run(
+        self, run_id: int, *, offset: int, limit: int, with_sql: bool = False
+    ) -> RunResults:
+        """The objects at positions ``offset`` to ``offset + limit - 1`` with their results.
+
+        The reviewed SQL text is read only for ``with_sql`` (the SQL export).
+        """
+
+        in_range = (
+            ReviewRunObject.review_run_id == run_id,
+            ReviewRunObject.position >= offset,
+            ReviewRunObject.position < offset + limit,
+            ReviewRunObject.is_deleted.is_(False),
+        )
+        query = select(ReviewRunObject).where(*in_range).order_by(ReviewRunObject.position)
+        if not with_sql:
+            query = query.options(defer(ReviewRunObject.source_sql, raiseload=True))
+        objects = list(await self.session.scalars(query))
+        rule_results: dict[int, list[ReviewRuleResult]] = {
+            item.review_run_object_id: [] for item in objects
+        }
         findings: dict[int, list[ReviewFinding]] = {}
-        if not object_ids:
+        if not objects:
             return RunResults(objects, rule_results, findings)
         for result in await self.session.scalars(
             select(ReviewRuleResult)
-            .where(
-                ReviewRuleResult.review_run_object_id.in_(object_ids),
-                ReviewRuleResult.is_deleted.is_(False),
+            .join(
+                ReviewRunObject,
+                ReviewRunObject.review_run_object_id == ReviewRuleResult.review_run_object_id,
             )
+            .where(*in_range, ReviewRuleResult.is_deleted.is_(False))
             .order_by(ReviewRuleResult.review_run_object_id, ReviewRuleResult.position)
         ):
             rule_results[result.review_run_object_id].append(result)
             findings[result.review_rule_result_id] = []
-        if findings:
-            for finding in await self.session.scalars(
-                select(ReviewFinding)
-                .where(
-                    ReviewFinding.review_rule_result_id.in_(list(findings)),
-                    ReviewFinding.is_deleted.is_(False),
-                )
-                .order_by(ReviewFinding.review_rule_result_id, ReviewFinding.position)
-            ):
-                findings[finding.review_rule_result_id].append(finding)
+        for finding in await self.session.scalars(
+            select(ReviewFinding)
+            .join(
+                ReviewRuleResult,
+                ReviewRuleResult.review_rule_result_id == ReviewFinding.review_rule_result_id,
+            )
+            .join(
+                ReviewRunObject,
+                ReviewRunObject.review_run_object_id == ReviewRuleResult.review_run_object_id,
+            )
+            .where(
+                *in_range,
+                ReviewRuleResult.is_deleted.is_(False),
+                ReviewFinding.is_deleted.is_(False),
+            )
+            .order_by(ReviewFinding.review_rule_result_id, ReviewFinding.position)
+        ):
+            findings[finding.review_rule_result_id].append(finding)
         return RunResults(objects, rule_results, findings)
+
+    def release(self, results: RunResults) -> None:
+        """Let the rows of one read chunk leave the session before the next chunk is read."""
+
+        for item in results.objects:
+            self.session.expunge(item)
+        for rule_results in results.rule_results.values():
+            for result in rule_results:
+                self.session.expunge(result)
+        for run_findings in results.findings.values():
+            for finding in run_findings:
+                self.session.expunge(finding)
 
     async def rule_result_of_run(
         self, run_id: int, public_id: str

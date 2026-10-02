@@ -161,6 +161,11 @@
             },
             "type": "array"
           },
+          "results_omitted": {
+            "default": false,
+            "description": "True when the run has more objects than one result page: results stays empty and the stored run is read page by page from the review run detail.",
+            "type": "boolean"
+          },
           "run_id": {
             "type": "string"
           }
@@ -1142,10 +1147,11 @@
       "ObjectReviewRequest": {
         "properties": {
           "selections": {
+            "description": "No product limit; the list length is bounded only technically.",
             "items": {
               "$ref": "#/components/schemas/ObjectSelectionItem"
             },
-            "maxItems": 1000,
+            "maxItems": 10000,
             "type": "array"
           }
         },
@@ -1302,11 +1308,19 @@
             "type": "string"
           },
           "results": {
-            "description": "Stored results; empty unless the run completed. Never carries SQL text.",
+            "description": "Stored results of one page of objects in selection order; empty unless the run completed. Never carries SQL text. object_count is the total number of objects.",
             "items": {
               "$ref": "#/components/schemas/ObjectResultItem"
             },
             "type": "array"
+          },
+          "results_page": {
+            "description": "The returned page of objects, starting at 1.",
+            "type": "integer"
+          },
+          "results_page_size": {
+            "description": "Objects per page of this response.",
+            "type": "integer"
           },
           "rule_version": {
             "type": "integer"
@@ -1355,7 +1369,9 @@
           "owner_display_name",
           "owned",
           "label",
-          "results"
+          "results",
+          "results_page",
+          "results_page_size"
         ],
         "type": "object"
       },
@@ -3367,7 +3383,7 @@
     },
     "/api/dwhcodereview/v1/object-reviews": {
       "post": {
-        "description": "Review up to 50 selected objects with live progress (object-review).",
+        "description": "Review the selected objects with live progress; no object limit (object-review).",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3624,7 +3640,7 @@
         ]
       },
       "get": {
-        "description": "The stored results with false-positive marks; never the SQL text (Requirement 3).",
+        "description": "One page of the stored objects with their results and false-positive marks.\n\nNever the SQL text (Requirement 3); ``object_count`` is the total number of objects.",
         "parameters": [
           {
             "in": "path",
@@ -3634,6 +3650,27 @@
               "maxLength": 64,
               "minLength": 1,
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
             }
           }
         ],

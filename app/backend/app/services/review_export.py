@@ -110,20 +110,21 @@ def _fail_rule_marked(item: ExportObject, result: ExportRuleResult) -> bool:
     )
 
 
-def build_results_csv(
-    objects: Sequence[ExportObject],
-    *,
-    generated_at: str,
-    database: str = "",
-    review_error: str | None = None,
-) -> str:
-    """``buildReviewResultsCsv``: UTF-8 BOM, CRLF, one row per finding or rule result."""
+def results_csv_header() -> str:
+    return "\ufeff" + _csv_line(CSV_HEADERS)
 
-    header = "﻿" + _csv_line(CSV_HEADERS)
-    if not objects and review_error:
-        error_row = [generated_at, database, "", "", "", "", "", "", "", review_error, "", ""]
-        return f"{header}\r\n{_csv_line([*error_row, 'false'])}"
-    lines = [header]
+
+def results_csv_error_row(generated_at: str, database: str, review_error: str) -> str:
+    error_row = [generated_at, database, "", "", "", "", "", "", "", review_error, "", ""]
+    return _csv_line([*error_row, "false"])
+
+
+def results_csv_rows(
+    objects: Sequence[ExportObject], *, generated_at: str, database: str = ""
+) -> list[str]:
+    """The rows of some objects of a run; a large run is written chunk by chunk."""
+
+    lines: list[str] = []
     for item in objects:
         row_database = js_trim(item.database) or database
         meta = " | ".join(part for part in (item.error, item.parse_warning) if part)
@@ -177,7 +178,23 @@ def build_results_csv(
             lines.extend(finding_row(finding) for finding in item.findings)
         else:
             lines.append(_csv_line([*prefix, "", "", "", "", meta, "", "", "false"]))
-    return "\r\n".join(lines)
+    return lines
+
+
+def build_results_csv(
+    objects: Sequence[ExportObject],
+    *,
+    generated_at: str,
+    database: str = "",
+    review_error: str | None = None,
+) -> str:
+    """``buildReviewResultsCsv``: UTF-8 BOM, CRLF, one row per finding or rule result."""
+
+    header = results_csv_header()
+    if not objects and review_error:
+        return f"{header}\r\n{results_csv_error_row(generated_at, database, review_error)}"
+    rows = results_csv_rows(objects, generated_at=generated_at, database=database)
+    return "\r\n".join([header, *rows])
 
 
 def _object_title(item: ExportObject) -> str:

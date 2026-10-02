@@ -24,7 +24,9 @@ from app.schemas.review_runs.contracts import (
 )
 from app.services.review_history_service import (
     DEFAULT_PAGE_SIZE,
+    DEFAULT_RESULTS_PAGE_SIZE,
     MAX_PAGE_SIZE,
+    MAX_RESULTS_PAGE_SIZE,
     ExportFile,
     ReviewHistoryService,
 )
@@ -90,11 +92,18 @@ async def delete_own_review_runs(
 
 @router.get("/{run_id}", response_model=ReviewRunDetail, responses=_NOT_FOUND)
 async def read_review_run(
-    run_id: RunId, context: CurrentContext, service: Service
+    run_id: RunId,
+    context: CurrentContext,
+    service: Service,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=MAX_RESULTS_PAGE_SIZE)] = DEFAULT_RESULTS_PAGE_SIZE,
 ) -> ReviewRunDetail:
-    """The stored results with false-positive marks; never the SQL text (Requirement 3)."""
+    """One page of the stored objects with their results and false-positive marks.
 
-    return await service.detail(context, run_id)
+    Never the SQL text (Requirement 3); ``object_count`` is the total number of objects.
+    """
+
+    return await service.detail(context, run_id, page=page, page_size=page_size)
 
 
 @router.delete(

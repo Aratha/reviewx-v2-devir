@@ -1,7 +1,11 @@
 import type {CatalogObject, ObjectSelection} from '@/types/sqlReview';
 
-/** At most 50 objects per run (sql-review object-review Requirement 3, Decision 3). */
-export const MAX_SELECTION = 50;
+/**
+ * A run has no object limit (sql-review object-review Requirement 3, Decision 3). This is only the
+ * technical bound of one request body, mirrored from the backend contract; it is not a product
+ * limit and is far above a selection anyone reviews in one run.
+ */
+export const SELECTION_TECHNICAL_LIMIT = 10_000;
 
 export const OBJECT_TYPES: Array<{code: string; label: string}> = [
   {code: 'P', label: 'Saklı yordam (P)'},
@@ -22,7 +26,7 @@ export function toSelection(database: string, object: CatalogObject): ObjectSele
   return {database, schema: object.schema, name: object.name, type_code: object.type_code};
 }
 
-/** Add or remove one object; adding stops at the limit. */
+/** Add or remove one object. */
 export function toggleSelection(
   selection: SelectionMap,
   database: string,
@@ -35,19 +39,27 @@ export function toggleSelection(
     delete next[key];
     return next;
   }
-  if (key in selection || Object.keys(selection).length >= MAX_SELECTION) return selection;
+  if (key in selection) return selection;
   return {...selection, [key]: toSelection(database, object)};
 }
 
-/** Select or clear every listed object; selecting adds only as many as the limit allows. */
+/** Add every given object in one copy; thousands of objects stay cheap. */
+export function addSelections(selection: SelectionMap, database: string, objects: CatalogObject[]): SelectionMap {
+  const next = {...selection};
+  for (const object of objects) next[selectionKey(database, object)] = toSelection(database, object);
+  return next;
+}
+
+/** Select or clear every listed object. */
 export function toggleAll(
   selection: SelectionMap,
   database: string,
   objects: CatalogObject[],
   selected: boolean,
 ): SelectionMap {
-  let next = selection;
-  for (const object of objects) next = toggleSelection(next, database, object, selected);
+  if (selected) return addSelections(selection, database, objects);
+  const next = {...selection};
+  for (const object of objects) delete next[selectionKey(database, object)];
   return next;
 }
 

@@ -1,5 +1,12 @@
 import {describe, expect, it} from 'vitest';
-import {applyEvent, completionRatio, createProgress, orderedObjects, tokenLabel} from './reviewProgress';
+import {
+  RECENT_OBJECTS,
+  applyEvent,
+  completionRatio,
+  createProgress,
+  orderedObjects,
+  tokenLabel,
+} from './reviewProgress';
 import {objectRunEvents} from '@/test/reviewEvents';
 import type {ReviewStreamEvent} from '@/types/sqlReview';
 
@@ -11,8 +18,10 @@ describe('live review progress', () => {
   it('merges the event sequence into stages, rule counters and token counts', () => {
     const events = objectRunEvents();
     const progress = replay(events.slice(0, -1));
-    const [object] = orderedObjects(progress);
-    expect(progress).toMatchObject({runId: 'run-1', ruleVersion: 2, objectsDone: 1});
+    // A finished object leaves the in-flight map and becomes the newest recent one.
+    expect(orderedObjects(progress)).toEqual([]);
+    const [object] = progress.recent;
+    expect(progress).toMatchObject({runId: 'run-1', ruleVersion: 2, objectsDone: 1, objectsFailed: 0});
     expect(object).toMatchObject({stage: 'done', rulesTotal: 2, rulesDone: 2, sqlLength: 1200});
     expect(object.ruleOrder).toEqual(['Kural01', 'Kural03']);
     expect(object.rules.Kural01).toMatchObject({stage: 'done', tier: 'critical', completionTokens: 30});
@@ -49,11 +58,53 @@ describe('live review progress', () => {
       ],
       2,
     );
-    const objects = orderedObjects(progress);
-    expect(objects.map((object) => object.stage)).toEqual(['rules', 'error']);
-    expect(objects[1].error?.code).toBe('object_not_found');
-    expect(progress.objectsDone).toBe(1);
+    expect(orderedObjects(progress).map((object) => object.stage)).toEqual(['rules']);
+    expect(progress.recent.map((object) => [object.index, object.stage])).toEqual([[1, 'error']]);
+    expect(progress.recent[0].error?.code).toBe('object_not_found');
+    expect([progress.objectsDone, progress.objectsFailed]).toEqual([0, 1]);
     expect(completionRatio(progress)).toBeCloseTo(0.5);
+  });
+
+  it('keeps only the objects in flight and the last finished ones for a run of thousands', () => {
+    const total = 5_000;
+    const inFlight = 6;
+    let progress = applyEvent(createProgress(total), {
+      phase: 'run_started',
+      run_id: 'run-1',
+      rule_version: 2,
+      objects_total: total,
+      kind: 'object',
+    });
+    const fields = (index: number) => ({
+      kind: 'object' as const,
+      database: 'DWH',
+      object_index: index,
+      objects_total: total,
+      object_label: `[DWH] dbo.p${index} (P)`,
+      schema: 'dbo',
+      name: `p${index}`,
+      type_code: 'P',
+    });
+    let largest = 0;
+    for (let index = 0; index < total; index += 1) {
+      progress = applyEvent(progress, {...fields(index), phase: 'object_start'});
+      largest = Math.max(largest, Object.keys(progress.objects).length);
+      if (index >= inFlight - 1) {
+        const leaving = index - (inFlight - 1);
+        progress =
+          leaving % 10 === 0
+            ? applyEvent(progress, {...fields(leaving), phase: 'object_error', code: 'object_not_found', message: 'x'})
+            : applyEvent(progress, {...fields(leaving), phase: 'object_done'});
+      }
+    }
+    const finishedCount = total - (inFlight - 1);
+    expect(largest).toBe(inFlight);
+    expect(Object.keys(progress.objects)).toHaveLength(inFlight - 1);
+    expect(progress.recent).toHaveLength(RECENT_OBJECTS);
+    expect(progress.recent[0].index).toBe(finishedCount - 1);
+    expect(progress.objectsDone + progress.objectsFailed).toBe(finishedCount);
+    expect(progress.objectsFailed).toBe(Math.ceil(finishedCount / 10));
+    expect(completionRatio(progress)).toBeCloseTo(finishedCount / total);
   });
 
   it('estimates tokens from characters when the server sends no count', () => {

@@ -6,6 +6,12 @@ review itself runs in its own task and reports through ``ReviewExecution.events`
 stream closes early (stop button or lost connection) the task is cancelled: no new LLM call
 starts, running calls close, the run is stored as cancelled and no partial result is written.
 SQL text, snippets, metadata, labels and model replies never reach a log line.
+
+A run has no object limit (003 Decision 3), so its memory must not follow the selection size:
+only ``ReviewRuntime.objects_in_flight`` objects are read from SQL Server and reviewed at a time,
+the event queue is bounded so a slow reader holds the run back, and the results are written in
+chunks. What grows with the selection is the outcome of each finished object, kept until the
+single transaction that stores the run.
 """
 
 import asyncio
@@ -35,7 +41,6 @@ from app.domain.llm import LlmChatPort, LlmEndpoint, LlmNotConfigured, LlmRunSes
 from app.domain.models.review import ReviewRunKind, ReviewRunStatus, RuleResultStatus
 from app.domain.review import (
     LABEL_MAX_LENGTH,
-    MAX_OBJECTS_PER_RUN,
     REVIEWED_SQL_MAX_LENGTH,
     SCRIPT_DEFAULT_LABEL,
     SCRIPT_SCHEMA,
@@ -110,6 +115,12 @@ REVIEW_FAILED_CODE = "review_failed"
 REVIEW_FAILED_MESSAGE = "İnceleme tamamlanamadı."
 INTERRUPTED_CODE = "review_interrupted"
 INTERRUPTED_MESSAGE = "İnceleme yarıda kesildi."
+
+# Events waiting for the stream reader; a full queue makes the run wait for the reader.
+EVENT_QUEUE_MAX_EVENTS = 256
+# The complete event carries the results of a run of at most this many objects, which is one page
+# of the stored run detail; a larger run is read from that detail page by page (005 Requirement 3).
+LIVE_RESULTS_MAX_OBJECTS = 50
 
 EventSink = Callable[[ReviewEvent], Awaitable[None]]
 
@@ -211,6 +222,9 @@ class ReviewRuntime:
     registry: ReviewRunRegistry
     reviewer: TextReviewer
     text_limit: int
+    # Objects read and reviewed at the same time: the per-run LLM call limit, so every LLM slot
+    # stays busy while no more SQL text is held than the calls in progress can use.
+    objects_in_flight: int = 1
 
 
 def _live_results(
@@ -283,7 +297,7 @@ class ReviewExecution:
         self._plan = plan
         self._runtime = runtime
         self._catalog = catalog
-        self._queue: asyncio.Queue[ReviewEvent] = asyncio.Queue()
+        self._queue: asyncio.Queue[ReviewEvent] = asyncio.Queue(EVENT_QUEUE_MAX_EVENTS)
         self.task: asyncio.Task[None] | None = None
 
     @property
@@ -291,7 +305,10 @@ class ReviewExecution:
         return self._plan.run_public_id
 
     def start(self) -> None:
-        """Start the review task; its events wait in order until ``events`` reads them."""
+        """Start the review task; its events wait in order until ``events`` reads them.
+
+        The queue is bounded: once it is full the review waits for the reader.
+        """
 
         if self.task is None:
             self.task = asyncio.create_task(self._run(self._queue.put))
@@ -393,9 +410,13 @@ class ReviewExecution:
             object_error_count=sum(1 for outcome in outcomes if outcome.error_code),
         )
         run.status = ReviewRunStatus.COMPLETED.value
-        await emit(
-            CompleteEvent(run_id=plan.run_public_id, results=_live_results(plan, outcomes, stored))
-        )
+        if len(plan.objects) <= LIVE_RESULTS_MAX_OBJECTS:
+            complete = CompleteEvent(
+                run_id=plan.run_public_id, results=_live_results(plan, outcomes, stored)
+            )
+        else:
+            complete = CompleteEvent(run_id=plan.run_public_id, results=[], results_omitted=True)
+        await emit(complete)
 
     def _log(self, event: str, started: float, **fields: str | int | bool | None) -> None:
         plan = self._plan
@@ -423,12 +444,20 @@ class ReviewExecution:
         plan = self._plan
         if plan.kind is ReviewRunKind.SCRIPT:
             return [await self._review_script(session, emit)]
+        # Workers take the next object only when they finished the previous one, so at most
+        # ``objects_in_flight`` definitions are fetched and held, whatever the selection size.
+        outcomes: dict[int, ObjectOutcome] = {}
+        waiting = iter(plan.objects)
+
+        async def worker() -> None:
+            for planned in waiting:
+                outcomes[planned.position] = await self._review_object(session, planned, emit)
+
+        workers = max(1, min(self._runtime.objects_in_flight, len(plan.objects)))
         async with asyncio.TaskGroup() as group:
-            tasks = [
-                group.create_task(self._review_object(session, planned, emit))
-                for planned in plan.objects
-            ]
-        return [task.result() for task in tasks]
+            for _ in range(workers):
+                group.create_task(worker())
+        return [outcomes[planned.position] for planned in plan.objects]
 
     def _scope(self, planned: _PlannedObject) -> ReviewScope:
         return ReviewScope(
@@ -600,12 +629,15 @@ class ReviewExecution:
         return ObjectOutcome(planned.position, source_sql=reviewed, review=review)
 
     async def _complete(self, outcomes: Sequence[ObjectOutcome]) -> list[StoredResult] | None:
+        """Store the run; the identifiers come back only when the complete event shows them."""
+
         async with self._runtime.session_factory() as session, session.begin():
             return await ReviewRepository(session).complete_run(
                 self._plan.run_id,
                 owner_user_id=self._plan.owner_user_id,
                 finished_at=datetime.now(UTC),
                 outcomes=outcomes,
+                collect_identifiers=len(outcomes) <= LIVE_RESULTS_MAX_OBJECTS,
             )
 
     async def _finish(
@@ -657,10 +689,6 @@ class ReviewRunService:
         tenant_id, actor_id, actor_public_id = await self._admit(context)
         if not selections:
             raise _unprocessable("selection_empty", "İncelemek için en az bir nesne seçin.")
-        if len(selections) > MAX_OBJECTS_PER_RUN:
-            raise _unprocessable(
-                "too_many_objects", f"Bir incelemede en çok {MAX_OBJECTS_PER_RUN} nesne olabilir."
-            )
         if any(item.type_code not in CATALOG_OBJECT_TYPES for item in selections):
             raise _unprocessable("object_type_invalid", "Nesne türü desteklenmiyor.")
         catalog = self.catalog
@@ -780,6 +808,8 @@ class ReviewRunService:
             ],
         )
         await self.session.commit()
+        # The request session lives as long as the stream; it must not keep a row per object.
+        self.session.expunge_all()
         plan = _RunPlan(
             run_id=run.review_run_id,
             run_public_id=run.public_id,

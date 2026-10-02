@@ -16,7 +16,10 @@ ReviewKindValue = Literal["object", "script"]
 
 # Transport bounds only; the services apply the review limits with their own error codes.
 _TRANSPORT_SQL_MAX_LENGTH = 1_000_000
-_TRANSPORT_SELECTION_MAX_ITEMS = 1_000
+# Technical bound of one request body, not a product limit: a run has no object limit
+# (003-object-review Decision 3). It keeps the request list finite, as rules/57 requires, far above
+# a selection anyone reviews in one run; a longer list answers 422 invalid_request.
+SELECTION_TECHNICAL_MAX_ITEMS = 10_000
 
 
 class DatabasePage(BaseModel):
@@ -54,7 +57,10 @@ class ObjectSelectionItem(BaseModel):
 
 
 class ObjectReviewRequest(BaseModel):
-    selections: list[ObjectSelectionItem] = Field(max_length=_TRANSPORT_SELECTION_MAX_ITEMS)
+    selections: list[ObjectSelectionItem] = Field(
+        max_length=SELECTION_TECHNICAL_MAX_ITEMS,
+        description="No product limit; the list length is bounded only technically.",
+    )
 
 
 class ScriptReviewRequest(BaseModel):

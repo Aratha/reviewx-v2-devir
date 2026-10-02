@@ -6,6 +6,7 @@ import {Badge} from '@/components/ui/Badge';
 import {Button} from '@/components/ui/Button';
 import {Dialog} from '@/components/ui/Dialog';
 import {useReviewSession, type ReviewSessionState} from '@/contexts/ReviewSessionContext';
+import {useOpenStoredRun} from '@/hooks/useOpenStoredRun';
 import {messageForCode} from '@/lib/errorMessages';
 import {
   completionRatio,
@@ -36,11 +37,15 @@ export function ReviewWindows() {
 
 function LiveReviewDialog() {
   const {session, stop, showResults, closeWindows} = useReviewSession();
+  const openStoredRun = useOpenStoredRun();
   const running = session.phase === 'running';
   const progress = session.progress;
   const objects = progress ? orderedObjects(progress) : [];
+  const recent = progress ? progress.recent : [];
   const percent = progress ? Math.round(completionRatio(progress) * 100) : 0;
-  const sqlAvailable = hasStoredSql(session.phase === 'completed', session.results);
+  // A large run does not send its results; whether SQL text was stored is answered by the export.
+  const sqlAvailable =
+    session.phase === 'completed' && (session.resultsOmitted || hasStoredSql(true, session.results));
 
   return (
     <Dialog
@@ -70,6 +75,11 @@ function LiveReviewDialog() {
                 Sonuçları göster
               </Button>
             )}
+            {session.phase === 'completed' && session.resultsOmitted && session.runId && (
+              <Button variant="primary" onClick={() => openStoredRun(session.runId!)}>
+                Sonuçları geçmişte aç
+              </Button>
+            )}
             <Button onClick={closeWindows}>Kapat</Button>
           </>
         )
@@ -94,17 +104,39 @@ function LiveReviewDialog() {
           <span style={{width: `${percent}%`}} />
         </div>
         <p className="subtle tabular" aria-live="polite">
-          {progress ? `${progress.objectsDone} / ${progress.objectsTotal} nesne tamamlandı` : 'İstek gönderiliyor…'}
+          {progress
+            ? `${progress.objectsDone} / ${progress.objectsTotal} nesne tamamlandı${
+                progress.objectsFailed > 0 ? ` · ${progress.objectsFailed} nesnede hata` : ''
+              }`
+            : 'İstek gönderiliyor…'}
         </p>
       </div>
+      {session.phase === 'completed' && session.resultsOmitted && (
+        <Alert tone="info">
+          Bu inceleme çok sayıda nesne içerdiği için sonuçlar bu pencerede gösterilmez. Sonuçlar kaydedildi;
+          İnceleme geçmişi sayfasında sayfa sayfa açabilir ya da buradan indirebilirsiniz.
+        </Alert>
+      )}
       {session.phase === 'failed' && session.errorMessage && <Alert tone="error">{session.errorMessage}</Alert>}
       {session.phase === 'cancelled' && <Alert tone="info">{session.errorMessage}</Alert>}
-      {objects.length === 0 && running && <p className="muted">Nesne kuyruğu hazırlanıyor…</p>}
-      <div className="stack">
-        {objects.map((object) => (
-          <LiveObjectCard key={object.index} object={object} initiallyOpen={objects.length <= 3 || object.index === 0} />
-        ))}
-      </div>
+      {objects.length === 0 && recent.length === 0 && running && <p className="muted">Nesne kuyruğu hazırlanıyor…</p>}
+      {objects.length > 0 && (
+        <section className="stack" aria-label="Şu an incelenen nesneler">
+          {objects.map((object) => (
+            <LiveObjectCard key={object.index} object={object} initiallyOpen={objects.length <= 3 || object.index === 0} />
+          ))}
+        </section>
+      )}
+      {recent.length > 0 && (
+        <section className="stack" aria-label="Son biten nesneler">
+          {progress !== null && progress.objectsDone + progress.objectsFailed > recent.length && (
+            <p className="subtle">Biten nesnelerden yalnız son {recent.length} tanesi listelenir.</p>
+          )}
+          {recent.map((object) => (
+            <LiveObjectCard key={object.index} object={object} initiallyOpen={false} />
+          ))}
+        </section>
+      )}
     </Dialog>
   );
 }

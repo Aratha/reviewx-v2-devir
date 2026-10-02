@@ -378,6 +378,8 @@ def test_the_migrations_go_down_and_up_again(migrated_database: None) -> None:
 
     try:
         asyncio.run(execute("DELETE FROM sql_connection_setting"))
+        # Going below 202610020001 needs runs that fit its previous 50-object check.
+        asyncio.run(execute("DELETE FROM review_run WHERE object_count > 50"))
         current = asyncio.run(columns())
         assert "trust_server_certificate" in current and "allowed_databases" not in current
 

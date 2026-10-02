@@ -30,6 +30,16 @@ kullanır. Üretilen çevrimdışı CI, mutlak `KT_SCAFFOLD_OFFLINE_BUNDLE` ile 
 `KT_SCAFFOLD_OFFLINE_BUNDLE_SHA256` kabul özetini ister, imaj yüklemeden önce doğrular ve bütün
 adlandırılmış bağlamları açıkça ayarlar; bağlı bağımlılık çözümlemesine geri dönmez.
 
+Sabitlenmiş nginx tabanında henüz bulunmayan güvenlik düzeltmeleri
+`locks/nginx-alpine-packages.lock` dosyasında durur: her satır bir Alpine paketinin tam sürümünü ve
+SHA-256 özetini (içeriğin parmak izi) mimari başına verir. `Dockerfile.frontend.release` yalnız bu
+paketleri kurar; özet tutmazsa derleme durur, paket yöneticisi imzayı doğrular ve hiçbir depoya
+bakmaz. `connected` kipinde paket `ALPINE_PACKAGE_SOURCE` adresinden indirilir (banka yansısı bu
+değişkenle verilir). `offline` kipinde indirme yapılmaz: paket, `alpine_packages` adlı derleme
+bağlamında `<alpine-mimarisi>/<paket>-<sürüm>.apk` yolunda hazır bulunmalıdır, yoksa derleme durur.
+Yerel Compose ters vekili ve isteğe bağlı `local-egress` geçidi aynı tabanı derlemeden çalıştırır;
+ters vekil yalnız geri döngü adresinde dinler, geçit hiçbir port yayımlamaz.
+
 Loki ve Tempo, yeniden başlatmalar arasında veriyi korurken kök olmayan kimlikte kalır. Adlandırılmış
 birimleri `/loki` ve `/var/tempo` yollarına bağlanır; sabitlenmiş imajlar bu dizinlerin UID/GID 10001
 sahibidir ve Docker'ın yeni birim kopyalaması, kök başlatıcı olmadan doğru sahibi korur. Her iki servis

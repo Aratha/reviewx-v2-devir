@@ -155,6 +155,9 @@ class FakeCatalog:
     objects: dict[str, list[CatalogObject]] = field(default_factory=dict)
     failure: Exception | None = None
     calls: list[tuple[str, ...]] = field(default_factory=list)
+    # Definition and metadata calls running at the same moment, and the highest value seen.
+    active: int = 0
+    peak: int = 0
 
     def is_allowed(self, database: str) -> bool:
         return not is_system_database(database)
@@ -193,16 +196,30 @@ class FakeCatalog:
         if not self.is_allowed(database):
             raise DatabaseNotAllowed()
         key = (database, schema, name)
-        if key in self.errors:
-            raise self.errors[key]
-        return self.definitions.get(key)
+        async with self._in_flight():
+            if key in self.errors:
+                raise self.errors[key]
+            return self.definitions.get(key)
 
     async def fetch_object_metadata(self, database: str, schema: str, name: str) -> str:
         self.calls.append(("fetch_object_metadata", database, schema, name))
         key = (database, schema, name)
-        if key in self.metadata_errors:
-            raise self.metadata_errors[key]
-        return self.metadata.get(key, "")
+        async with self._in_flight():
+            if key in self.metadata_errors:
+                raise self.metadata_errors[key]
+            return self.metadata.get(key, "")
+
+    @asynccontextmanager
+    async def _in_flight(self) -> AsyncIterator[None]:
+        """A catalog call takes a turn of the event loop, like the real adapter's thread hop."""
+
+        self.active += 1
+        self.peak = max(self.peak, self.active)
+        try:
+            await asyncio.sleep(0)
+            yield
+        finally:
+            self.active -= 1
 
 
 if TYPE_CHECKING:

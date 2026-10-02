@@ -39,7 +39,6 @@ const MESSAGES: Record<string, string> = {
   database_not_allowed: 'Sistem veritabanları incelenemez.',
   object_not_found: 'Tanım alınamadı (nesne yok veya yetki yok).',
   selection_empty: 'İnceleme için en az bir nesne seçin.',
-  too_many_objects: 'Bir incelemede en çok 50 nesne olabilir.',
   object_type_invalid: 'Seçilen nesne türü incelenemiyor.',
   sql_text_empty: 'SQL metni boş olamaz.',
   sql_text_too_long: 'SQL metni en çok 120.000 karakter olabilir.',
@@ -68,6 +67,7 @@ function messageForStatus(status: number): string {
   if (status === 401) return MESSAGES.not_authenticated;
   if (status === 403) return MESSAGES.forbidden;
   if (status === 404) return MESSAGES.not_found;
+  if (status === 413) return 'Seçim, sunucunun tek istekte kabul ettiği boyutu aşıyor; daha az nesne seçip yeniden deneyin.';
   if (status === 409) return 'İşlem güncel durumla çakıştı; sayfayı yenileyip yeniden deneyin.';
   if (status === 400 || status === 422) return MESSAGES.invalid_request;
   if (status === 429) return 'Çok fazla istek gönderildi; biraz sonra yeniden deneyin.';

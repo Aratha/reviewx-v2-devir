@@ -104,6 +104,13 @@ class CompleteEvent(BaseModel):
     phase: Literal["complete"] = "complete"
     run_id: str
     results: list[LiveObjectResultItem]
+    results_omitted: bool = Field(
+        default=False,
+        description=(
+            "True when the run has more objects than one result page: results stays empty and "
+            "the stored run is read page by page from the review run detail."
+        ),
+    )
 
 
 class ErrorEvent(BaseModel):

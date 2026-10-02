@@ -3,8 +3,12 @@ import type {ReviewStreamEvent} from '@/types/sqlReview';
 /**
  * Pure merge of live review events into a progress snapshot for the live window
  * (sql-review object-review Requirement 14, script-review Requirement 7). Only counters and
- * stages are kept; the model's answer never reaches the browser during the run.
+ * stages are kept; the model's answer never reaches the browser during the run. A run has no
+ * object limit, so the snapshot holds only the objects in flight and the last finished ones;
+ * everything else is a counter.
  */
+export const RECENT_OBJECTS = 20;
+
 export type ObjectStage = 'pending' | 'fetch' | 'metadata' | 'rules' | 'done' | 'error';
 export type RuleStage = 'running' | 'done' | 'failed';
 
@@ -37,12 +41,18 @@ export interface LiveProgress {
   runId: string | null;
   ruleVersion: number | null;
   objectsTotal: number;
+  /** Objects reviewed to the end. */
   objectsDone: number;
+  /** Objects that ended with an object error. */
+  objectsFailed: number;
+  /** Objects in flight, by index. */
   objects: Record<number, LiveObject>;
+  /** The last finished objects, newest first; at most RECENT_OBJECTS. */
+  recent: LiveObject[];
 }
 
 export function createProgress(objectsTotal: number): LiveProgress {
-  return {runId: null, ruleVersion: null, objectsTotal, objectsDone: 0, objects: {}};
+  return {runId: null, ruleVersion: null, objectsTotal, objectsDone: 0, objectsFailed: 0, objects: {}, recent: []};
 }
 
 type ObjectEvent = Extract<ReviewStreamEvent, {object_index: number}>;
@@ -85,9 +95,10 @@ export function applyEvent(progress: LiveProgress, event: ReviewStreamEvent): Li
     return {...progress, runId: event.run_id, ruleVersion: event.rule_version, objectsTotal: event.objects_total};
   }
   if (event.phase === 'complete' || event.phase === 'error' || !('object_index' in event)) return progress;
+  // An object that already finished left the in-flight map; a late event for it changes nothing.
+  if (event.phase === 'object_done' && !(event.object_index in progress.objects)) return progress;
 
   const object = objectFor(progress, event);
-  let objectsDone = progress.objectsDone;
   switch (event.phase) {
     case 'object_start':
     case 'definition_fetch':
@@ -139,29 +150,41 @@ export function applyEvent(progress: LiveProgress, event: ReviewStreamEvent): Li
     case 'object_error':
       object.stage = 'error';
       object.error = {code: event.code, message: event.message};
-      break;
+      return finished(progress, object);
     case 'object_done':
-      if (object.stage !== 'error') object.stage = 'done';
-      objectsDone += 1;
-      break;
+      object.stage = 'done';
+      return finished(progress, object);
   }
-  return {...progress, objectsDone, objects: {...progress.objects, [object.index]: object}};
+  return {...progress, objects: {...progress.objects, [object.index]: object}};
 }
 
+/** Move a finished object out of the in-flight map into the short list of recent ones. */
+function finished(progress: LiveProgress, object: LiveObject): LiveProgress {
+  const objects = {...progress.objects};
+  delete objects[object.index];
+  const failed = object.stage === 'error';
+  return {
+    ...progress,
+    objectsDone: progress.objectsDone + (failed ? 0 : 1),
+    objectsFailed: progress.objectsFailed + (failed ? 1 : 0),
+    objects,
+    recent: [object, ...progress.recent].slice(0, RECENT_OBJECTS),
+  };
+}
+
+/** The objects in flight, in selection order. */
 export function orderedObjects(progress: LiveProgress): LiveObject[] {
   return Object.values(progress.objects).sort((left, right) => left.index - right.index);
 }
 
 /** Share of finished rule calls among the planned ones, 0–1; objects not started yet count as 0. */
 export function completionRatio(progress: LiveProgress): number {
-  const objects = orderedObjects(progress);
   if (progress.objectsTotal === 0) return 0;
-  let finished = 0;
-  for (const object of objects) {
-    if (object.stage === 'done' || object.stage === 'error') finished += 1;
-    else if (object.rulesTotal > 0) finished += Math.min(object.rulesDone / object.rulesTotal, 0.99);
+  let done = progress.objectsDone + progress.objectsFailed;
+  for (const object of Object.values(progress.objects)) {
+    if (object.rulesTotal > 0) done += Math.min(object.rulesDone / object.rulesTotal, 0.99);
   }
-  return Math.min(finished / progress.objectsTotal, 1);
+  return Math.min(done / progress.objectsTotal, 1);
 }
 
 export function stageLabel(stage: ObjectStage): string {

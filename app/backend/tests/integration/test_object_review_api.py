@@ -16,7 +16,7 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from app.api.integrations import get_llm_chat
 from app.db.session import async_session_factory
@@ -31,8 +31,12 @@ from app.domain.models.tenant import Tenant
 from app.domain.sql_server import SqlServerError, SqlServerErrorClass
 from app.infrastructure.llm.http_chat import HttpLlmChat
 from app.main import app
+from app.schemas.reviews.contracts import SELECTION_TECHNICAL_MAX_ITEMS
 from app.services.llm_call_summary_service import LlmCallSummaryRecorder
-from app.services.review_run_service import interrupt_stale_runs
+from app.services.review_run_service import (
+    LIVE_RESULTS_MAX_OBJECTS,
+    interrupt_stale_runs,
+)
 from tests.fakes.llm_server import (
     HOST_NAME,
     FakeLlmServer,
@@ -317,12 +321,15 @@ async def test_checks_before_the_stream_answer_json_and_create_no_run(
     review_env: ReviewEnv,
 ) -> None:
     reviewer, _, _ = await _ready(review_env)
-    too_many = [
-        {"database": "DWH", "schema": "dbo", "name": f"p{n}", "type_code": "P"} for n in range(51)
+    # No product limit on the selection (Decision 3). Only the technical transport bound of
+    # the request remains, and it answers like any other malformed request.
+    beyond_transport = [
+        {"database": "DWH", "schema": "dbo", "name": f"p{n}", "type_code": "P"}
+        for n in range(SELECTION_TECHNICAL_MAX_ITEMS + 1)
     ]
     cases = [
         ({"selections": []}, 422, "selection_empty"),
-        ({"selections": too_many}, 422, "too_many_objects"),
+        ({"selections": beyond_transport}, 422, "invalid_request"),
         ({"selections": [SELECTION_A | {"type_code": "U"}]}, 422, "object_type_invalid"),
         ({"selections": [SELECTION_A | {"database": ""}]}, 422, "invalid_request"),
         ({"selections": [SELECTION_A | {"database": "msdb"}]}, 403, "database_not_allowed"),
@@ -351,15 +358,215 @@ async def test_checks_before_the_stream_answer_json_and_create_no_run(
     assert review_env.llm.calls == []
 
 
-async def test_fifty_objects_are_accepted(review_env: ReviewEnv) -> None:
-    reviewer, _, _ = await _ready(review_env)
-    selections = [
-        {"database": "DWH", "schema": "dbo", "name": f"p{n}", "type_code": "P"} for n in range(50)
+def _selections(count: int) -> list[dict[str, str]]:
+    return [
+        {"database": "DWH", "schema": "dbo", "name": f"usp_{n:04d}", "type_code": "P"}
+        for n in range(count)
     ]
-    events = sse_events((await review_env.object_review(reviewer, selections)).text)
-    assert events[0]["objects_total"] == 50
+
+
+def _define(env: ReviewEnv, count: int) -> None:
+    for n in range(count):
+        env.catalog.definitions[("DWH", "dbo", f"usp_{n:04d}")] = DEFINITION_A
+
+
+def _peak_objects_in_flight(events: list[dict[str, Any]]) -> int:
+    """The highest number of objects between their first event and their last one."""
+
+    current = peak = 0
+    for event in events:
+        if event["phase"] == "object_start":
+            current += 1
+            peak = max(peak, current)
+        elif event["phase"] in ("object_done", "object_error"):
+            current -= 1
+    return peak
+
+
+async def test_more_than_fifty_objects_are_reviewed_and_stored(review_env: ReviewEnv) -> None:
+    # Decision 3 (owner decision 2026-10-02): a run has no object limit.
+    reviewer, _, codes = await _ready(review_env, flagged=False)
+    _define(review_env, 51)
+
+    events = sse_events((await review_env.object_review(reviewer, _selections(51))).text)
+
+    assert events[0]["objects_total"] == 51 and events[-1]["phase"] == "complete"
+    run = await run_of(events[0]["run_id"])
+    assert (run.status, run.object_count) == ("completed", 51)
+    assert await result_counts(run) == (51 * len(codes), 51)
+    stored = await objects_of(run)
+    assert [item.position for item in stored] == list(range(51))
+    assert all(item.source_sql == DEFINITION_A for item in stored)
+
+
+async def test_the_complete_event_carries_results_only_for_a_run_that_fits_one_page(
+    review_env: ReviewEnv,
+) -> None:
+    reviewer, _, _ = await _ready(review_env, flagged=False)
+    _define(review_env, LIVE_RESULTS_MAX_OBJECTS + 1)
+
+    small = sse_events(
+        (await review_env.object_review(reviewer, _selections(LIVE_RESULTS_MAX_OBJECTS))).text
+    )[-1]
+    large = sse_events(
+        (await review_env.object_review(reviewer, _selections(LIVE_RESULTS_MAX_OBJECTS + 1))).text
+    )[-1]
+
+    assert small["results_omitted"] is False
+    assert len(small["results"]) == LIVE_RESULTS_MAX_OBJECTS
+    # A larger run is read from the stored run, page by page (005 Requirement 3).
+    assert large == {
+        "phase": "complete",
+        "run_id": large["run_id"],
+        "results": [],
+        "results_omitted": True,
+    }
+    assert DEFINITION_A not in json.dumps(large)
+
+
+async def test_a_thousand_objects_complete_with_a_bounded_number_in_flight(
+    review_env: ReviewEnv,
+) -> None:
+    # Requirement 3 and 5: the run is safe at large sizes. Objects are started only as earlier
+    # ones finish, so definitions are never fetched and held for the whole selection at once.
+    reviewer, _, codes = await _ready(review_env, flagged=False)
+    count = 1_000
+    bound = review_env.auth.settings.llm_max_concurrent_calls
+    _define(review_env, count)
+
+    response = await review_env.object_review(reviewer, _selections(count))
+    events = sse_events(response.text)
+
+    assert events[0]["objects_total"] == count and events[-1]["phase"] == "complete"
+    assert _peak_objects_in_flight(events) == bound
+    assert review_env.catalog.peak <= bound
+    assert review_env.llm.peak <= review_env.llm.run_limit
+    assert len(review_env.llm.calls) == count * len(codes)
+    starts = [event["object_index"] for event in events if event["phase"] == "object_start"]
+    assert starts == list(range(count))  # objects start in the selection order
+    for index in (0, count // 2, count - 1):
+        phases = [
+            event["phase"]
+            for event in events
+            if event.get("object_index") == index and event["phase"] != "llm_stream"
+        ]
+        assert phases[:4] == ["object_start", "definition_fetch", "sql_ready", "rules_batch_start"]
+        assert phases[-1] == "object_done"
+    run = await run_of(events[0]["run_id"])
+    assert (run.status, run.object_count) == ("completed", count)
+    results, findings = await result_counts(run)
+    assert (results, findings) == (count * len(codes), count)
+    async with async_session_factory() as session:
+        positions = list(
+            await session.scalars(
+                select(ReviewRunObject.position)
+                .join(ReviewRuleResult)
+                .where(ReviewRunObject.review_run_id == run.review_run_id)
+                .group_by(ReviewRunObject.position)
+                .order_by(ReviewRunObject.position)
+            )
+        )
+        without_sql = await session.scalar(
+            select(func.count())
+            .select_from(ReviewRunObject)
+            .where(
+                ReviewRunObject.review_run_id == run.review_run_id,
+                ReviewRunObject.source_sql.is_(None),
+            )
+        )
+    assert positions == list(range(count)) and without_sql == 0
+
+
+async def test_definitions_are_fetched_only_for_the_objects_in_flight(
+    review_env: ReviewEnv,
+) -> None:
+    reviewer, _, _ = await _ready(review_env, flagged=False)
+    count = 200
+    bound = review_env.auth.settings.llm_max_concurrent_calls
+    _define(review_env, count)
+    review_env.llm.gate = asyncio.Event()
+
+    request = asyncio.create_task(review_env.object_review(reviewer, _selections(count)))
+    await review_env.llm.started.wait()
+    for _ in range(50):
+        await asyncio.sleep(0.01)
+    fetched_while_waiting = [
+        call for call in review_env.catalog.calls if call[0] == "fetch_definition"
+    ]
+    review_env.llm.gate.set()
+    events = sse_events((await request).text)
+
+    # With every LLM slot busy, only the objects in flight have their SQL text in memory.
+    assert len(fetched_while_waiting) == bound
+    assert [call[3] for call in fetched_while_waiting] == [f"usp_{n:04d}" for n in range(bound)]
     assert events[-1]["phase"] == "complete"
-    assert {r["error_code"] for r in events[-1]["results"]} == {"object_not_found"}
+    assert sum(1 for call in review_env.catalog.calls if call[0] == "fetch_definition") == count
+
+
+async def test_a_reader_that_falls_behind_holds_the_run_back(review_env: ReviewEnv) -> None:
+    # The event queue is bounded: a slow connection slows the run down instead of letting the
+    # events of thousands of objects pile up in memory.
+    reviewer, _, _ = await _ready(review_env, flagged=False)
+    count = 600
+    _define(review_env, count)
+    pause = asyncio.Event()
+    fetched: list[int] = []
+
+    async def resume_later() -> None:
+        for _ in range(60):
+            await asyncio.sleep(0.01)
+        fetched.append(sum(1 for call in review_env.catalog.calls if call[0] == "fetch_definition"))
+        pause.set()
+
+    resumer = asyncio.create_task(resume_later())
+    events, _ = await stream_until(
+        review_env,
+        reviewer,
+        "/object-reviews",
+        {"selections": _selections(count)},
+        lambda event: False,
+        pause=pause,
+        timeout=60,
+    )
+    await resumer
+
+    assert 0 < fetched[0] < count // 4
+    assert events[-1]["phase"] == "complete"
+    assert [event["object_index"] for event in events if event["phase"] == "object_start"] == list(
+        range(count)
+    )
+
+
+async def test_a_lost_connection_cancels_a_large_run_without_reading_the_rest(
+    review_env: ReviewEnv,
+) -> None:
+    reviewer, _, _ = await _ready(review_env, flagged=False)
+    count = 500
+    bound = review_env.auth.settings.llm_max_concurrent_calls
+    _define(review_env, count)
+    review_env.llm.gate = asyncio.Event()
+
+    events, _ = await stream_until(
+        review_env,
+        reviewer,
+        "/object-reviews",
+        {"selections": _selections(count)},
+        lambda event: event["phase"] == "rule_start",
+    )
+    run_id = events[0]["run_id"]
+    for _ in range(200):
+        run = await run_of(run_id)
+        if run.status != "running":
+            break
+        await asyncio.sleep(0.025)
+    await review_env.settle()
+    review_env.llm.gate.set()
+    await asyncio.sleep(0.05)
+
+    assert run.status == "cancelled" and await result_counts(run) == (0, 0)
+    assert sum(1 for call in review_env.catalog.calls if call[0] == "fetch_definition") <= bound
+    assert all(call.cancelled for call in review_env.llm.calls)
+    assert all(item.source_sql is None for item in await objects_of(run))
 
 
 async def test_no_published_rule_set_is_a_conflict(

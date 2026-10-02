@@ -158,6 +158,7 @@ def get_review_runtime(
         registry=registry,
         reviewer=TextReviewer(two_part_threshold_chars=settings.review_two_part_threshold_chars),
         text_limit=review_text_limit(settings),
+        objects_in_flight=settings.llm_max_concurrent_calls,
     )
 
 
@@ -247,7 +248,7 @@ async def start_object_review(
     context: CurrentContext,
     service: Annotated[ReviewRunService, Depends(get_object_review_service)],
 ) -> ReviewEventStream:
-    """Review up to 50 selected objects with live progress (object-review)."""
+    """Review the selected objects with live progress; no object limit (object-review)."""
 
     execution = await service.start_object_review(
         context,

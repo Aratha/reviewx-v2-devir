@@ -2,14 +2,15 @@
 
 Status: Accepted
 
-Version: 1.1.1
+Version: 1.2.0
 
-Acceptance date: 2026-09-27
+Acceptance date: 2026-10-02
 
 Domain: [sql-review](../../DOMAIN.md)
 
-Kabul kaydı: Proje sahibi bu PRD'yi 2026-09-27'de, açık sorulardaki önerileri ve sahip kararlarını
-benimseyerek kabul etti.
+Kabul kaydı: Proje sahibi bu PRD'yi 2026-10-02'de, bir koşumdaki nesne sayısı sınırının kaldırılması
+ve süzgece uyan bütün nesnelerin tek adımda seçilebilmesi kararıyla (Decision 3) ve önceki sahip
+kararlarıyla kabul etti.
 
 ## Amaç
 
@@ -111,10 +112,16 @@ olan nesneleri bırakır. Yanıt sayfalama bilgisi (sayfa, sayfa boyutu, toplam)
 
 Requirement 3: İnceleyici bir koşuma farklı veritabanlarından nesne ekleyebilir; veritabanı değişince
 önceki seçimler korunur ve seçim sayısı ile veritabanı sayısı gösterilir. Her seçim veritabanı, şema, ad
-ve tür kodu taşır. Bir koşumda en çok 50 nesne olur; arayüz 50. seçimden sonra ekleme yapmaz. Boş seçim,
-50'den çok nesne (`too_many_objects`) veya izinli küme dışındaki tür kodu `422` ile, sistem
-veritabanı (`master`, `tempdb`, `model`, `msdb`) `403` `database_not_allowed` ile reddedilir
-(Decision 3).
+ve tür kodu taşır. Bir koşumdaki nesne sayısı için ürün sınırı yoktur (Decision 3). Tablo başlığındaki
+kutu yalnız listelenen sayfadaki nesneleri seçer. "Süzgece uyan N nesnenin tümünü seç" eylemi, seçili
+veritabanında geçerli arama, tür ve tarih süzgecine uyan bütün nesneleri, sayfalar arasında dolaşmadan
+seçime ekler; arayüz bunun için nesne listeleme ucunu en büyük sayfa boyutuyla (500) sayfa sayfa çağırır,
+toplanan sayıyı gösterir, işlem yarıda bırakılabilir ve binlerce nesne tabloya çizilmez. "Seçimi
+temizle" bütün seçimi kaldırır. Boş seçim veya izinli küme dışındaki tür kodu `422` ile, sistem
+veritabanı (`master`, `tempdb`, `model`, `msdb`) `403` `database_not_allowed` ile reddedilir. Tek
+isteğin gövdesi teknik olarak en çok 10.000 seçim taşır; bu bir ürün sınırı değil, istek boyutunun
+sonlu kalması için konmuş teknik sınırdır (Decision 7). Daha uzun liste `422` `invalid_request` alır ve
+arayüz bunu "teknik sınır" olarak adlandırıp incelemeyi başlatmaz.
 
 Requirement 4: Koşum başında en son yayımlanmış kural sürümü bir kez okunur ve koşum kaydına yazılır;
 koşumdaki tüm nesneler ve tüm kurallar bu sürümle incelenir. Yayımlanmış sürüm yoksa koşum başlamaz;
@@ -179,6 +186,10 @@ Arayüz `NOT_APPLICABLE` sonucunu kaynaktaki gibi uyumlu grubunda gösterir.
 Requirement 14: Canlı ilerleme, API sözleşmesindeki olayları sırasıyla üretir. `llm_stream` olayı bir
 çağrı için en sık 0,2 saniyede bir gelir ve yalnız belirteç (token) ve karakter sayısı taşır; model
 yanıtının içeriğini taşımaz. Arayüz nesne kartlarında aşama, kural sayacı ve kural durumunu gösterir.
+Canlı pencere yalnız o anda incelenen nesneleri ve son biten 20 nesneyi listeler; diğerleri "n / toplam
+nesne tamamlandı" ve hata sayacıyla özetlenir. Koşum 50 nesneden büyükse `complete` olayı sonuçları
+taşımaz (`results_omitted: true`); arayüz sonuçları saklanan koşumdan,
+[review-history-export](../005-review-history-export/PRD.md) Requirement 3'teki sayfalı uçla açar.
 
 Requirement 15: İnceleyici "Analizi durdur" dediğinde veya bağlantı koptuğunda sunucu 5 saniye içinde
 yeni LLM çağrısı başlatmayı bırakır ve süren çağrıları keser. Koşum "iptal edildi" durumuyla saklanır,
@@ -212,6 +223,21 @@ parçaya bölme, yanıt çözümleme, birleştirme ve satır referansı çıkar�
 çağrısı `infrastructure` uyarlayıcısında. Çözümleme ve birleştirme işlevleri ağ, veritabanı ve dosya
 erişimi yapmaz.
 
+Requirement 21: Koşum büyük seçimlerde de güvenli kalır; belleği seçimin büyüklüğüyle değil, aynı
+anda işlenen nesne sayısıyla ve biten nesnelerin saklanacak sonuçlarıyla büyür.
+
+- Aynı anda en çok koşumun LLM eşzamanlılık sınırı kadar nesne işlenir
+  ([llm-connection](../006-llm-connection/PRD.md) Requirement 7, varsayılan 6; Decision 8). Bir nesnenin
+  tanımı ve meta verisi ancak sırası geldiğinde SQL Server'dan okunur; sıradaki nesnelerin SQL metni
+  bellekte tutulmaz. Nesneler seçim sırasıyla başlar; nesne içi olay sırası (Requirement 14) ve
+  Requirement 7'deki iki LLM sınırı değişmez.
+- Olay kuyruğu en çok 256 olay tutar; okuyan bağlantı yavaşsa koşum onu bekler, olaylar bellekte
+  birikmez.
+- İptal ve kopan bağlantı (Requirement 15) aynı çalışır: sırası gelmemiş nesneler hiç okunmaz.
+- Biten koşum Requirement 16'daki tek işlemde, 100'er nesnelik parçalar hâlinde yazılır.
+- Her nesnenin sonucu ve incelenen SQL metni koşum bitene kadar sunucu belleğinde durur; bu, seçimle
+  birlikte büyüyen tek paydır (Riskler).
+
 ## API sözleşmesi
 
 Ön ek `/api/dwhcodereview/v1`. Tüm uçlar geçerli oturum belirteci (JWT) ve `inceleyici` veya
@@ -225,8 +251,10 @@ erişimi yapmaz.
   `q` en çok 200 karakterdir. Hata: `403 database_not_allowed`, `422` geçersiz tarih/tür/uzunluk,
   `503`/`504` Requirement 8 sınıfları.
 - `POST /object-reviews` (yanıt `text/event-stream`) → istek: `selections[]` (`database`, `schema`,
-  `name`, `type_code`). Akış öncesi hatalar normal JSON yanıttır: `401`, `403` (rol veya
-  `database_not_allowed`), `409 no_published_rule_set`, `422` (`too_many_objects` dahil), `429
+  `name`, `type_code`); nesne sayısı için ürün sınırı yoktur, liste teknik olarak en çok 10.000 öğe
+  taşır. Akış öncesi hatalar normal JSON yanıttır: `401`, `403` (rol veya
+  `database_not_allowed`), `409 no_published_rule_set`, `422` (`selection_empty`,
+  `object_type_invalid`, teknik sınırı aşan ya da biçimsiz istekte `invalid_request`), `429
   rate_limited`. Akış başladıktan sonra her olay tek `data:`
   satırında `phase` alanlı JSON'dur:
   - `run_started` (yeni): `run_id` (`public_id`), `rule_version`, `objects_total`.
@@ -236,8 +264,10 @@ erişimi yapmaz.
   - Kural olayları: `rules_batch_start` (`rules_total`), `rule_start` (`rule_id`, `tier`, `rule_index`,
     `sql_two_part`), `llm_stream` (`rule_id`, `completion_tokens`, `total_chars`), `rule_done` (`ok`,
     `completion_tokens`, `total_chars`).
-  - `complete`: `run_id` ve Requirement 13'teki sonuç listesi; bu oturumdaki gösterim için nesnenin SQL
-    metni (`source_sql`) de gelir. Aynı metin Requirement 16 ile koşumda saklanır.
+  - `complete`: `run_id`, `results_omitted` ve Requirement 13'teki sonuç listesi; bu oturumdaki
+    gösterim için nesnenin SQL metni (`source_sql`) de gelir. Aynı metin Requirement 16 ile koşumda
+    saklanır. Koşum 50 nesneden büyükse `results` boştur ve `results_omitted` `true`'dur
+    (Requirement 14).
   - `error`: `code`, `message`; akış kapanır, koşum "hata" olur.
 - Kaldırılan: kaynaktaki akışsız `POST /api/review`. Koşum ve sonuçların sonradan okunması
   [review-history-export](../005-review-history-export/PRD.md) PRD'sindedir.
@@ -263,6 +293,9 @@ erişimi yapmaz.
   ([rule-management](../001-rule-management/PRD.md)); LLM çağrı özetleri koşuma bağlanır
   ([llm-connection](../006-llm-connection/PRD.md)).
 - İncelenen SQL metni ve bulgulardaki kod parçaları saklama süresi boyunca saklanır (Requirement 16).
+- Koşumdaki nesne sayısı sütunu yalnız "en az 1" denetimi taşır (göç `202610020001`). Göç yalnız
+  genişleticidir: denetim gevşer, satır değişmez, önceki uygulama sürümü bu şemayla çalışır. Geri alma,
+  50'den çok nesneli koşum saklıyken hata verip durur, çünkü önceki denetim o satırı kabul etmez.
 - Kaynaktaki tarayıcı deposundaki geçmiş taşınmaz; sunucu geçmişi boş başlar.
 
 ## Gözlemlenebilirlik
@@ -290,6 +323,12 @@ erişimi yapmaz.
   sayısı. Sır değildir; chart değer dosyasında belgelenir.
 - Ingress ve vekil sunucu SSE yanıtını tamponlamamalı (`X-Accel-Buffering: no`) ve okuma süresi en uzun
   LLM çağrısını karşılamalıdır ([llm-connection](../006-llm-connection/PRD.md)).
+- İstek gövdesi boyutu: 10.000 seçimlik istek ortalama ad uzunluğuyla yaklaşık 1 MB'tır. Yerel vekil
+  4 MB kabul eder. Chart'ın ingress kaynağı gövde boyutu için ek açıklama taşımaz; kümede ingress
+  denetleyicisinin varsayılanı (ingress-nginx'te 1 MB) geçerlidir ve daha büyük istek uygulamaya
+  ulaşmadan `413` alır; arayüz bunu "seçim tek istekte kabul edilen boyutu aşıyor" iletisiyle gösterir.
+- Yeni ayar yoktur; aynı anda işlenen nesne sayısı mevcut `DWHCODEREVIEW_LLM_MAX_CONCURRENT_CALLS`
+  ayarından gelir.
 
 ## Test stratejisi
 
@@ -304,9 +343,16 @@ erişimi yapmaz.
 - Hizmet testleri LLM test ikamesiyle (sahte uç): sürüm sabitleme, meta veri yalnız işaretli kurala,
   koşum ve süreç geneli eşzamanlılık üst sınırı, iki parça çağrı sayısı, iptalde yeni çağrı olmaması,
   kalıcılık (incelenen SQL metni dahil) ve durumlar.
-- API testleri: akış öncesi `401`/`403`/`409`/`422`/`429`; 50 ve 51 nesnelik seçim; olay sırası;
-  günlükte SQL metni olmaması.
-- Ön yüz testleri: filtreler, çoklu veritabanı seçimi, olay birleştirme, durdurma, Türkçe hata iletileri.
+- API testleri: akış öncesi `401`/`403`/`409`/`422`/`429`; 51 nesnelik ve 1.000 nesnelik seçimin
+  tamamlanıp saklanması; teknik sınırı aşan isteğin `invalid_request` alması; aynı anda işlenen nesne
+  sayısının sınırı aşmaması ve tanımların yalnız sırası gelen nesneler için okunması (sahte kataloğun
+  eşzamanlı çağrı sayacıyla); yavaş okuyan bağlantının koşumu bekletmesi; büyük koşumda iptal;
+  `complete` olayının 50 nesneye kadar sonuç taşıması; olay sırası; günlükte SQL metni olmaması; göçün
+  geri alınıp yeniden uygulanması.
+- Ön yüz testleri: filtreler, çoklu veritabanı seçimi, 50'den çok nesne seçimi, süzgece uyan bütün
+  nesnelerin sayfalar arasından seçilmesi, sayının gösterilmesi, yarıda bırakma ve temizleme, teknik
+  sınır iletisi, canlı pencerenin yalnız işlenen ve son biten nesneleri listelemesi, büyük koşumda
+  sonuçların geçmişten açılması, olay birleştirme, durdurma, Türkçe hata iletileri.
 
 ## Vektör ve gömme sözleşmesi (uygulanabilirse)
 
@@ -325,9 +371,10 @@ erişimi yapmaz.
 - [ ] Acceptance 2: L1 — Otomatik testlerden geçti: LLM test ikamesiyle sürüm sabitleme, meta veri,
   eşzamanlılık üst sınırı, iki parçalı analiz, kalıcılık ve durum testleri geçer (Requirement 4–7, 9, 16,
   17).
-- [ ] Acceptance 3: L1 — Otomatik testlerden geçti: akış öncesi yetki ve doğrulama hataları, 50 nesne
-  sınırı, hız sınırı, olay sırası, iptal ve günlükte SQL metni bulunmaması API testleri geçer
-  (Requirement 3, 14, 15, 18).
+- [ ] Acceptance 3: L1 — Otomatik testlerden geçti: akış öncesi yetki ve doğrulama hataları, nesne
+  sınırı olmadan 51 ve 1.000 nesnelik koşumların tamamlanması, aynı anda işlenen nesne sayısının ve
+  olay kuyruğunun sınırlı kalması, hız sınırı, olay sırası, iptal ve günlükte SQL metni bulunmaması API
+  testleri geçer (Requirement 3, 14, 15, 18, 21).
 - [ ] Acceptance 4: L1 — Otomatik testlerden geçti: katman yapısı, `OpenAPI` ve ön yüz tip sapması
   kapıları ile ön yüz testleri geçer (Requirement 1–3, 19, 20).
 - [ ] Acceptance 5: L2 — Gerçek istemci/ortamda doğrulandı: yerel PostgreSQL, test SQL Server'ı ve onaylı
@@ -336,6 +383,10 @@ erişimi yapmaz.
   bulunur, log çıktısında SQL metni bulunmaz (Requirement 1–7, 11, 13, 14, 16).
 - [ ] Acceptance 6: L2 — Gerçek istemci/ortamda doğrulandı: tarayıcıda "Analizi durdur" sonrasında 5
   saniyeden sonra yeni LLM çağrı özeti oluşmaz ve koşum "iptal edildi" görünür (Requirement 15).
+- [ ] Acceptance 7: L2 — Gerçek istemci/ortamda doğrulandı: gerçek SQL Server ve onaylı LLM ucuyla
+  tarayıcıda bir veritabanının süzgece uyan bütün nesneleri (50'den çok) seçilip koşum çalışır; canlı
+  pencere yalnız işlenen ve son biten nesneleri listeler, backend belleği koşum boyunca sınırının
+  altında kalır, sonuçlar geçmişte sayfa sayfa açılır ve dışa aktarılır (Requirement 3, 14, 21).
 
 ## Kararlar
 
@@ -345,7 +396,10 @@ erişimi yapmaz.
   yalnız koşumu başlatan kullanıcı ve `kural-yoneticisi` görür, günlüğe yazılmaz (Requirement 16).
   Geçmişten SQL dışa aktarımı nesne tanımını SQL Server'dan yeniden okumaz, saklanan metni kullanır
   ([review-history-export](../005-review-history-export/PRD.md)).
-- Decision 3: Bir koşumda en çok 50 nesne olur (Requirement 3).
+- Decision 3: Proje sahibinin 2026-10-02 kararı: bir koşumdaki nesne sayısı için ürün sınırı yoktur ve
+  süzgece uyan bütün nesneler tek adımda seçilebilir (Requirement 3). Koşumun arka planda sürmesi,
+  kaldığı yerden devam etmesi ve sonuçların nesne nesne saklanması bu kararın kapsamında değildir;
+  sahibin sonra karar verebileceği ayrı bir iştir (Riskler).
 - Decision 4: LLM eşzamanlılık sınırı nesne başına değil koşumun tamamına uygulanır; ayrıca süreç geneli
   bir sınır vardır (Requirement 7). Nesne başına uygulama LLM sunucusunu aşırı yükleyebilir.
 - Decision 5: Bu PRD yanlış pozitif işaretini saklamaz; kalıcı işaretleme
@@ -354,6 +408,15 @@ erişimi yapmaz.
 - Decision 6: Veritabanı ve nesne listeleme uçları ve filtreleri bu PRD'dedir; SQL Server sorguları,
   veritabanı listesinin kapsamı, hata sınıfları ve bağlantı [sql-server-connection](../002-sql-server-connection/PRD.md)
   PRD'sindedir.
+
+- Decision 7: İstek gövdesindeki seçim listesi teknik olarak 10.000 öğeyle sınırlıdır. Gerekçe: güvenli
+  kodlama tabanı (rules/57) her girdinin boyutunun sınırlı olmasını ister; sınırsız liste tek istekle
+  sunucu belleğini tüketebilir. 10.000, tek koşumda incelenebilecek gerçekçi seçimin çok üstündedir
+  (25 kuralla 250.000 LLM çağrısı) ve küme ingress'inin varsayılan 1 MB gövde sınırına yakın en büyük
+  yuvarlak değerdir. Bu sınır kullanıcıya ürün sınırı olarak gösterilmez.
+- Decision 8: Aynı anda işlenen nesne sayısı için yeni ayar eklenmez; koşumun LLM eşzamanlılık sınırı
+  kullanılır. Gerekçe: her nesne bütün kurallarını o sınırın yuvalarında çalıştırır; sınır kadar nesne
+  bütün yuvaları dolu tutmaya yeter, daha fazlası yalnız bekleyen SQL metnini bellekte tutar.
 
 ## Teslim akışı
 
@@ -366,6 +429,23 @@ Belirtim → Plan → Görevler → Uygulama
 - "İhlal değil" süzgeci Türkçe ifadelere dayanır; gerçek bir ihlali yanlışlıkla eleyebilir.
 - Kod parçasından satır çıkarımı ilk eşleşen satırı seçer; tekrar eden kodda yanlış satırı gösterebilir.
 - Kural sayısı × nesne sayısı çağrı üretir; uzun koşumlar SSE bağlantısının vekil zaman aşımına takılabilir.
+- **Çok büyük koşum saatler sürer.** Nesne sınırı olmadığı için bir koşum kural sayısı × nesne sayısı
+  kadar LLM çağrısı yapar (25 kural ve 1.000 nesneyle 25.000 çağrı) ve saatlerce, daha büyük seçimde
+  günlerce sürebilir.
+- **Sonuç yalnız sonda saklanır.** Koşum bitmeden tarayıcı bağlantısı koparsa, sekme kapanırsa ya da
+  backend yeniden başlarsa (her dağıtım backend'i yeniden başlatır) koşum kaybolur: "iptal edildi" ya
+  da "yarıda kesildi" olur ve o ana kadar yapılan bütün LLM çağrılarının sonucu atılır. Koşumun arka
+  planda sürmesi, kaldığı yerden devam etmesi ve sonuçların nesne nesne saklanması yapılmamıştır;
+  sahibin ayrıca karar vereceği bir sonraki iştir (Decision 3).
+- **LLM payı.** Bir kullanıcının büyük koşumu, o süre boyunca süreç geneli LLM sınırından kendi koşum
+  payını (varsayılan 12 yuvanın 6'sı) doldurur; aynı anda çalışan diğer koşumlar yavaşlar.
+- **Bellek.** Her nesnenin sonucu ve incelenen SQL metni koşum bitene kadar backend belleğinde durur.
+  Backend podunun bellek sınırı 512 MiB'tir; ortalama 10 KB'lık nesnelerle birkaç bin nesnelik koşum
+  bu sınırın içinde kalır, 10.000 nesneye yaklaşan ya da çok uzun tanımlı nesnelerden oluşan koşum
+  sınırı aşıp podu yeniden başlatabilir ve o anda süren bütün koşumlar kaybolur. SQL dışa aktarımı da
+  koşumun bütün SQL metnini bir kerede bellekte kurar.
+- **Seçim sırasında katalog değişirse** "tümünü seç" sayfalar arasında bir nesneyi atlayabilir ya da
+  silinmiş bir nesneyi seçebilir; silinmiş nesne koşumda `object_not_found` sonucunu alır.
 - İncelenen SQL metni ve kod parçaları kurum içi kaynak koddur ve PostgreSQL'de saklama süresi boyunca
   durur; erişim denetimi veya saklama işi bozulursa kod gereğinden geniş kitleye veya uzun süre açık
   kalır.

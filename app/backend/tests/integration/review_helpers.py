@@ -83,8 +83,15 @@ async def stream_until(
     path: str,
     body: dict[str, Any],
     stop: Callable[[dict[str, Any]], bool],
+    *,
+    pause: asyncio.Event | None = None,
+    timeout: float = 10,
 ) -> tuple[list[dict[str, Any]], float]:
-    """Drive the ASGI app directly and drop the connection once ``stop`` sees its event."""
+    """Drive the ASGI app directly and drop the connection once ``stop`` sees its event.
+
+    With ``pause`` the client stops reading after the first event until the event is set, the
+    way a slow browser connection holds the stream back.
+    """
 
     payload = json.dumps(body).encode("utf-8")
     headers = [(name.lower().encode(), value.encode()) for name, value in session.headers.items()]
@@ -124,6 +131,8 @@ async def stream_until(
         nonlocal buffer
         if message["type"] != "http.response.body":
             return
+        if pause is not None and events:
+            await pause.wait()
         buffer += message.get("body", b"").decode("utf-8")
         while "\n\n" in buffer:
             block, buffer = buffer.split("\n\n", 1)
@@ -134,5 +143,5 @@ async def stream_until(
                     dropped_at[0] = time.monotonic()
                     disconnected.set()
 
-    await asyncio.wait_for(app(scope, receive, send), 10)
+    await asyncio.wait_for(app(scope, receive, send), timeout)
     return events, dropped_at[0]

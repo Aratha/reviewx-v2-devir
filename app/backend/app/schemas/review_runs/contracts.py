@@ -38,8 +38,13 @@ class ReviewRunPage(BaseModel):
 class ReviewRunDetail(ReviewRunSummary):
     label: str | None
     results: list[ObjectResultItem] = Field(
-        description="Stored results; empty unless the run completed. Never carries SQL text."
+        description=(
+            "Stored results of one page of objects in selection order; empty unless the run "
+            "completed. Never carries SQL text. object_count is the total number of objects."
+        )
     )
+    results_page: int = Field(description="The returned page of objects, starting at 1.")
+    results_page_size: int = Field(description="Objects per page of this response.")
 
 
 class FalsePositiveUpdate(BaseModel):

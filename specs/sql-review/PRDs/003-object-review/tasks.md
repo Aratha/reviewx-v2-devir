@@ -1,8 +1,10 @@
 # Görevler — object-review
 
-[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-09-26'da yerel
-Compose yığınında geçti. Bu, arka uç kapsamı için L1 (otomatik testlerden geçti) kanıtıdır;
-gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
+[Plan](plan.md) belgesinden türetildi. Kanıt: `scripts/quality-gate.sh all` 2026-10-02'de yerel
+Compose yığınında geçti (arka uç 726/726, ön yüz 144/144 test; göç, OpenAPI, üretilmiş tip, yönetişim
+sapması ve chart adımı dahil). Bu, L1 (otomatik testlerden geçti) kanıtıdır; otomatik testler sahte
+katalog ve sahte LLM ile koşar, gerçek SQL Server ve kurum içi LLM ile yapılan gözlem Task 9 ve
+Task 11'dedir.
 
 - [x] Task V1 — Requirement 3, 4, 8, 13, 16 / Acceptance 2: koşum, koşum nesnesi, kural sonucu ve
   bulgu tabloları (göç `202609260001`); önemin yalnız `FAIL` sonucunda dolu olması ve 500
@@ -29,8 +31,8 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
   `app/backend/tests/integration/test_object_review_api.py`.
 - [x] Task 4 — Requirement 3, 14, 15, 18 / Acceptance 3: akış öncesi `401`, `403
   database_not_allowed`, `409 no_published_rule_set`, `422` (`selection_empty`,
-  `too_many_objects`, `object_type_invalid`, `invalid_request`), `429 rate_limited` ve metin
-  incelemesiyle ortak sayaç, `503 llm_not_configured`; 50 nesnenin kabulü; olay sırası; kopan
+  `object_type_invalid`, `invalid_request`), `429 rate_limited` ve metin
+  incelemesiyle ortak sayaç, `503 llm_not_configured`; olay sırası; kopan
   bağlantıda 5 saniye içinde `cancelled`, yeni çağrı olmaması ve kısmi sonuç yazılmaması; günlükte
   SQL ve model metni olmaması. Kanıt: `app/backend/tests/integration/test_object_review_api.py`,
   `app/backend/tests/unit/test_review_throttle.py`.
@@ -43,7 +45,7 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
 - [x] Task 7 — Requirement 1–3, 14, 15, 19 / Acceptance 4: inceleme sayfası, canlı pencere,
   "Analizi durdur", sonuç penceresi ve Vitest testleri. Kanıt:
   `app/frontend/src/pages/ObjectReviewPage.test.tsx` (sunucuda süzgeç, çoklu veritabanı seçimi,
-  50 sınırı, SQL Server hatasında Türkçe ileti ve "Listeyi yenile"),
+  SQL Server hatasında Türkçe ileti ve "Listeyi yenile"),
   `app/frontend/src/lib/eventStream.test.ts` (akış çözümleyici, parça sınırları, erken durma,
   kopma), `app/frontend/src/lib/reviewProgress.test.ts` (olay birleştirme),
   `app/frontend/src/contexts/ReviewSessionContext.test.tsx` (`fetch` akışı ve oturum başlığı,
@@ -64,3 +66,22 @@ gerçek SQL Server ve kurum içi LLM ile koşum yapılmadı.
   46.544 karakter); canlı ilerlemede belirteç sayısı, satır referanslı bulgular, koşum kaydında kural
   sürümü ve saklanan SQL metni görüldü; uygulama logunda SQL metni yoktu; istemci bağlantısı
   kapanınca koşum "iptal edildi" oldu. Onaylı kurum LLM ucu yerelden erişilemediği için açık.
+- [x] Task 10 — Requirement 3, 14, 21, Decision 3, 7, 8 / Acceptance 3, Acceptance 4: nesne sınırının
+  kaldırılması ve süzgece uyan bütün nesnelerin seçilmesi. Arka uç: göç `202610020001` (geri alınıp
+  yeniden uygulanır; 50'den çok nesneli koşum varken geri alma durur), 51 ve 1.000 nesnelik
+  koşumların tamamlanıp saklanması, teknik sınırı aşan istekte `422 invalid_request`, aynı anda
+  işlenen nesne sayısının ve tanım okumalarının sınırlı kalması (sahte kataloğun eşzamanlı çağrı
+  sayacı), yavaş okuyan bağlantının koşumu bekletmesi, büyük koşumda iptalin kalan nesneleri
+  okumaması, `complete` olayının yalnız 50 nesneye kadar sonuç taşıması. Kanıt:
+  `app/backend/tests/integration/test_object_review_api.py`,
+  `app/backend/tests/integration/test_review_run_object_limit_migration.py`. Ön yüz: sınırsız seçim,
+  sayfalar arasından "tümünü seç" (1.234 nesne), sayının gösterilmesi, yarıda bırakma, temizleme,
+  teknik sınır iletisi, canlı pencerenin 400 nesnelik koşumda yalnız işlenen ve son biten nesneleri
+  çizmesi, büyük koşumda sonuçların geçmişte açılması, `413` iletisi. Kanıt:
+  `app/frontend/src/pages/ObjectReviewPage.test.tsx`,
+  `app/frontend/src/contexts/ReviewSessionContext.test.tsx`,
+  `app/frontend/src/lib/reviewProgress.test.ts`. Bu, L1 (otomatik testlerden geçti) kanıtıdır;
+  sahte katalog ve sahte LLM ile koşuldu.
+- [ ] Task 11 — Acceptance 7: gerçek SQL Server ve onaylı LLM ucuyla tarayıcıda 50'den çok nesnelik
+  koşum, backend belleğinin gözlenmesi ve küme ingress'inin istek gövdesi sınırının doğrulanması;
+  açık.

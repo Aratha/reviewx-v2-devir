@@ -1,11 +1,11 @@
 import {formatDateTime} from '@/lib/format';
-import {MAX_SELECTION, selectionKey, type SelectionMap} from '@/lib/objectSelection';
+import {selectionKey, type SelectionMap} from '@/lib/objectSelection';
 import type {CatalogObject} from '@/types/sqlReview';
 
 /**
  * Objects of one database with a checkbox per row. The checkbox is the keyboard-accessible primary
- * action; clicking anywhere on the row toggles it too. After 50 selections unselected rows are
- * disabled (sql-review object-review Requirement 3).
+ * action; clicking anywhere on the row toggles it too. The header checkbox selects the listed page
+ * only (sql-review object-review Requirement 3).
  */
 export function ObjectTable({
   database,
@@ -20,7 +20,6 @@ export function ObjectTable({
   onToggle: (object: CatalogObject, selected: boolean) => void;
   onToggleAll: (objects: CatalogObject[], selected: boolean) => void;
 }) {
-  const full = Object.keys(selection).length >= MAX_SELECTION;
   const allSelected = objects.length > 0 && objects.every((object) => selectionKey(database, object) in selection);
   return (
     <div className="table-wrap">
@@ -32,7 +31,7 @@ export function ObjectTable({
               <input
                 type="checkbox"
                 checked={allSelected}
-                disabled={objects.length === 0 || (full && !allSelected)}
+                disabled={objects.length === 0}
                 aria-label="Görünen nesnelerin tümünü seç"
                 onChange={(event) => onToggleAll(objects, event.target.checked)}
               />
@@ -48,20 +47,16 @@ export function ObjectTable({
           {objects.map((object) => {
             const key = selectionKey(database, object);
             const checked = key in selection;
-            const disabled = !checked && full;
             return (
               <tr
                 key={key}
                 className={`is-clickable${checked ? ' is-selected' : ''}`}
-                onClick={() => {
-                  if (!disabled) onToggle(object, !checked);
-                }}
+                onClick={() => onToggle(object, !checked)}
               >
                 <td className="cell-check">
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={disabled}
                     aria-label={`${object.schema}.${object.name} seç`}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) => onToggle(object, event.target.checked)}

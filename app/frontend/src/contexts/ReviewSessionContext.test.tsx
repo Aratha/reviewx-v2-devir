@@ -1,4 +1,5 @@
 import {fireEvent, screen, waitFor, within} from '@testing-library/react';
+import {useLocation} from 'react-router';
 import {describe, expect, it, vi} from 'vitest';
 import {useReviewSession} from './ReviewSessionContext';
 import {ReviewWindows} from '@/components/review/ReviewWindows';
@@ -8,9 +9,11 @@ import type {ReviewStreamEvent} from '@/types/sqlReview';
 
 function Starter() {
   const {session, startObjectReview, startScriptReview} = useReviewSession();
+  const location = useLocation();
   return (
     <div>
       <p data-testid="phase">{session.phase}</p>
+      <p data-testid="location">{`${location.pathname}${location.search}`}</p>
       <button
         onClick={() => startObjectReview([{database: 'DWH', schema: 'dbo', name: 'usp_load', type_code: 'P'}])}
       >
@@ -74,6 +77,71 @@ describe('review session', () => {
     expect(sessionStorage.length).toBe(0);
   });
 
+  it('points a run too large for the results window at the stored run instead', async () => {
+    // object-review Requirement 14: a run of more objects than one result page sends no results.
+    const events = objectRunEvents().slice(0, -1);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      eventStreamResponse([...events, {phase: 'complete', run_id: 'run-1', results: [], results_omitted: true}]),
+    );
+    renderWithSession(<Starter />);
+    fireEvent.click(screen.getByRole('button', {name: 'start object'}));
+    await phase('completed');
+
+    const live = screen.getByRole('dialog', {name: 'Canlı inceleme'});
+    expect(within(live).getByText(/sonuçlar bu pencerede gösterilmez/)).toBeInTheDocument();
+    expect(within(live).queryByRole('button', {name: 'Sonuçları göster'})).toBeNull();
+    expect(within(live).getByRole('button', {name: 'CSV indir'})).toBeEnabled();
+    expect(within(live).getByRole('button', {name: 'SQL indir'})).toBeEnabled();
+
+    fireEvent.click(within(live).getByRole('button', {name: 'Sonuçları geçmişte aç'}));
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/gecmis?run=run-1'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('lists only the objects in flight and the last finished ones in the live window', async () => {
+    const total = 400;
+    const fields = (index: number) => ({
+      kind: 'object' as const,
+      database: 'DWH',
+      object_index: index,
+      objects_total: total,
+      object_label: `[DWH] dbo.p${index} (P)`,
+      schema: 'dbo',
+      name: `p${index}`,
+      type_code: 'P',
+    });
+    const events: ReviewStreamEvent[] = [
+      {phase: 'run_started', run_id: 'run-1', rule_version: 2, objects_total: total, kind: 'object'},
+    ];
+    for (let index = 0; index < 300; index += 1) {
+      events.push({...fields(index), phase: 'object_start'});
+      if (index < 297) {
+        events.push(
+          index === 7
+            ? {...fields(index), phase: 'object_error', code: 'object_not_found', message: 'x'}
+            : {...fields(index), phase: 'object_done'},
+        );
+      }
+    }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => openStream(events, init?.signal));
+    renderWithSession(<Starter />);
+    fireEvent.click(screen.getByRole('button', {name: 'start object'}));
+
+    const live = await screen.findByRole('dialog', {name: 'Canlı inceleme'});
+    expect(await within(live).findByText('296 / 400 nesne tamamlandı · 1 nesnede hata')).toBeInTheDocument();
+    const inFlight = within(live).getByRole('region', {name: 'Şu an incelenen nesneler'});
+    expect(within(inFlight).getAllByRole('region').map((card) => card.getAttribute('aria-label'))).toEqual([
+      '[DWH] dbo.p297 (P)',
+      '[DWH] dbo.p298 (P)',
+      '[DWH] dbo.p299 (P)',
+    ]);
+    const recent = within(live).getByRole('region', {name: 'Son biten nesneler'});
+    expect(within(recent).getAllByRole('region')).toHaveLength(20);
+    expect(within(recent).getByText('Biten nesnelerden yalnız son 20 tanesi listelenir.')).toBeInTheDocument();
+    fireEvent.click(within(live).getByRole('button', {name: 'Analizi durdur'}));
+    await phase('cancelled');
+  });
+
   it('cannot be dismissed while running; stop aborts, shows "İnceleme durduruldu." and no results', async () => {
     let signal: AbortSignal | null | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
@@ -124,7 +192,11 @@ describe('review session', () => {
     [409, 'no_published_rule_set', 'Henüz yayımlanmış kural yok; inceleme başlatılamaz.'],
     [429, 'rate_limited', 'Çok fazla inceleme başlattınız; biraz sonra yeniden deneyin.'],
     [503, 'llm_not_configured', 'LLM bağlantısı yapılandırılmamış.'],
-    [422, 'too_many_objects', 'Bir incelemede en çok 50 nesne olabilir.'],
+    [
+      413,
+      'unknown_code',
+      'Seçim, sunucunun tek istekte kabul ettiği boyutu aşıyor; daha az nesne seçip yeniden deneyin.',
+    ],
   ])('shows a %s %s refusal before the stream opens', async (status, code, text) => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(status, {detail: {code, message: 'x'}}));
     renderWithSession(<Starter />);
@@ -137,7 +209,7 @@ describe('review session', () => {
     const failedObject = liveResult({error_code: 'object_not_found', error_message: 'x', rule_results: [], findings: []});
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(eventStreamResponse([{phase: 'complete', run_id: 'run-2', results: [failedObject]}]));
+      .mockResolvedValue(eventStreamResponse([{phase: 'complete', run_id: 'run-2', results_omitted: false, results: [failedObject]}]));
     renderWithSession(<Starter />);
     fireEvent.click(screen.getByRole('button', {name: 'start script'}));
     await phase('completed');

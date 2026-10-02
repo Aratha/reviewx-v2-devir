@@ -891,7 +891,7 @@ export interface paths {
         put?: never;
         /**
          * Start Object Review
-         * @description Review up to 50 selected objects with live progress (object-review).
+         * @description Review the selected objects with live progress; no object limit (object-review).
          */
         post: {
             parameters: {
@@ -1127,11 +1127,16 @@ export interface paths {
         };
         /**
          * Read Review Run
-         * @description The stored results with false-positive marks; never the SQL text (Requirement 3).
+         * @description One page of the stored objects with their results and false-positive marks.
+         *
+         *     Never the SQL text (Requirement 3); ``object_count`` is the total number of objects.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    page?: number;
+                    page_size?: number;
+                };
                 header?: never;
                 path: {
                     run_id: string;
@@ -2257,6 +2262,11 @@ export interface components {
              */
             phase: "complete";
             results: components["schemas"]["LiveObjectResultItem"][];
+            /**
+             * @description True when the run has more objects than one result page: results stays empty and the stored run is read page by page from the review run detail.
+             * @default false
+             */
+            results_omitted: boolean;
             run_id: string;
         };
         DatabasePage: {
@@ -2500,6 +2510,7 @@ export interface components {
             type_code: string;
         };
         ObjectReviewRequest: {
+            /** @description No product limit; the list length is bounded only technically. */
             selections: components["schemas"]["ObjectSelectionItem"][];
         };
         ObjectSelectionItem: {
@@ -2539,8 +2550,12 @@ export interface components {
             /** @description True when the caller started the run. */
             owned: boolean;
             owner_display_name: string;
-            /** @description Stored results; empty unless the run completed. Never carries SQL text. */
+            /** @description Stored results of one page of objects in selection order; empty unless the run completed. Never carries SQL text. object_count is the total number of objects. */
             results: components["schemas"]["ObjectResultItem"][];
+            /** @description The returned page of objects, starting at 1. */
+            results_page: number;
+            /** @description Objects per page of this response. */
+            results_page_size: number;
             rule_version: number;
             /** Format: date-time */
             started_at: string;

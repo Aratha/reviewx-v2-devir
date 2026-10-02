@@ -28,7 +28,7 @@ function summary(overrides: Partial<ReviewRunSummary> = {}): ReviewRunSummary {
 }
 
 function detail(overrides: Partial<ReviewRunDetail> = {}): ReviewRunDetail {
-  return {...summary(), label: null, results: [storedResult()], ...overrides};
+  return {...summary(), label: null, results: [storedResult()], results_page: 1, results_page_size: 50, ...overrides};
 }
 
 const cancelled = summary({
@@ -87,6 +87,39 @@ describe('review history page', () => {
     await waitFor(() => expect(save).toHaveBeenCalled());
     expect(exportRun).toHaveBeenCalledWith('run-1', 'csv');
     expect(save.mock.calls[0][1]).toBe('sql-review-1.csv');
+  });
+
+  it('opens the run named in the address, as a large review asks it to', async () => {
+    renderWithSession(<ReviewHistoryPage />, {path: '/gecmis?run=run-1'});
+    expect(await screen.findByRole('checkbox', {name: 'Kural01 bulgu 1 yanlış pozitif'})).toBeInTheDocument();
+    expect(ReviewService.run).toHaveBeenCalledWith('run-1', 1, 50, expect.any(AbortSignal));
+  });
+
+  it('reads a large run page by page and keeps the downloads for the whole run', async () => {
+    const pageOf = (page: number) =>
+      detail({
+        title: 'DWH · 120 nesne',
+        object_count: 120,
+        results_page: page,
+        results: Array.from({length: page === 3 ? 20 : 50}, (_, index) =>
+          storedResult({name: `usp_${(page - 1) * 50 + index + 1}`, error_code: 'object_not_found', rule_results: [], findings: []}),
+        ),
+      });
+    vi.mocked(ReviewService.run).mockImplementation(async (_id, page) => pageOf(page));
+    renderWithSession(<ReviewHistoryPage />, {path: '/gecmis?run=run-1'});
+
+    expect(await screen.findByText('1–50 / 120')).toBeInTheDocument();
+    expect(screen.getByText(/sayfa başına 50 nesne gösterilir/)).toBeInTheDocument();
+    expect(screen.getByText(/usp_50\b/)).toBeInTheDocument();
+    expect(screen.queryByText(/usp_51\b/)).toBeNull();
+    // Every object of this page failed; other pages may still hold SQL text, so the button stays on.
+    expect(screen.getByRole('button', {name: 'SQL indir'})).toBeEnabled();
+
+    const detailCard = screen.getByText('1–50 / 120').closest('nav')!;
+    fireEvent.click(within(detailCard).getByRole('button', {name: 'Sonraki'}));
+    expect(await screen.findByText('51–100 / 120')).toBeInTheDocument();
+    expect(ReviewService.run).toHaveBeenLastCalledWith('run-1', 2, 50, expect.any(AbortSignal));
+    expect(screen.getByText(/usp_51\b/)).toBeInTheDocument();
   });
 
   it('disables SQL download for a run without stored SQL and explains a stopped run', async () => {

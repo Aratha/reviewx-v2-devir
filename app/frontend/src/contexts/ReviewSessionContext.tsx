@@ -33,6 +33,8 @@ export interface ReviewSessionState {
   subtitle: string;
   progress: LiveProgress | null;
   results: LiveObjectResult[];
+  /** The run is larger than one result page: its results are read from the stored run. */
+  resultsOmitted: boolean;
   runId: string | null;
   errorMessage: string | null;
   view: ReviewView;
@@ -43,7 +45,7 @@ export interface ReviewSessionState {
 type Action =
   | {type: 'start'; kind: ReviewKind; title: string; subtitle: string; objectsTotal: number}
   | {type: 'event'; event: ReviewStreamEvent}
-  | {type: 'complete'; runId: string; results: LiveObjectResult[]}
+  | {type: 'complete'; runId: string; results: LiveObjectResult[]; resultsOmitted: boolean}
   | {type: 'fail'; message: string}
   | {type: 'cancelled'}
   | {type: 'show'; view: ReviewView; fromLive?: boolean}
@@ -57,6 +59,7 @@ const initialState: ReviewSessionState = {
   subtitle: '',
   progress: null,
   results: [],
+  resultsOmitted: false,
   runId: null,
   errorMessage: null,
   view: 'none',
@@ -81,7 +84,14 @@ function reducer(state: ReviewSessionState, action: Action): ReviewSessionState 
       return {...state, progress, runId: progress.runId ?? state.runId};
     }
     case 'complete':
-      return {...state, phase: 'completed', runId: action.runId, results: action.results, errorMessage: null};
+      return {
+        ...state,
+        phase: 'completed',
+        runId: action.runId,
+        results: action.results,
+        resultsOmitted: action.resultsOmitted,
+        errorMessage: null,
+      };
     case 'fail':
       return {...state, phase: 'failed', results: [], errorMessage: action.message};
     case 'cancelled':
@@ -122,11 +132,10 @@ function objectRunTitle(selections: ObjectSelection[]): {title: string; subtitle
   const databases = [...new Set(selections.map((selection) => selection.database))];
   const database =
     databases.length === 1 ? databases[0] : `${databases.length} veritabanı (${databases.join(', ')})`;
-  const targets = selections.map(
-    (selection) => `[${selection.database}] ${selection.schema}.${selection.name} (${selection.type_code})`,
-  );
-  const subtitle =
-    targets.length <= 3 ? targets.join(', ') : `${targets.slice(0, 3).join(', ')} +${targets.length - 3}`;
+  const targets = selections
+    .slice(0, 3)
+    .map((selection) => `[${selection.database}] ${selection.schema}.${selection.name} (${selection.type_code})`);
+  const subtitle = selections.length <= 3 ? targets.join(', ') : `${targets.join(', ')} +${selections.length - 3}`;
   return {title: `${database} · ${selections.length} nesne`, subtitle};
 }
 
@@ -157,7 +166,12 @@ export function ReviewSessionProvider({children}: {children: ReactNode}) {
           if (generation !== generationRef.current || finished) return;
           if (event.phase === 'complete') {
             finished = true;
-            dispatch({type: 'complete', runId: event.run_id, results: event.results});
+            dispatch({
+              type: 'complete',
+              runId: event.run_id,
+              results: event.results,
+              resultsOmitted: Boolean(event.results_omitted),
+            });
           } else if (event.phase === 'error') {
             finished = true;
             dispatch({type: 'fail', message: messageForCode(event.code) ?? FAILED_MESSAGE});

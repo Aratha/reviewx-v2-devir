@@ -4,6 +4,9 @@ sql-review/PRDs/005-review-history-export. A reviewer sees and changes only thei
 rule manager also reads every run of the tenant but changes none (Decision 1). A run the caller
 may not see answers 404 as if it did not exist. SQL text is returned only by the SQL export;
 descriptions, snippets and SQL never reach a log line.
+
+A run has no object limit (003 Decision 3): the list builds its titles without reading the
+objects, the detail returns one page of objects, and the exports read the run chunk by chunk.
 """
 
 import asyncio
@@ -23,14 +26,15 @@ from app.domain.models.review import (
     ReviewFinding,
     ReviewRuleResult,
     ReviewRunKind,
-    ReviewRunObject,
     ReviewRunStatus,
 )
 from app.domain.models.role import ROLE_RULE_MANAGER
 from app.domain.models.user import User
 from app.domain.review import SCRIPT_DEFAULT_LABEL
 from app.infrastructure.repositories.review_repository import (
+    HEADING_OBJECTS,
     ReviewRepository,
+    RunHeading,
     RunResults,
     RunRow,
 )
@@ -48,14 +52,20 @@ from app.services.review_export import (
     ExportFinding,
     ExportObject,
     ExportRuleResult,
-    build_results_csv,
     build_sql_export,
+    results_csv_error_row,
+    results_csv_header,
+    results_csv_rows,
 )
 
 logger = logging.getLogger("app.review_history")
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
+# Objects of one detail page (Requirement 3) and of one export read chunk.
+DEFAULT_RESULTS_PAGE_SIZE = 50
+MAX_RESULTS_PAGE_SIZE = 200
+EXPORT_CHUNK_OBJECTS = 200
 # Several runs a day keep the "at least once a day" promise across restarts.
 RETENTION_INTERVAL_SECONDS = 6 * 60 * 60
 
@@ -81,36 +91,37 @@ class ExportFile:
     content: str
 
 
-def _database_label(objects: list[ReviewRunObject]) -> str:
-    databases = list(dict.fromkeys(item.database_name or "" for item in objects))
+def _database_label(databases: list[str]) -> str:
     if len(databases) == 1:
         return databases[0]
     return f"{len(databases)} veritabanı ({', '.join(databases)})"
 
 
 def run_title(
-    kind: str, status_value: str, label: str | None, objects: list[ReviewRunObject]
+    kind: str, status_value: str, label: str | None, object_count: int, heading: RunHeading
 ) -> tuple[str, str | None]:
     """Title and subtitle in the previous application's history format."""
 
     if kind == ReviewRunKind.SCRIPT.value:
         return label or SCRIPT_DEFAULT_LABEL, None
     targets = [
-        f"[{item.database_name or ''}] {item.schema_name}.{item.object_name} ({item.type_code})"
-        for item in objects
+        f"[{item.database or ''}] {item.schema}.{item.name} ({item.type_code})"
+        for item in heading.first_objects
     ]
-    database = _database_label(objects)
+    database = _database_label(heading.databases)
     if status_value == ReviewRunStatus.FAILED.value:
-        return f"{database} · hata", ", ".join(targets[:4])
+        return f"{database} · hata", ", ".join(targets[:HEADING_OBJECTS])
     subtitle = (
-        ", ".join(targets) if len(targets) <= 3 else f"{', '.join(targets[:3])} +{len(targets) - 3}"
+        ", ".join(targets[:object_count])
+        if object_count <= 3
+        else f"{', '.join(targets[:3])} +{object_count - 3}"
     )
-    return f"{database} · {len(objects)} nesne", subtitle
+    return f"{database} · {object_count} nesne", subtitle
 
 
-def _summary_fields(row: RunRow, objects: list[ReviewRunObject], actor: User) -> dict[str, object]:
+def _summary_fields(row: RunRow, heading: RunHeading, actor: User) -> dict[str, object]:
     run = row.run
-    title, subtitle = run_title(run.kind, run.status, run.label, objects)
+    title, subtitle = run_title(run.kind, run.status, run.label, run.object_count, heading)
     return {
         "id": run.public_id,
         "kind": run.kind,
@@ -185,10 +196,14 @@ def _object_results(results: RunResults) -> list[ObjectResultItem]:
     return items
 
 
-def _export_objects(results: RunResults) -> list[ExportObject]:
+def _export_objects(results: RunResults, *, with_sql: bool) -> list[ExportObject]:
+    """Plain export values of one chunk; the SQL file needs only the failed rule results."""
+
     objects: list[ExportObject] = []
     for item in results.objects:
         rule_results = results.rule_results.get(item.review_run_object_id, [])
+        if with_sql:
+            rule_results = [result for result in rule_results if result.status == "FAIL"]
         objects.append(
             ExportObject(
                 database=item.database_name or "",
@@ -222,7 +237,7 @@ def _export_objects(results: RunResults) -> list[ExportObject]:
                     for result in rule_results
                     for finding in results.findings.get(result.review_rule_result_id, [])
                 ],
-                source_sql=item.source_sql or "",
+                source_sql=(item.source_sql or "") if with_sql else "",
             )
         )
     return objects
@@ -281,11 +296,11 @@ class ReviewHistoryService:
             offset=(page - 1) * page_size,
             limit=page_size,
         )
-        objects = await self.reviews.objects_of_runs([row.run.review_run_id for row in rows])
+        headings = await self.reviews.headings_of_runs([row.run.review_run_id for row in rows])
         return ReviewRunPage(
             items=[
                 ReviewRunSummary.model_validate(
-                    _summary_fields(row, objects[row.run.review_run_id], actor)
+                    _summary_fields(row, headings[row.run.review_run_id], actor)
                 )
                 for row in rows
             ],
@@ -294,15 +309,32 @@ class ReviewHistoryService:
             total=total,
         )
 
-    async def detail(self, context: RequestContext, run_id: str) -> ReviewRunDetail:
+    async def _heading(self, row: RunRow) -> RunHeading:
+        return (await self.reviews.headings_of_runs([row.run.review_run_id]))[row.run.review_run_id]
+
+    async def detail(
+        self, context: RequestContext, run_id: str, *, page: int, page_size: int
+    ) -> ReviewRunDetail:
+        """One page of the stored objects of a run, in selection order (Requirement 3)."""
+
         row, actor = await self._visible(context, run_id)
-        results = await self.reviews.results_of_run(row.run.review_run_id)
         completed = row.run.status == ReviewRunStatus.COMPLETED.value
+        results = (
+            _object_results(
+                await self.reviews.results_of_run(
+                    row.run.review_run_id, offset=(page - 1) * page_size, limit=page_size
+                )
+            )
+            if completed
+            else []
+        )
         return ReviewRunDetail.model_validate(
             {
-                **_summary_fields(row, results.objects, actor),
+                **_summary_fields(row, await self._heading(row), actor),
                 "label": row.run.label,
-                "results": _object_results(results) if completed else [],
+                "results": results,
+                "results_page": page,
+                "results_page_size": page_size,
             }
         )
 
@@ -391,44 +423,66 @@ class ReviewHistoryService:
         )
         return DeletedRuns(deleted_count=count)
 
-    async def _export_source(
-        self, context: RequestContext, run_id: str
-    ) -> tuple[RunRow, RunResults]:
-        row, _ = await self._visible(context, run_id)
-        return row, await self.reviews.results_of_run(row.run.review_run_id)
+    async def _export_chunks(self, row: RunRow, *, with_sql: bool) -> list[ExportObject]:
+        """The export values of a completed run, read and released chunk by chunk."""
+
+        objects: list[ExportObject] = []
+        if row.run.status != ReviewRunStatus.COMPLETED.value:
+            return objects
+        for offset in range(0, row.run.object_count, EXPORT_CHUNK_OBJECTS):
+            results = await self.reviews.results_of_run(
+                row.run.review_run_id,
+                offset=offset,
+                limit=EXPORT_CHUNK_OBJECTS,
+                with_sql=with_sql,
+            )
+            objects.extend(_export_objects(results, with_sql=with_sql))
+            self.reviews.release(results)
+        return objects
 
     async def export_csv(self, context: RequestContext, run_id: str) -> ExportFile:
-        row, results = await self._export_source(context, run_id)
+        row, _ = await self._visible(context, run_id)
         now = datetime.now(UTC)
-        completed = row.run.status == ReviewRunStatus.COMPLETED.value
-        objects = _export_objects(results) if completed else []
+        generated_at = _iso_ms(now)
         database = (
-            _database_label(results.objects) if row.run.kind == ReviewRunKind.OBJECT.value else ""
+            _database_label((await self._heading(row)).databases)
+            if row.run.kind == ReviewRunKind.OBJECT.value
+            else ""
         )
-        content = build_results_csv(
-            objects,
-            generated_at=_iso_ms(now),
-            database=database,
-            review_error=None if objects else row.run.error_message,
-        )
+        lines = [results_csv_header()]
+        if row.run.status == ReviewRunStatus.COMPLETED.value:
+            # Rows are built per chunk, so only text lines stay in memory for a large run.
+            for offset in range(0, row.run.object_count, EXPORT_CHUNK_OBJECTS):
+                results = await self.reviews.results_of_run(
+                    row.run.review_run_id, offset=offset, limit=EXPORT_CHUNK_OBJECTS
+                )
+                lines.extend(
+                    results_csv_rows(
+                        _export_objects(results, with_sql=False),
+                        generated_at=generated_at,
+                        database=database,
+                    )
+                )
+                self.reviews.release(results)
+        if len(lines) == 1 and row.run.error_message:
+            lines.append(results_csv_error_row(generated_at, database, row.run.error_message))
+        content = "\r\n".join(lines)
         log_event(
             logger,
             "review_history.exported",
             run_id=row.run.public_id,
             format="csv",
-            rows=content.count("\r\n"),
+            rows=len(lines) - 1,
         )
         record_review_export("csv")
         return ExportFile(f"sql-review-{_timestamp_ms(now)}.csv", "text/csv", content)
 
     async def export_sql(self, context: RequestContext, run_id: str) -> ExportFile:
-        row, results = await self._export_source(context, run_id)
-        completed = row.run.status == ReviewRunStatus.COMPLETED.value
+        row, _ = await self._visible(context, run_id)
+        objects = await self._export_chunks(row, with_sql=True)
         content = (
-            build_sql_export(
-                _export_objects(results), script=row.run.kind == ReviewRunKind.SCRIPT.value
-            )
-            if completed
+            build_sql_export(objects, script=row.run.kind == ReviewRunKind.SCRIPT.value)
+            if objects
             else None
         )
         if content is None:
@@ -442,7 +496,7 @@ class ReviewHistoryService:
             "review_history.exported",
             run_id=row.run.public_id,
             format="sql",
-            objects=sum(1 for item in results.objects if item.source_sql),
+            objects=sum(1 for item in objects if item.source_sql),
         )
         record_review_export("sql")
         now = datetime.now(UTC)

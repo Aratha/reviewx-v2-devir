@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useSearchParams} from 'react-router';
 import {ExportButtons} from '@/components/review/ExportButtons';
 import {ReviewResultsView} from '@/components/review/ReviewResultsView';
 import {Alert} from '@/components/ui/Alert';
@@ -19,6 +20,8 @@ import {ReviewService} from '@/services/reviews';
 import type {ReviewRunStatus, ReviewRunSummary} from '@/types/sqlReview';
 
 const PAGE_SIZE = 50;
+/** Objects of a run shown per page of its results (review-history-export Requirement 3). */
+const RESULTS_PAGE_SIZE = 50;
 
 const STATUS: Record<ReviewRunStatus, {label: string; tone: Tone}> = {
   running: {label: 'Sürüyor', tone: 'warning'},
@@ -40,7 +43,15 @@ export default function ReviewHistoryPage() {
   const {access} = useAuth();
   const [scope, setScope] = useState<Scope>('mine');
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // "?run=<id>" opens that run: a large review points here instead of showing its results itself.
+  const [searchParams] = useSearchParams();
+  const requestedRun = searchParams.get('run');
+  const [openedRun, setOpenedRun] = useState(requestedRun);
+  const [selectedId, setSelectedId] = useState<string | null>(requestedRun);
+  if (requestedRun !== openedRun) {
+    setOpenedRun(requestedRun);
+    if (requestedRun !== null) setSelectedId(requestedRun);
+  }
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<{tone: 'success' | 'error'; text: string} | null>(null);
@@ -215,7 +226,10 @@ function RunRow({
 }
 
 function RunDetail({runId}: {runId: string}) {
-  const detail = useResource(`run:${runId}`, (signal) => ReviewService.run(runId, signal));
+  const [resultsPage, setResultsPage] = useState(1);
+  const detail = useResource(`run:${runId}:${resultsPage}`, (signal) =>
+    ReviewService.run(runId, resultsPage, RESULTS_PAGE_SIZE, signal),
+  );
   const run = detail.data;
   if (detail.status === 'error')
     return (
@@ -234,7 +248,17 @@ function RunDetail({runId}: {runId: string}) {
     <Card
       title={run.title}
       actions={<Badge tone={status.tone}>{status.label}</Badge>}
-      footer={<ExportButtons runId={run.id} sqlAvailable={hasStoredSql(run.status === 'completed', run.results)} size="sm" />}
+      footer={
+        <ExportButtons
+          runId={run.id}
+          // Only one page of a large run is loaded; the export itself answers when no text is stored.
+          sqlAvailable={
+            run.status === 'completed' &&
+            (run.object_count > run.results.length || hasStoredSql(true, run.results))
+          }
+          size="sm"
+        />
+      }
     >
       <div className="stack">
         <p className="subtle">
@@ -247,6 +271,15 @@ function RunDetail({runId}: {runId: string}) {
         {run.status === 'interrupted' && <Alert tone="warning">Bu inceleme yarıda kesildi; sonucu saklanmadı.</Alert>}
         {run.status === 'failed' && (
           <Alert tone="error">{messageForCode(run.error_code) ?? run.error_message ?? 'İnceleme tamamlanamadı.'}</Alert>
+        )}
+        {run.status === 'completed' && run.object_count > RESULTS_PAGE_SIZE && (
+          <div className="stack-tight">
+            <p className="subtle">
+              Sonuçlar nesne sırasıyla, sayfa başına {RESULTS_PAGE_SIZE} nesne gösterilir; süzgeç yalnız açık sayfadaki
+              nesnelere uygulanır. Bütün sonuçlar için CSV dosyasını indirin.
+            </p>
+            <Pager page={resultsPage} pageSize={RESULTS_PAGE_SIZE} total={run.object_count} onPage={setResultsPage} />
+          </div>
         )}
         {run.results.length > 0 && (
           <ReviewResultsView

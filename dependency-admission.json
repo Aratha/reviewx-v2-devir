@@ -54,13 +54,14 @@
     }
   ],
   "decision": {
-    "id": "DWHCODEREVIEW-DEPENDENCY-2026-10-02-NGINX-PCRE2-OPENSSL",
-    "reviewed_on": "2026-10-02",
+    "id": "DWHCODEREVIEW-DEPENDENCY-2026-10-05-DEPENDABOT-PYJWT",
+    "reviewed_on": "2026-10-05",
     "inventory_sha256_by_variant": {
-      "observability-enabled": "4ede665337c08f7650fe4b089bddbc65713a9aff7482ec5c496646364990e764",
-      "observability-disabled": "4ede665337c08f7650fe4b089bddbc65713a9aff7482ec5c496646364990e764"
+      "observability-enabled": "83e1a18482796c9994e86f911bdd79de4ab56dfb7140696090e9e84dc9e41052",
+      "observability-disabled": "83e1a18482796c9994e86f911bdd79de4ab56dfb7140696090e9e84dc9e41052"
     },
     "compatibility_evidence": [
+      "2026-10-05: Dependabot #41, #42, #44 and #45 are taken in one reviewed change (security update plus mature updates). Backend: PyJWT[crypto] 2.15.0 (PyPI 2026-09-23, MIT) replaces 2.13.0, which OSV lists with 13 advisories (CVE-2026-102268 CRITICAL; CVE-2026-102266, -102267, -102271, -102272, -102273 HIGH; seven MODERATE) reachable through jwt.encode/jwt.decode in app/core/security.py; 2.14.0 still carries CVE-2026-101918, so 2.15.0 is the nearest release without an open advisory and stays a security exception until it is 30 days old. protobuf 7.36.1 (PyPI 2026-08-31, BSD-3-Clause, no OSV advisory) replaces 7.36.0 as the held OTLP transitive; the resolver's own 7.36.2 (2026-09-17) is still inside the window. The three Python locks were regenerated with scripts/compile-dependency-locks.sh; only the pyjwt and protobuf blocks changed and their digests match PyPI. Frontend: happy-dom 20.12.0 (npm 2026-08-29) and typescript-eslint 8.69.0 with the @typescript-eslint packages 8.69.0 (2026-08-31) and ignore 7.0.8 (2026-08-31), all MIT with no OSV advisory; brace-expansion 2.1.7 and 5.0.12 (2026-09-14, MIT) fix CVE-2026-102276 and CVE-2026-102278 (HIGH) and CVE-2026-102277 (MODERATE) in the development lock and are security exceptions. package-lock.json was regenerated with npm 11.19.1 limited to releases before 2026-09-05 (before 2026-09-15 for brace-expansion); its 15 changed entries equal Dependabot's and their integrity values match the npm registry. Trivy 0.74.0 (DB 2026-10-05) reports no HIGH or CRITICAL finding in app/backend/requirements.txt or app/frontend/package-lock.json, and no PyJWT finding in the backend release image. The open-source licence Agent (factory-managed, authority generation 47) still names pyjwt==2.13.0; kt-scaffold PR #178 moves it to 2.15.0 (generation 48) and the next governance transfer closes that gap.",
       "2026-10-02 security update, approved by the owner (kt-scaffold factory main 0db677c with PR #177; docs/evidence/2026-10-02-nginx-pcre2-security-update.md in factory source). Frontend: nginx:1.31.6-alpine-slim@sha256:f761b94f2cb9e8e05e2943d5f773609596113ef69b54e2433a996d109a8f78b7 (nginx 1.31.6, Alpine 3.24.2 OCI index, linux/amd64 and linux/arm64, published 2026-09-23) replaces nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 (nginx 1.31.3, Alpine 3.24.1) in the frontend release image, the local Compose reverse proxy, the local-egress gate and the image workflow. Trivy 0.74.0 (vulnerability database of 2026-10-02) reports 18 HIGH findings for the previous base (OpenSSL 2, libuuid 7, libexpat 5, pcre2 4); the slim variant ships neither libexpat nor libuuid. No published official nginx Alpine image carries pcre2 10.49-r0 (CVE-2026-103111, HIGH, Alpine package published 2026-10-01), so app/infra/locks/nginx-alpine-packages.lock pins it (BSD-3-Clause) by exact version and SHA-256 for both architectures and app/infra/Dockerfile.frontend.release installs it after the digest check, with apk's own signature check and without consulting a repository. Backend: Alpine v3.23 replaced OpenSSL 3.5.8-r0 with 3.5.9-r0 on 2026-09-30 and its index no longer lists the locked 3.5.8-r0 packages (libssl3-3.5.8-r0.apk for x86_64 returned HTTP 404 on 2026-10-02), so an uncached build of the backend development or release image stops. The Microsoft driver package declares a dependency on openssl, and the served openssl 3.5.9-r0 requires exactly libssl3=3.5.9-r0 and libcrypto3=3.5.9-r0, so app/infra/locks/backend-alpine-packages.lock moves the three packages to 3.5.9-r0 (Apache-2.0; .apk SHA-256 bytes observed from dl-cdn.alpinelinux.org on 2026-10-02, file sizes equal to the APKINDEX records). OpenSSL 3.5.9 (upstream release 2026-09-29) is a security patch release whose most severe fix is High; Alpine aports commit adcf4978 (main/openssl: security upgrade to 3.5.9) names the thirteen CVEs recorded in the exception. OSV queries for Alpine:v3.23 openssl 3.5.9-r0 and Alpine:v3.24 pcre2 10.49-r0 on 2026-10-02 returned no advisory. The three releases are younger than 30 days and are recorded as security exceptions; the reviewed inventory grows from 103 to 105 coordinates. Compatibility on 2026-10-02: the frontend and backend release images build without cache in connected mode for linux/amd64 and linux/arm64 (pcre2 10.48-r0 -> 10.49-r0; libcrypto3 and libssl3 3.5.8-r0 -> 3.5.9-r0, openssl 3.5.9-r0). Trivy reports 0 findings at every severity for the frontend image on both architectures and 0 operating-system package findings for the backend image. The backend image still reports 1 CRITICAL and 9 HIGH Python package findings on both architectures, which this change does not address: PyJWT 2.13.0 (1 CRITICAL and 5 HIGH, fixed in 2.14.0; the kt-scaffold profile pin) and msgpack 1.1.2, setuptools 70.3.0 and urllib3 2.7.0 (4 HIGH), which the pinned Python base image itself carries. The frontend image served the application with HTTP 200 as user 101 on a read-only root file system with every capability dropped (nginx/1.31.6). On both backend images Python 3.14.7 links OpenSSL 3.5.9, unixODBC registers 'ODBC Driver 18 for SQL Server', a pyodbc connection attempt reaches the driver (login timeout against a closed port) and pip check reports no broken requirement. tests/infra/local-egress.test.sh passed, including the gate configuration check on the new image. scripts/quality-gate.sh all passed on a separate Compose project with the development image rebuilt without cache from the new lock (backend lint, strict types, 726 unit and PostgreSQL integration tests, database validation, OpenAPI contract, frontend lint, build, 144 tests and generated types, governance drift and Helm render). Limits: the local Compose reverse proxy and the local-egress gate run the base image without a build and keep pcre2 10.48-r0; the proxy listens on the loopback address only and the gate publishes no port. Alpine does not keep superseded package versions, so a locked version stops downloading once its successor is published and the lock then has to move. This is a local build and scan; it is not evidence of the GitHub image publication or of the nonprod deployment.",
       "2026-09-28 (kt-scaffold authority generation 47, factory main 77c6b8a with PR #164): CPython 3.14.7 (released 2026-08-05) replaces 3.13.15 as the backend Python with a 3.14.7 security floor; python:3.14-alpine3.23@sha256:218761489de417a6eb0808e264cbdd7043ec6659fe5a61898815e9848536541d (Python 3.14.7, Alpine 3.23.6 OCI index) replaces python:3.13-alpine3.23@sha256:7ea3f82de8ea6d4fb7e5d2bbe3fe3c9d931700b7a529f1fe5769e42abe514ca1 in the development, release and migration images, Compose and the image workflow. Security driver, CPython advisories and the factory's cp314 wheel check: docs/evidence/2026-09-28-python-3-14-7-profile.md in factory source. Project packages: every pinned runtime, development and LLM package publishes a CPython 3.14, abi3 or pure-Python wheel at the same version for musllinux x86_64 and aarch64 (PyPI file lists on 2026-09-28), among them pyodbc 5.3.0, grpcio 1.83.1, asyncpg 0.31.0, cffi 2.1.1 and the pure-Python ldap3 2.9.1; scripts/compile-dependency-locks.sh recompiled the three Python locks on the 3.14 development image and only their Python-version header changed, so no package version or hash changed. The Alpine locks are unchanged: every locked version is still the current Alpine v3.23 main package (APKINDEX on 2026-09-28). On the rebuilt 3.14 development image pyodbc 5.3.0 imports, unixODBC registers 'ODBC Driver 18 for SQL Server', a connection attempt reaches the driver (login timeout against a closed port) and pip check reports no broken requirement; the linux/amd64 release backend image builds in connected mode from both Alpine locks and loads the same driver on Python 3.14.7. scripts/quality-gate.sh all passed on these images (backend lint, strict types, 654 unit and PostgreSQL integration tests, database validation, OpenAPI contract, frontend lint, build, 130 tests and generated types, governance drift and Helm render).",
       "Dependabot #15-#22 of 2026-09-27 (superseded by one reviewed change): frontend react-router 8.3.1 (npm release 2026-08-28), @testing-library/react 16.3.3 (2026-08-27), @types/node 26.4.0 (2026-08-27), @vitejs/plugin-react 6.1.1 (2026-08-28) and happy-dom 20.11.13 (2026-08-28), all MIT; their package-lock.json integrity digests match the npm registry and no other lock entry changes. Backend runtime pydantic 2.13.5 with its exact pydantic-core 2.46.5 (PyPI releases 2026-08-28, MIT) and grpcio 1.83.1 (2026-08-28, Apache-2.0; the resolver's own 1.84.0 of 2026-09-14 is still inside the 30-day window, so requirements.in keeps the direct pin). Inactive LangChain set: langchain 1.3.18 and langchain-core 1.6.1 (2026-08-27, MIT) with unchanged transitives; requirements-llm.txt installs with --require-hashes in the backend development image and the set imports. Development tools isort 9.0.1 (2026-08-27), setuptools 84.0.0 (2026-08-08) and ruff 0.16.5 (2026-08-27), all MIT, at the exact versions the factory's open-source licence Agent 1.16.0 names. Workflow actions actions/checkout v7.0.1 (GitHub release 2026-07-20, MIT) and docker/setup-buildx-action v4.3.0 (2026-08-19), docker/login-action v4.6.0 (2026-07-29) and docker/build-push-action v7.3.0 (2026-07-01), all Apache-2.0; each tag is a lightweight tag on the pinned commit (3d3c42e5aac5ba805825da76410c181273ba90b1, 37fe631027851001ddb9b187196cc803df7f5f0e, dbcb813823bdd20940b903addbd779551569679f, 53b7df96c91f9c12dcc8a07bcb9ccacbed38856a), and the workflows come unchanged from the factory's managed files (docs/evidence/2026-09-27-dependabot-admission.md in factory source). Every release is at least 30 days old on 2026-09-27 and OSV queries on 2026-09-27 returned no advisory for any of these versions. Compatibility: the three Python locks were regenerated with scripts/compile-dependency-locks.sh and change only these packages; the backend and frontend development images were rebuilt from the new locks and scripts/quality-gate.sh all passed (backend lint, strict types, unit and PostgreSQL integration tests, database validation, OpenAPI contract, frontend lint, build, tests and generated types, governance drift and Helm render).",
@@ -150,6 +151,77 @@
         "CVE-2026-77696",
         "CVE-2026-84782",
         "CVE-2026-84784"
+      ]
+    },
+    {
+      "artifact": "backend-pyjwt-security-update",
+      "version": "2.15.0",
+      "released_on": "2026-09-23",
+      "release_evidence": [
+        "https://pypi.org/pypi/PyJWT/2.15.0/json",
+        "https://github.com/advisories/GHSA-ffc3-869f-jxw9",
+        "https://github.com/advisories/GHSA-9j54-fg26-wv3r",
+        "https://github.com/advisories/GHSA-9v7f-9g4p-ffgj",
+        "https://github.com/advisories/GHSA-p4g4-x82p-q773",
+        "https://github.com/advisories/GHSA-r6x4-923q-g947",
+        "https://github.com/advisories/GHSA-w2cx-738m-mc7w",
+        "https://github.com/advisories/GHSA-2gx3-rcp4-g85q",
+        "https://github.com/advisories/GHSA-42vr-xj54-vc7v",
+        "https://github.com/advisories/GHSA-8wjv-2p76-3863",
+        "https://github.com/advisories/GHSA-hxm8-2xgr-2p9m",
+        "https://github.com/advisories/GHSA-jwrc-g2q2-pq5p",
+        "https://github.com/advisories/GHSA-w6j9-cwv2-h6wq",
+        "https://github.com/advisories/GHSA-gvp8-978c-rx2q"
+      ],
+      "reason": "security",
+      "advisory_ids": [
+        "CVE-2026-102268",
+        "CVE-2026-102266",
+        "CVE-2026-102267",
+        "CVE-2026-102271",
+        "CVE-2026-102272",
+        "CVE-2026-102273",
+        "CVE-2026-101917",
+        "CVE-2026-101918",
+        "CVE-2026-102265",
+        "CVE-2026-102269",
+        "CVE-2026-102270",
+        "CVE-2026-102274",
+        "CVE-2026-103001"
+      ]
+    },
+    {
+      "artifact": "frontend-brace-expansion-2-security-update",
+      "version": "2.1.7",
+      "released_on": "2026-09-14",
+      "release_evidence": [
+        "https://registry.npmjs.org/brace-expansion/2.1.7",
+        "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+        "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+        "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"
+      ],
+      "reason": "security",
+      "advisory_ids": [
+        "CVE-2026-102276",
+        "CVE-2026-102278",
+        "CVE-2026-102277"
+      ]
+    },
+    {
+      "artifact": "frontend-brace-expansion-5-security-update",
+      "version": "5.0.12",
+      "released_on": "2026-09-14",
+      "release_evidence": [
+        "https://registry.npmjs.org/brace-expansion/5.0.12",
+        "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+        "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+        "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr"
+      ],
+      "reason": "security",
+      "advisory_ids": [
+        "CVE-2026-102276",
+        "CVE-2026-102278",
+        "CVE-2026-102277"
       ]
     }
   ]

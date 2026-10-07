@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:kt:agent-platform:agent-migration-catalog:1.4",
+  "$id": "urn:kt:agent-platform:agent-migration-catalog:1.5",
   "title": "Yönetişim Ajanı Teslim Kataloğu",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "kind", "status", "as_of", "source_lineage", "projection", "roles"],
   "properties": {
-    "schema_version": {"const": "1.4"},
+    "schema_version": {"const": "1.5"},
     "kind": {"const": "GovernanceAgentCatalog"},
     "status": {"const": "implementation"},
-    "as_of": {"const": "2026-08-31"},
+    "as_of": {"const": "2026-10-05"},
     "source_lineage": {
       "type": "object",
       "additionalProperties": false,
@@ -39,8 +39,8 @@
     },
     "roles": {
       "type": "array",
-      "minItems": 14,
-      "maxItems": 14,
+      "minItems": 15,
+      "maxItems": 15,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/role"}
     }

@@ -28,7 +28,7 @@ def decode_encryption_key(value: str) -> bytes:
 
     try:
         key = base64.b64decode(value.strip(), validate=True)
-    except binascii.Error, ValueError:
+    except (binascii.Error, ValueError):
         key = b""
     if len(key) != KEY_BYTES:
         raise ValueError("the encryption key must be base64 of exactly 32 bytes")
@@ -61,5 +61,5 @@ class SecretCipher:
             if version != _VERSION or len(nonce) != _NONCE_BYTES or len(sealed) < _TAG_BYTES:
                 raise ValueError
             return self._aead.decrypt(nonce, sealed, context.encode("utf-8")).decode("utf-8")
-        except InvalidTag, ValueError, binascii.Error:
+        except (InvalidTag, ValueError, binascii.Error):
             raise SecretUnreadable() from None

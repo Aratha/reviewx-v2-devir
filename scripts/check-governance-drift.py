@@ -71,6 +71,7 @@ AGENT_IDS = {
     "otomatik-duzeltme",
     "test-otomasyonu",
     "uygulama-guvenligi",
+    "yuk-testi",
 }
 CLIENT_PATHS = {
     "claude-code": ".claude/agents/{agent_id}.md",

@@ -40,7 +40,7 @@
       "artifact_id": "rule:20-backend-yapisi",
       "authority": "recommended",
       "kind": "rule",
-      "sha256": "18e506a63d42527caf97ba4c78637c6c9699eba69018a8bc36dd1d6e3fe35669",
+      "sha256": "38f255b41d170c2178872f25fc36dd4a449152fbc036146c4d02e424513b8268",
       "version": "0.4.0"
     },
     {
@@ -359,12 +359,12 @@
       "version": "0.4.0"
     }
   ],
-  "authority_generation": 47,
+  "authority_generation": 50,
   "backend_profile": "python-fastapi",
   "blueprint_id": "kt-vibecoding",
   "blueprint_version": "0.4.0",
   "format": 1,
-  "governance_digest": "3550e2cb4786f292cdab4bc746e23d5768a94f207b31235ddcc6b04d8066af13",
+  "governance_digest": "535e8c9c7db5a01fa854e71e79838859ded02d4a52a41ccc61f514177922d2f4",
   "governance_version": "0.4.0",
   "locales": [
     "tr"

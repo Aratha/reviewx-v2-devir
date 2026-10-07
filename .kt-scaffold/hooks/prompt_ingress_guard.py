@@ -89,9 +89,9 @@ RECORD_WARNING = "GOVERNANCE_RECORD_UNAVAILABLE: {code}; prompt karari degismedi
 INTERPRETER_MESSAGE = (
     "Mesajiniz (prompt) gonderilmedi, cunku gonderimden once yapilan veri guvenligi denetimi "
     "tamamlanamadi (python-runtime-mismatch): projenin Python ortami (.venv klasoru) yok ya da "
-    "surumu teknoloji profilindeki Python surumuyle uyusmuyor. .venv hazir olana kadar her "
-    "mesaj durdurulur. Terminalde proje klasorunde su komutu calistirip yeniden deneyin: "
-    "{command}"
+    "Python surumu teknoloji profilinin kabul ettigi en eski surumden eski. .venv hazir olana "
+    "kadar her mesaj durdurulur. Terminalde proje klasorunde su komutu calistirip yeniden "
+    "deneyin: {command}"
 )
 EXPECTED_PRIVATE_KEY_BEGIN_PATTERN = (
     r"-----BEGIN (?:[A-Z0-9]{1,24}(?: [A-Z0-9]{1,24}){0,3} )?PRIVATE KEY-----"
@@ -1353,7 +1353,7 @@ def _run(client_id: str) -> tuple[dict[str, object], dict[str, object] | None]:
 
 
 def _interpreter_status() -> str | None:
-    """Move to the project's profile Python; a remaining mismatch stops the prompt."""
+    """Move to an accepted Python once; an interpreter below the profile stops the prompt."""
     script = Path(__file__)
     try:
         status: str | None = _records()["ensure_profile_interpreter"](
@@ -1365,12 +1365,12 @@ def _interpreter_status() -> str | None:
 
 
 def _repair_command() -> str:
-    """The distributed `.venv` preparation command pinned to the profile's Python."""
+    """The distributed `.venv` preparation command on a Python the profile accepts."""
     try:
         records = _records()
-        required = records["profile_python_version"](Path(__file__).resolve().parents[2])
-        if isinstance(required, str):
-            return str(records["repair_command"](required))
+        minimum = records["profile_python_minimum"](Path(__file__).resolve().parents[2])
+        if isinstance(minimum, str):
+            return str(records["repair_command"](minimum))
     except Exception:
         pass
     # Without a readable profile the script itself reports which Python it needs.

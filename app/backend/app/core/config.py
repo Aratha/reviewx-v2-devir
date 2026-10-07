@@ -320,7 +320,7 @@ class Settings(BaseSettings):
         return suffix
 
     @model_validator(mode="after")
-    def require_complete_directory_when_enabled(self) -> Settings:
+    def require_complete_directory_when_enabled(self) -> "Settings":
         if not self.directory_enabled:
             return self
         required = {
@@ -381,7 +381,7 @@ class Settings(BaseSettings):
         return self.jwt_signing_key.public_key()
 
     @model_validator(mode="after")
-    def require_key_matching_the_algorithm(self) -> Settings:
+    def require_key_matching_the_algorithm(self) -> "Settings":
         key = self.jwt_signing_key
         if self.jwt_algorithm == "ES256":
             if not isinstance(key, ec.EllipticCurvePrivateKey) or key.curve.name != "secp256r1":
@@ -394,7 +394,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def reject_hosted_llm_services(self) -> Settings:
+    def reject_hosted_llm_services(self) -> "Settings":
         configured = [name for name in _HOSTED_LLM_SERVICE_VARIABLES if os.environ.get(name)]
         configured += [
             name
@@ -409,7 +409,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def reject_untyped_telemetry_configuration(self) -> Settings:
+    def reject_untyped_telemetry_configuration(self) -> "Settings":
         # The OpenTelemetry SDK would otherwise read exporter headers, endpoints, certificates and
         # resource attributes from OTEL_* process variables behind the typed settings.
         configured = sorted(name for name in os.environ if name.upper().startswith("OTEL_"))
@@ -438,7 +438,7 @@ def _is_ip_address(value: str) -> bool:
 def _load_signing_key(value: SecretStr) -> JwtSigningKey:
     try:
         key = load_pem_private_key(value.get_secret_value().encode("utf-8"), password=None)
-    except TypeError, ValueError, UnsupportedAlgorithm:
+    except (TypeError, ValueError, UnsupportedAlgorithm):
         raise ValueError("jwt_private_key must be an unencrypted PEM private key") from None
     if isinstance(key, (ec.EllipticCurvePrivateKey, rsa.RSAPrivateKey)):
         return key

@@ -11,7 +11,7 @@ the same entries here instead of asking the user to press Trust.
 This is the only implementation. The factory package loads this file; the HTTP creation flow asks
 the client to run it once, right after it has written the canonical hook file:
 
-    python3.14 .kt-scaffold/hooks/codex_hook_trust.py onayla --ozet <sha256 of .codex/hooks.json>
+    python3 .kt-scaffold/hooks/codex_hook_trust.py onayla --ozet <sha256 of .codex/hooks.json>
 
 It writes trust only for the hooks of the project it belongs to, only when the hook file is
 byte-identical to the canonical digest it is given, and only Codex's own trust record. It never

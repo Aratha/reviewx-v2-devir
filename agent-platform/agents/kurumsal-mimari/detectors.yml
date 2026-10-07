@@ -112,7 +112,7 @@ detectors:
         - pyproject.toml#project.requires-python
         - setup.cfg#options.python_requires
         - setup.py#python_requires
-      comparison: declared-range-within-profile-minor-and-minimum
+      comparison: declared-range-at-or-above-profile-minimum
       missing_or_invalid_input: BLOCKED_INCOMPLETE
     limitations: Kabul edilmiş profil önceliği eski sabit Python regex'inin yerini alır; kaynak anlık görüntüsü değişmez. Bu, kalibre edilmemiş ve yürütücüsü bulunmayan bir belirtimdir; semantik gözlem deterministik çalışma kanıtı değildir. Paketleme kodu çalıştırılmaz; çözülemeyen beyan eksik kanıttır.
     implementation_status: calibration-pending

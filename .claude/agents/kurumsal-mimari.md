@@ -63,13 +63,15 @@ listesini, yasaklı listeyi veya kayıtlı hedefi kendiliğinden değiştiremez.
 - `ARCH-002`: Python 2 biçemindeki `print` ifadesi yüksek önem dereceli sürüm uyumsuzluğu adayıdır.
 - `ARCH-004`: `urllib2` kullanımı düşük önem dereceli Python 2 uyumsuzluğu adayıdır.
 - `ARCH-006`: aynı Git adayındaki profil ile `pyproject.toml` içindeki `project.requires-python`
-  veya `setup.cfg`/`setup.py` içindeki `python_requires` beyanını karşılaştır. Kabul edilen sürüm
-  aralığı profilin Python minor serisi ve alt sınırı içinde kalmalıdır. Profil 3.14 ve alt sınır
-  3.14.7 ise `>=3.14.7,<3.15` uyumludur; `>=3.13,<3.14`, alt sınırı 3.14.7 altında kalan
-  `>=3.14,<3.15` ve üst sınırı olmayan `>=3.14.7` uyumsuz adaydır.
-  Hedef seri değiştiğinde örneğin sürümünü değil güncel profil değerini kullan. Kaynakta korunan
-  3.12 regex'ini etkin algılayıcı olarak uygulama; yeni belirtimin yürütücüsü yoktur, Agentic
-  kaynak incelemesi deterministik algılayıcı koşumu değildir.
+  veya `setup.cfg`/`setup.py` içindeki `python_requires` beyanını karşılaştır. Profil
+  `backend.minimum_language_version` ile kabul edilen en eski Python serisini adlandırır; o seri ve
+  sonraki bütün sürümler kabul edilir, yama düzeyinde güvenlik alt sınırı ve üst sınır yoktur.
+  Beyan edilen aralık bu serinin altına inmemelidir. Alt seri 3.12 ise `>=3.12`, `>=3.13` ve
+  `>=3.12,<3.15` uyumludur; `>=3.11`, `<3.13` ve `>=3.10,<3.13` gibi 3.12'den eski bir sürümü
+  kapsayan beyan uyumsuz adaydır. Yalnız bilinen bir Python sürümündeki güvenlik açığı nedeniyle
+  bulgu üretme. Alt seri değiştiğinde örneğin sürümünü değil güncel profil değerini kullan.
+  Kaynakta korunan 3.12 regex'ini etkin algılayıcı olarak uygulama; yeni belirtimin yürütücüsü
+  yoktur, Agentic kaynak incelemesi deterministik algılayıcı koşumu değildir.
 - Profil, çözüm kaydı veya paketleme beyanı eksik/geçersizse; alanlar çelişiyorsa ya da aynı
   adaydan okunamıyorsa `BLOCKED_INCOMPLETE` sınırını koru. Paketleme kodunu çalıştırma, eski
   sürüme geri dönme veya eksik girdiyi uyumlu sayma. Kaynak hedefiyle tek fark bu kabul edilmiş

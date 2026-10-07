@@ -4,23 +4,25 @@ Bu profil sağlayıcıdan bağımsız FastAPI platform temel çizgisidir. Kirac�
 `/auth/me`, RBAC koruması, uygulama düzeyi `super_admin`, PostgreSQL hazır olma, Alembic ve OpenAPI
 dışa aktarımı içerir. Bilinçli olarak iş varlığı içermez.
 
-İlk CLI, yerel MCP veya çevrimdışı `paketi-uygula` oluşturması, iskelet kökünde profile uygun Python
-3.14 ile `.venv` ve pip hazırlar. HTTP MCP akışında bu hazırlığı yerel kodlama istemcisi, prompt
-kancası ayarları gelmeden önce yapar; `.venv` makbuzu olmadan kurulum tamamlanmaz. Makinede
-güvenilen, en az 3.14.7 olan Python 3.14 yoksa açık hata bildirilir; Python indirilmez veya sistem
-politikası değiştirilmez. Uygulama bağımlılıkları otomatik kurulmaz ve çağıran terminal otomatik
-etkinleştirilmez.
+İlk CLI, yerel MCP veya çevrimdışı `paketi-uygula` oluşturması, iskelet kökünde Python 3.12 veya
+daha yenisiyle `.venv` ve pip hazırlar. Profil 3.12 ve sonraki bütün Python sürümlerini kabul eder;
+yama düzeyinde güvenlik alt sınırı ve üst sınır yoktur. HTTP MCP akışında bu hazırlığı yerel
+kodlama istemcisi, prompt kancası ayarları gelmeden önce yapar; `.venv` makbuzu olmadan kurulum
+tamamlanmaz. Makinede güvenilen Python 3.12 veya daha yenisi yoksa açık hata bildirilir; Python
+indirilmez veya sistem politikası değiştirilmez. Uygulama bağımlılıkları otomatik kurulmaz ve
+çağıran terminal otomatik etkinleştirilmez.
 
 Hazırlığın tek komutu iskelet kökünde çalışır; `.venv` eksikken prompt kancasının durdurduğu
 oturumu da bu komut açar:
 
 ```sh
-python3.14 .kt-scaffold/hooks/python_environment.py hazirla
+python3 .kt-scaffold/hooks/python_environment.py hazirla
 ```
 
-Windows'ta `py -3.14 .kt-scaffold/hooks/python_environment.py hazirla` kullanın. Komut yalnız eksik
-ortamı oluşturur; var olan ortamı önce doğrular, üzerine yazmaz ve bozuk ya da kısmi ortamı silmez.
-`dogrula` yalnız doğrular.
+Windows'ta `py -3 .kt-scaffold/hooks/python_environment.py hazirla` kullanın; komutu çalıştıran
+Python 3.12 veya daha yenisi olmalıdır. Komut yalnız eksik ortamı oluşturur; var olan ortamı önce
+doğrular, üzerine yazmaz ve bozuk ya da kısmi ortamı silmez. Var olan `.venv` başka bir Python ile
+hazırlanmışsa komut o sürümü bildirir; komutu o Python ile çalıştırın. `dogrula` yalnız doğrular.
 
 Ortam hazırlığı başarılıysa, POSIX terminalinde iskelet kökünden:
 
@@ -46,7 +48,7 @@ Windows PowerShell etkinleştirme yolu `.\.venv\Scripts\Activate.ps1`, komut ist
 gevşetmeyin; doğrudan `.venv\Scripts\python.exe -m pip` gibi ortam yorumlayıcısını kullanın.
 POSIX'te de `.venv/bin/python -m pip` etkinleştirme gerektirmez.
 
-Doğrulama, gerçek yorumlayıcının en az 3.14.7 olan Python 3.14.x sürümünü, nihai `.venv`
+Doğrulama, gerçek yorumlayıcının Python 3.12 veya daha yeni bir sürüm olduğunu, nihai `.venv`
 yolundaki `sys.prefix` değerini, farklı `sys.base_prefix` değerini, `include-system-site-packages=false` ayarını ve pip
 erişimini kapsar. İskelet güncellemesi mevcut ortamı korur; eksik ortam oluşturmaz. `.venv` yerel çalışma zamanı çıktısıdır, güvenlik sandbox'ı değildir.
 

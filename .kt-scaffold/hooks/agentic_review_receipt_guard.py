@@ -264,7 +264,7 @@ AUTHORITY_MANAGED_ASSET_RELATIVE_PATHS = (
     *(
         f"agents/{agent}/{filename}"
         for agent in sorted(
-            {item.removeprefix("agent:") for item in AGENTS} | {"otomatik-duzeltme"}
+            {item.removeprefix("agent:") for item in AGENTS} | {"otomatik-duzeltme", "yuk-testi"}
         )
         for filename in ("agent.yml", "detectors.yml", "instructions.md", "policy.yml")
     ),

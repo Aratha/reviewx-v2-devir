@@ -283,7 +283,7 @@ async def _api_v1_chat_call(
         raw = await _bounded_body(response)
     try:
         body: Any = json.loads(raw)
-    except json.JSONDecodeError, UnicodeDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         raise _Failure(LlmCallOutcome.INVALID_RESPONSE) from None
     text = _text_from_body(body, observed)
     await progress.update(observed.completion_tokens, len(text))
@@ -318,7 +318,7 @@ class HttpLlmChat:
         self._resolver = resolver
 
     @asynccontextmanager
-    async def open_run(self) -> AsyncIterator[_Run]:
+    async def open_run(self) -> AsyncIterator["_Run"]:
         transport = PolicyTransport(
             ssl_context=tls_context(self._ca_bundle),
             max_connections=self._run_limit,
@@ -453,7 +453,7 @@ class _Run:
         self._run_slots = asyncio.Semaphore(chat._run_limit)
 
     @asynccontextmanager
-    async def slot(self) -> AsyncIterator[_Slot]:
+    async def slot(self) -> AsyncIterator["_Slot"]:
         async with self._run_slots, self._chat._process_slots:
             yield _Slot(self._chat, self._client)
 

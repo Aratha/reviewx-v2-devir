@@ -6,10 +6,11 @@ right after the canonical files are published, and the prompt gate names its `ha
 the one recovery step. The factory package loads the same file through
 ``kt_scaffold.python_environment``.
 
-Usage from the project root, on the technology profile's Python:
+Usage from the project root, on any Python at or above the technology profile's oldest accepted
+series (3.12 today; later series are accepted too, with no patch floor):
 
-    python3.14 .kt-scaffold/hooks/python_environment.py hazirla
-    python3.14 .kt-scaffold/hooks/python_environment.py dogrula
+    python3 .kt-scaffold/hooks/python_environment.py hazirla
+    python3 .kt-scaffold/hooks/python_environment.py dogrula
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 # A host python3 may be older than the profile; keep 3.9 syntax so a wrong interpreter can still
-# report which one to use. Everything past the version check runs on the profile's Python.
+# report which one to use. Everything past the version check runs on an accepted Python.
 
 _HOST_PROBE = """import json, pathlib, sys, sysconfig, venv
 suffix = "t" if sysconfig.get_config_var("Py_GIL_DISABLED") else ""
@@ -39,7 +40,7 @@ print(json.dumps({"version": ".".join(map(str, sys.version_info[:3])),
                   "venv_launcher": str(launcher)}))
 """
 
-# On Python 3.14 -S deliberately leaves sys.prefix at the base interpreter.
+# From Python 3.14, -S deliberately leaves sys.prefix at the base interpreter.
 # Run the trusted stdlib's prefix discovery while disabling every site directory
 # and startup hook. Existing .pth, sitecustomize, and pip code must never execute.
 _ENVIRONMENT_PROBE = """import site, sys
@@ -64,7 +65,7 @@ print(json.dumps({"version": ".".join(map(str, sys.version_info[:3])),
 PUBLIC_RESULT_FIELDS = (
     "status",
     "path",
-    "required_version",
+    "minimum_version",
     "observed_version",
     "isolated",
     "prefix_matches_target",
@@ -101,34 +102,25 @@ def public_result(result: dict[str, object]) -> dict[str, object]:
     return {name: result[name] for name in PUBLIC_RESULT_FIELDS if name in result}
 
 
-def repair_command(required: str) -> str:
-    """The one command that prepares `.venv` from the project root on the profile's Python."""
+def repair_command(minimum: str) -> str:
+    """The one command that prepares `.venv` from the project root on an accepted Python."""
 
-    return str(_records()["repair_command"](required))
-
-
-def required_version(root: Path) -> str | None:
-    """The `major.minor` Python version fixed by the project's technology profile."""
-
-    version: str | None = _records()["profile_python_version"](root)
-    return version
+    return str(_records()["repair_command"](minimum))
 
 
 def minimum_version(root: Path) -> str | None:
-    """The lowest `major.minor.micro` Python the project's technology profile admits."""
+    """The oldest `major.minor` Python series the project's technology profile accepts."""
 
     version: str | None = _records()["profile_python_minimum"](root)
     return version
 
 
-def meets_minimum(version: str, minimum: str | None) -> bool:
-    """Whether a probed `major.minor.micro` is at or above the profile's security floor."""
+def meets_minimum(version: str, minimum: str) -> bool:
+    """Whether a probed `major.minor.micro` is in the profile's series or any later one."""
 
-    if minimum is None:
-        return True
-    return tuple(int(part) for part in version.split(".")) >= tuple(
-        int(part) for part in minimum.split(".")
-    )
+    major, minor, _micro = (int(part) for part in version.split("."))
+    series: bool = _records()["python_meets_minimum"]((major, minor), minimum)
+    return series
 
 
 def _run_python(
@@ -203,8 +195,14 @@ def _read_config(environment: Path, executable: Path, version: str) -> None:
     if config.get("include-system-site-packages") != "false":
         raise _EnvironmentError("Mevcut .venv sistem site-packages erişimini kapatmalıdır.")
     if config.get("version") != version:
+        recorded = _version_text(config.get("version"))
         raise _EnvironmentError(
-            "Mevcut .venv Python sürümü kurulu güvenilir yorumlayıcıyla uyuşmuyor."
+            "Mevcut .venv Python sürümü bu komutu çalıştıran Python ile uyuşmuyor"
+            + (
+                f"; .venv Python {recorded} ile hazırlanmış, komutu o Python ile çalıştırın."
+                if recorded is not None
+                else "."
+            )
         )
     if not config.get("command", "").endswith(" " + str(environment)):
         raise _EnvironmentError("Mevcut .venv başka bir hedefte oluşturulmuş veya kaynağı eksik.")
@@ -320,7 +318,7 @@ def _result(*, create: bool, root: Path) -> dict[str, object]:
     result: dict[str, object] = {
         "status": "failed",
         "path": ".venv",
-        "required_version": None,
+        "minimum_version": None,
         "observed_version": None,
         "isolated": False,
         "prefix_matches_target": False,
@@ -330,24 +328,18 @@ def _result(*, create: bool, root: Path) -> dict[str, object]:
     owned_identity: tuple[int, int] | None = None
     try:
         root = _root_directory(root)
-        required = required_version(root)
-        if required is None:
-            raise _EnvironmentError("Proje teknoloji profilinde Python sürümü okunamadı.")
-        result["required_version"] = required
+        minimum = minimum_version(root)
+        if minimum is None:
+            raise _EnvironmentError("Proje teknoloji profilinde Python alt sürümü okunamadı.")
+        result["minimum_version"] = minimum
         executable, host = _trusted_python(root)
         version = _version_text(host.get("version"))
         result["observed_version"] = version
-        if version is None or not version.startswith(required + "."):
+        if version is None or not meets_minimum(version, minimum):
             raise _EnvironmentError(
-                f"Kurulu Python sürümü {required}.x koşulunu sağlamıyor; "
-                f"proje kökünde çalıştırın: {repair_command(required)}"
-            )
-        minimum = minimum_version(root)
-        if not meets_minimum(version, minimum):
-            raise _EnvironmentError(
-                f"Kurulu Python {version}, projenin istediği en az Python {minimum} sürümünden "
-                f"eski; güvenlik düzeltmeleri için kurumsal uygulama kataloğundan Python "
-                f"{minimum} veya daha yenisini kurun."
+                f"Kurulu Python sürümü Python {minimum} veya daha yenisi koşulunu sağlamıyor; "
+                f"kurumsal uygulama kataloğundaki Python ile proje kökünde çalıştırın: "
+                f"{repair_command(minimum)}"
             )
         environment = root / ".venv"
         if not environment.exists() and not _is_link(environment) and create:
@@ -397,17 +389,18 @@ def main(arguments: list[str] | None = None) -> int:
         print("usage: python_environment.py hazirla|dogrula", file=sys.stderr)
         return 2
     root = Path(__file__).resolve(strict=True).parents[2]
-    required = required_version(root)
-    running = f"{sys.version_info.major}.{sys.version_info.minor}"
-    if required is not None and running != required:
+    minimum = minimum_version(root)
+    if minimum is not None and not _records()["python_meets_minimum"](
+        (sys.version_info.major, sys.version_info.minor), minimum
+    ):
         result: dict[str, object] = {
             "status": "failed",
             "path": ".venv",
-            "required_version": required,
+            "minimum_version": minimum,
             "observed_version": ".".join(map(str, sys.version_info[:3])),
             "error": (
-                f"Bu komut Python {required} ile çalışmalıdır; "
-                f"proje kökünde çalıştırın: {repair_command(required)}"
+                f"Bu komut Python {minimum} veya daha yenisiyle çalışmalıdır; "
+                f"proje kökünde çalıştırın: {repair_command(minimum)}"
             ),
         }
     else:

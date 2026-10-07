@@ -20,7 +20,7 @@ application_modes:
           - no_separate_frontend_required
       approval: accepted-prd-must-declare-this-mode
     desktop:
-      language: python-3.14
+      language: python
       framework: tkinter
       boundary: single-local-python-application
       runtime_dependencies: standard-library-only
@@ -64,8 +64,8 @@ frontend:
   package_manager: npm-with-committed-lockfile
 
 backend:
-  language: python-3.14
-  minimum_language_version: "3.14.7"
+  language: python
+  minimum_language_version: "3.12"
   framework: fastapi
   framework_version: "0.141.1"
   validation: pydantic-2

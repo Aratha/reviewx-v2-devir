@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:kt:agent-platform:detector-pack:1.4",
+  "$id": "urn:kt:agent-platform:detector-pack:1.5",
   "title": "Kanonik Algılayıcı Belirtim Paketi",
   "type": "object",
   "additionalProperties": false,
@@ -22,7 +22,8 @@
         "1.1",
         "1.2",
         "1.3",
-        "1.4"
+        "1.4",
+        "1.5"
       ]
     },
     "kind": {
@@ -172,31 +173,28 @@
     {
       "if": {
         "properties": {
-          "detectors": {
-            "contains": {
-              "properties": {
-                "implementation": {
-                  "properties": {
-                    "resolution_ref": {
-                      "const": "resolution:sec009-loopback-exemption"
-                    }
-                  },
-                  "required": [
-                    "resolution_ref"
-                  ]
+          "runtime_profile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "not": {
+                  "const": "runtime-profile:test-otomasyonu-yalitilmis"
                 }
-              },
-              "required": [
-                "implementation"
-              ]
-            }
+              }
+            },
+            "required": [
+              "id"
+            ]
           }
-        }
+        },
+        "required": [
+          "runtime_profile"
+        ]
       },
       "then": {
         "properties": {
           "schema_version": {
-            "const": "1.4"
+            "const": "1.5"
           }
         }
       },
@@ -208,12 +206,12 @@
                 "properties": {
                   "implementation": {
                     "properties": {
-                      "kind": {
-                        "const": "rsa-key-size-minimum"
+                      "resolution_ref": {
+                        "const": "resolution:sec009-loopback-exemption"
                       }
                     },
                     "required": [
-                      "kind"
+                      "resolution_ref"
                     ]
                   }
                 },
@@ -227,7 +225,7 @@
         "then": {
           "properties": {
             "schema_version": {
-              "const": "1.3"
+              "const": "1.4"
             }
           }
         },
@@ -240,7 +238,7 @@
                     "implementation": {
                       "properties": {
                         "kind": {
-                          "const": "python-profile-compatibility"
+                          "const": "rsa-key-size-minimum"
                         }
                       },
                       "required": [
@@ -258,14 +256,46 @@
           "then": {
             "properties": {
               "schema_version": {
-                "const": "1.2"
+                "const": "1.3"
               }
             }
           },
           "else": {
-            "properties": {
-              "schema_version": {
-                "const": "1.1"
+            "if": {
+              "properties": {
+                "detectors": {
+                  "contains": {
+                    "properties": {
+                      "implementation": {
+                        "properties": {
+                          "kind": {
+                            "const": "python-profile-compatibility"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "implementation"
+                    ]
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "schema_version": {
+                  "const": "1.2"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "schema_version": {
+                  "const": "1.1"
+                }
               }
             }
           }
@@ -300,7 +330,7 @@
     },
     "sourceItemRef": {
       "type": "string",
-      "pattern": "^governance-source:desktop-agents/[a-z][a-z0-9]*(?:-[a-z0-9]+)*/(?:agent\\.md|policy\\.yaml|aggregation_policy\\.yaml|allowlist\\.yaml)#[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+      "pattern": "^governance-source:desktop-agents/[a-z][a-z0-9]*(?:-[a-z0-9]+)*/(?:agent\\.md|policy\\.yaml|aggregation_policy\\.yaml|allowlist\\.yaml|detectors\\.yaml)#[A-Za-z0-9][A-Za-z0-9._:/-]*$"
     },
     "controlRef": {
       "type": "string",
@@ -404,7 +434,7 @@
           ]
         },
         "comparison": {
-          "const": "declared-range-within-profile-minor-and-minimum"
+          "const": "declared-range-at-or-above-profile-minimum"
         },
         "missing_or_invalid_input": {
           "const": "BLOCKED_INCOMPLETE"
@@ -739,7 +769,8 @@
       ],
       "properties": {
         "id": {
-          "const": "runtime-profile:test-otomasyonu-yalitilmis"
+          "type": "string",
+          "pattern": "^runtime-profile:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
         },
         "source_refs": {
           "type": "array",
@@ -758,7 +789,7 @@
         "test_timeout_seconds": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 900
+          "maximum": 1800
         },
         "result_timeout_seconds": {
           "type": "integer",

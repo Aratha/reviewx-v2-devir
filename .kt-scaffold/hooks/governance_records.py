@@ -700,27 +700,12 @@ def published_reviews(
     return marks
 
 
-def profile_python_version(project_root: Path) -> str | None:
-    profile = project_root / "technology-profile.yml"
-    try:
-        if profile.is_symlink() or not profile.is_file():
-            return None
-        text = profile.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return None
-    in_backend = False
-    for line in text.splitlines():
-        if line and not line[0].isspace():
-            in_backend = line.rstrip() == "backend:"
-            continue
-        match = re.fullmatch(r"\s+language:\s*python-(\d+\.\d+)\s*", line)
-        if in_backend and match:
-            return match.group(1)
-    return None
-
-
 def profile_python_minimum(project_root: Path) -> str | None:
-    """The lowest `major.minor.micro` Python the technology profile admits, if it names one."""
+    """The oldest `major.minor` Python series the technology profile accepts.
+
+    Every later release, including a later series, is accepted; the profile names no patch floor
+    and no upper bound.
+    """
     profile = project_root / "technology-profile.yml"
     try:
         if profile.is_symlink() or not profile.is_file():
@@ -733,21 +718,28 @@ def profile_python_minimum(project_root: Path) -> str | None:
         if line and not line[0].isspace():
             in_backend = line.rstrip() == "backend:"
             continue
-        match = re.fullmatch(
-            r"\s+minimum_language_version:\s*\"(\d+\.\d+\.\d+)\"\s*", line
-        )
+        match = re.fullmatch(r"\s+minimum_language_version:\s*\"(\d+\.\d+)\"\s*", line)
         if in_backend and match:
             return match.group(1)
     return None
+
+
+def python_meets_minimum(series: tuple[int, int], minimum: str) -> bool:
+    """Whether an interpreter's `(major, minor)` is at or above the profile's oldest series."""
+    major, minor = (int(part) for part in minimum.split("."))
+    return series >= (major, minor)
 
 
 PYTHON_ENVIRONMENT_SCRIPT = ".kt-scaffold/hooks/python_environment.py"
 
 
-def repair_command(required: str) -> str:
-    """The one project-root command that prepares `.venv` on the profile's Python."""
+def repair_command(minimum: str) -> str:
+    """The one project-root command that prepares `.venv` on an accepted Python."""
     script = PYTHON_ENVIRONMENT_SCRIPT
-    return f"python{required} {script} hazirla (Windows: py -{required} {script} hazirla)"
+    return (
+        f"python3 {script} hazirla (Python {minimum} veya daha yenisi; "
+        f"Windows: py -3 {script} hazirla)"
+    )
 
 
 def venv_interpreter(project_root: Path) -> Path:
@@ -762,20 +754,20 @@ REEXEC_MARKER = "KT_SCAFFOLD_PROFILE_INTERPRETER"
 def ensure_profile_interpreter(
     project_root: Path, script: Path, arguments: list[str]
 ) -> str | None:
-    """Run the entry point on the profile's Python, moving once into the project's ``.venv``.
+    """Run the entry point on an accepted Python, moving once into the project's ``.venv``.
 
-    Returns ``None`` when the running interpreter matches the technology profile. Otherwise it
-    replaces the process with ``.venv`` when that exists, or returns ``python-runtime-mismatch``
-    so a gate can refuse and an observation hook can warn.
+    Returns ``None`` when the running interpreter is at or above the technology profile's oldest
+    accepted series. Otherwise it replaces the process with ``.venv`` when that exists, or
+    returns ``python-runtime-mismatch`` so a gate can refuse and an observation hook can warn.
     """
 
-    expected = profile_python_version(project_root)
-    running = f"{sys.version_info.major}.{sys.version_info.minor}"
-    if expected is not None and running == expected:
+    minimum = profile_python_minimum(project_root)
+    running = (sys.version_info.major, sys.version_info.minor)
+    if minimum is not None and python_meets_minimum(running, minimum):
         return None
     interpreter = venv_interpreter(project_root)
     # A POSIX `.venv` interpreter is normally a link to its base Python; follow it once.
-    if expected is not None and os.environ.get(REEXEC_MARKER) != "1" and interpreter.is_file():
+    if minimum is not None and os.environ.get(REEXEC_MARKER) != "1" and interpreter.is_file():
         environment = {**os.environ, REEXEC_MARKER: "1"}
         os.execve(  # noqa: S606 -- replace this hook with the same script on the profile Python
             str(interpreter), [str(interpreter), str(script), *arguments], environment
@@ -837,22 +829,23 @@ def preflight(project_root: Path, location: GovernanceLocation | None = None) ->
             root_status = "root-not-writable"
     except RecordError as exc:
         root_status = exc.code
-    expected = profile_python_version(project_root)
-    running = f"{sys.version_info.major}.{sys.version_info.minor}"
+    minimum = profile_python_minimum(project_root)
+    series = (sys.version_info.major, sys.version_info.minor)
+    running = f"{series[0]}.{series[1]}"
     interpreter = venv_interpreter(project_root)
     interpreter_status = "ok"
-    if expected is None:
+    if minimum is None:
         interpreter_status = "profile-unavailable"
     elif not interpreter.is_file():
         interpreter_status = "venv-missing"
-    elif running != expected:
+    elif not python_meets_minimum(series, minimum):
         interpreter_status = "python-runtime-mismatch"
     repository = repository_status(project_root)
     return {
         "ok": root_status == "ok" and interpreter_status == "ok" and repository == "ok",
         "root": str(selected.root),
         "root_status": root_status,
-        "profile_python": expected,
+        "profile_python_minimum": minimum,
         "running_python": running,
         "venv_interpreter": str(interpreter),
         "interpreter_status": interpreter_status,

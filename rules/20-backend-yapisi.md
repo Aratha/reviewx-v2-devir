@@ -14,9 +14,11 @@ application_modes:
 # Arka uç yapısı
 
 Arka uç kodunu değiştirmeden önce `technology-profile.yml` ve `.kt-scaffold/answers.yml` dosyalarını
-oku. Tek arka uç yığını `Python 3.14`, `FastAPI`, `Pydantic`, eşzamanlı olmayan `SQLAlchemy`/`asyncpg`,
-`Alembic` ve `pytest` oluşturur. `Node.js`, `NestJS`, `Prisma`, başka bir `Python` web çatısı ve elle
-yazılmış yerel `Python` `HTTP` yığı desteklenmez. Bunları `PRD` veya ajan tercihiyle getirme.
+oku. Tek arka uç yığını `Python` (3.12 veya daha yenisi; profil bu seriden sonraki bütün sürümleri
+kabul eder), `FastAPI`, `Pydantic`, eşzamanlı olmayan `SQLAlchemy`/`asyncpg`, `Alembic` ve `pytest`
+oluşturur. Kod 3.12'de bulunmayan dil veya standart kütüphane özelliği kullanmaz. `Node.js`,
+`NestJS`, `Prisma`, başka bir `Python` web çatısı ve elle yazılmış yerel `Python` `HTTP` yığı
+desteklenmez. Bunları `PRD` veya ajan tercihiyle getirme.
 Bağımlılıklar şu yönü korur:
 
 `api -> application/services -> infrastructure/repositories -> domain`

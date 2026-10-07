@@ -14,7 +14,8 @@ satır numarası atfı ile değiştirmeyin.
 - `technology-profile.yml#profile_id` = `kt-vibecoding-python-web-v2`
 - `.kt-scaffold/answers.yml#application_mode` = `separated-web`
 - `technology-profile.yml#application_modes.default` = `separated-web`
-- `technology-profile.yml#backend.language` = `python-3.14`
+- `technology-profile.yml#backend.language` = `python`
+- `technology-profile.yml#backend.minimum_language_version` = `3.12`
 - `technology-profile.yml#backend.framework` = `fastapi`
 - `technology-profile.yml#backend.framework_version` = `0.141.1`
 - `technology-profile.yml#backend.alternatives` = `forbidden`

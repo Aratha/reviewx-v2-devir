@@ -164,7 +164,7 @@ class FakeLlmServer:
     port: int = 0
     _server: asyncio.Server | None = None
 
-    async def start(self, *, certificate: TestPki | None = None) -> FakeLlmServer:
+    async def start(self, *, certificate: TestPki | None = None) -> "FakeLlmServer":
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         pki = certificate or self.pki
         context.load_cert_chain(pki.certificate_path, pki.key_path)
@@ -204,11 +204,11 @@ class FakeLlmServer:
                 await self.scenario(request, writer)
             finally:
                 self.active -= 1
-        except ConnectionError, asyncio.IncompleteReadError, ssl.SSLError:
+        except (ConnectionError, asyncio.IncompleteReadError, ssl.SSLError):
             pass
         finally:
             writer.close()
             try:
                 await writer.wait_closed()
-            except ConnectionError, ssl.SSLError:
+            except (ConnectionError, ssl.SSLError):
                 pass

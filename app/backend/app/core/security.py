@@ -102,7 +102,7 @@ def verify_password(password: str, password_hash: str | None) -> bool:
 
     try:
         verified = _password_hash.verify(password, password_hash or _unknown_account_hash())
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return False
     return verified and password_hash is not None
 

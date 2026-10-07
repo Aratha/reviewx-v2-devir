@@ -1,9 +1,9 @@
-schema_version: "1.0"
+schema_version: "1.1"
 kind: GovernanceSourceManifest
 metadata:
   id: governance-source-manifest:desktop-agents-v1
-  version: 1.0.0
-  as_of: "2026-08-25"
+  version: 1.1.0
+  as_of: "2026-10-05"
   owner: team:ai-governance
 claim_boundary:
   source_authority: governance-authoritative
@@ -19,6 +19,7 @@ roles:
   - documentation
   - enterprise-architecture
   - information-security
+  - load-test
   - observability
   - oss-license
   - privacy-kvkk
@@ -218,6 +219,54 @@ artifacts:
     implementation_status: not-evaluated
     projection_status: not-evaluated
     runtime_admission: not-admitted
+  - id: governance-source:load-test:instructions
+    role_id: load-test
+    artifact_type: instructions
+    source_locator: governance-source:desktop-agents/load-test/agent.md
+    snapshot_path: governance-sources/desktop-agents/load-test/agent.md
+    snapshot_encoding: raw-utf8
+    sha256: bda99ca07155657cc9ae1ce3a15fb31ff63d9be844cf0688902b31eb46e2999f
+    snapshot_sha256: bda99ca07155657cc9ae1ce3a15fb31ff63d9be844cf0688902b31eb46e2999f
+    source_authority: governance-authoritative
+    implementation_status: not-evaluated
+    projection_status: not-evaluated
+    runtime_admission: not-admitted
+    delivery:
+      delivered_by: team:ai-governance
+      delivered_on: "2026-10-05"
+      delivered_file_name: instructions.md
+  - id: governance-source:load-test:policy
+    role_id: load-test
+    artifact_type: policy
+    source_locator: governance-source:desktop-agents/load-test/policy.yaml
+    snapshot_path: governance-sources/desktop-agents/load-test/policy.yaml
+    snapshot_encoding: raw-utf8
+    sha256: 678ac2343d23a71f17ff3890b8799fa7d22ea9759250b680225116f1a8021b4e
+    snapshot_sha256: 678ac2343d23a71f17ff3890b8799fa7d22ea9759250b680225116f1a8021b4e
+    source_authority: governance-authoritative
+    implementation_status: not-evaluated
+    projection_status: not-evaluated
+    runtime_admission: not-admitted
+    delivery:
+      delivered_by: team:ai-governance
+      delivered_on: "2026-10-05"
+      delivered_file_name: policy.yml
+  - id: governance-source:load-test:detector-pack
+    role_id: load-test
+    artifact_type: detector-pack
+    source_locator: governance-source:desktop-agents/load-test/detectors.yaml
+    snapshot_path: governance-sources/desktop-agents/load-test/detectors.yaml
+    snapshot_encoding: raw-utf8
+    sha256: 0db775fd7ec95c57466fd05cb66b01ed5410e77a2f668483ed77ff610456f7fe
+    snapshot_sha256: 0db775fd7ec95c57466fd05cb66b01ed5410e77a2f668483ed77ff610456f7fe
+    source_authority: governance-authoritative
+    implementation_status: not-evaluated
+    projection_status: not-evaluated
+    runtime_admission: not-admitted
+    delivery:
+      delivered_by: team:ai-governance
+      delivered_on: "2026-10-05"
+      delivered_file_name: detectors.yml
   - id: governance-source:observability:instructions
     role_id: observability
     artifact_type: instructions

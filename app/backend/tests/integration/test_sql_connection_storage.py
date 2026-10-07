@@ -68,7 +68,7 @@ class Replica:
 class _Connection:
     timeout = 0
 
-    def cursor(self) -> _Connection:
+    def cursor(self) -> "_Connection":
         return self
 
     def execute(self, sql: str, *params: Any) -> None:

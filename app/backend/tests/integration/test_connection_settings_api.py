@@ -282,13 +282,13 @@ class _Driver:
     def __init__(self) -> None:
         self.connection_strings: list[str] = []
 
-    def connect(self, connection_string: str, *, timeout: int, autocommit: bool) -> _Driver:
+    def connect(self, connection_string: str, *, timeout: int, autocommit: bool) -> "_Driver":
         self.connection_strings.append(connection_string)
         return self
 
     timeout = 0
 
-    def cursor(self) -> _Driver:
+    def cursor(self) -> "_Driver":
         return self
 
     def execute(self, sql: str, *params: Any) -> None:

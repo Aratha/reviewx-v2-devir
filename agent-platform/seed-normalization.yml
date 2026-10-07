@@ -1,9 +1,9 @@
-schema_version: "1.11"
+schema_version: "1.12"
 kind: GovernanceNormalizationCrosswalk
 metadata:
   id: governance-crosswalk:desktop-agents-v1
-  version: 1.16.0
-  as_of: "2026-09-27"
+  version: 1.18.0
+  as_of: "2026-10-05"
   owner: team:ai-governance
   lifecycle: draft
 claim_boundary:
@@ -1143,6 +1143,351 @@ entries:
       - control:INFOSEC-102
     source_conflict_refs: []
     rationale: Yetkin kaynak öğesi kanonik politika kontrolüne eşlenir; teknik uygulaması açıkça beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/agent.md#instruction/document
+    source_kind: instructions
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - instructions:agent:yuk-testi
+      - control:LOAD-101
+      - control:LOAD-103
+      - control:LOAD-105
+      - control:LOAD-107
+      - control:LOAD-108
+      - control:LOAD-110
+      - control:LOAD-111
+    source_conflict_refs: []
+    rationale: Talimat belgesinin görevleri, sorumlulukları, sınırları, ölçütleri ve hata davranışı doğal Türkçe kanonik talimatlara eksiksiz aktarılır; yürütme ve ağ yetkisi isteyen ifadeler güvenli kapanan yerel sınırlarla korunur.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-101
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-101
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; uygulaması talimat düzeyindedir ve çalışma zamanı kabulü yoktur.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-102
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-102
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; algılayıcı belirtimi yürütücü ve kalibrasyon olmadan beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-103
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; sahip kararıyla talimat düzeyinde uygulanır, belirlenimci denetimi algılayıcı kayıtlarında beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-104
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-104
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; algılayıcı belirtimi yürütücü ve kalibrasyon olmadan beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-105
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-105
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; uygulaması talimat düzeyindedir ve çalışma zamanı kabulü yoktur.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-106
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-106
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; kabul edilmiş yalıtılmış çalıştırıcı olmadığı için uygulaması beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-107
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-107
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; sahip kararıyla talimat düzeyinde uygulanır, belirlenimci denetimi algılayıcı kayıtlarında beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-108
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-108
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; sahip kararıyla talimat düzeyinde uygulanır, belirlenimci denetimi algılayıcı kayıtlarında beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-109
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-109
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; algılayıcı belirtimi yürütücü ve kalibrasyon olmadan beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-110
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: implemented
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-110
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; uygulaması talimat düzeyindedir ve çalışma zamanı kabulü yoktur.
+  - source_ref: governance-source:desktop-agents/load-test/policy.yaml#control/LOAD-111
+    source_kind: control
+    source_authority: governance-authoritative
+    implementation_status: externally-enforced
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-111
+    source_conflict_refs: []
+    rationale: Teslim edilen politika kontrolü aynı kimlik ve ifadeyle kanonik politikaya taşınır; insan onayı ve kabul kapısı depo dışında uygulanır.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/sabit-hedef-adresi
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - detector:yuk-testi/sabit-hedef-adresi
+      - control:LOAD-102
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcı mevcut algılayıcı şemasında ifade edilebildiği için aynı kimlik, uygulama ve sınırlamayla kanonik pakete taşınır; kalibrasyon ve yürütücü beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/izinsiz-yikici-uc-nokta
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-104
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük aracına özgü çağrı kalıbı mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-104 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/dis-yan-etkili-uc-nokta
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - detector:yuk-testi/dis-yan-etkili-uc-nokta
+      - control:LOAD-104
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcı mevcut algılayıcı şemasında ifade edilebildiği için aynı kimlik, uygulama ve sınırlamayla kanonik pakete taşınır; kalibrasyon ve yürütücü beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/yuk-tavani-asimi
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük tavanı türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-103 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/senaryo-uretilemedi
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - detector:yuk-testi/senaryo-uretilemedi
+      - control:LOAD-109
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcı mevcut algılayıcı şemasında ifade edilebildiği için aynı kimlik, uygulama ve sınırlamayla kanonik pakete taşınır; kalibrasyon ve yürütücü beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/yuk-testi-zaman-asimi
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - detector:yuk-testi/yuk-testi-zaman-asimi
+      - control:LOAD-106
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcı mevcut algılayıcı şemasında ifade edilebildiği için aynı kimlik, uygulama ve sınırlamayla kanonik pakete taşınır; kalibrasyon ve yürütücü beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/yuk-testi-tamamlanamadi
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: calibration-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - detector:yuk-testi/yuk-testi-tamamlanamadi
+      - control:LOAD-106
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcı mevcut algılayıcı şemasında ifade edilebildiği için aynı kimlik, uygulama ve sınırlamayla kanonik pakete taşınır; kalibrasyon ve yürütücü beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/uygulama-bileseni-coktu
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-109
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının uygulama bileşeni çökmesi olayı mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-109 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/http-hata-orani
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-107
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük ölçütü türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-107 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/p95-gecikme
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-107
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük ölçütü türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-107 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/p99-gecikme
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-107
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük ölçütü türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-107 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/check-basari-orani
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-107
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük ölçütü türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-107 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#detector/p95-gerileme
+    source_kind: detector
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-108
+    source_conflict_refs: []
+    rationale: Teslim edilen algılayıcının yük ölçütü türü mevcut algılayıcı şemasında ifade edilemez veya araçtan bağımsız değildir; anlamı kanonik LOAD-108 kontrolünde ve talimatlarda korunur, belirlenimci denetimi beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/max-generation-retries
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-106
+      - runtime-profile:yuk-testi-yalitilmis
+    source_conflict_refs: []
+    rationale: Teslim edilen çalıştırıcı ayarı kanonik çalışma profiline ve kontrole eşlenir; kabul edilmiş yalıtılmış çalıştırıcı olmadığı için uygulaması beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/test-timeout-seconds
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-106
+      - runtime-profile:yuk-testi-yalitilmis
+    source_conflict_refs: []
+    rationale: Teslim edilen çalıştırıcı ayarı kanonik çalışma profiline ve kontrole eşlenir; kabul edilmiş yalıtılmış çalıştırıcı olmadığı için uygulaması beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/result-timeout-seconds
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: not-projectable
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-106
+      - runtime-profile:yuk-testi-yalitilmis
+    source_conflict_refs: []
+    rationale: Teslim edilen çalıştırıcı ayarı kanonik çalışma profiline ve kontrole eşlenir; kabul edilmiş yalıtılmış çalıştırıcı olmadığı için uygulaması beklemede kalır.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/max-vus
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen yük tavanı veya profil değeri mevcut algılayıcı şemasında alanı olmadığı için talimat düzeyindeki LOAD-103 kontrolüne aktarılır; çalıştırıcıda uygulanması beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/max-arrival-rate-per-second
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen yük tavanı veya profil değeri mevcut algılayıcı şemasında alanı olmadığı için talimat düzeyindeki LOAD-103 kontrolüne aktarılır; çalıştırıcıda uygulanması beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/max-duration-seconds
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen yük tavanı veya profil değeri mevcut algılayıcı şemasında alanı olmadığı için talimat düzeyindeki LOAD-103 kontrolüne aktarılır; çalıştırıcıda uygulanması beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/load-profile/smoke
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen yük tavanı veya profil değeri mevcut algılayıcı şemasında alanı olmadığı için talimat düzeyindeki LOAD-103 kontrolüne aktarılır; çalıştırıcıda uygulanması beklemededir.
+  - source_ref: governance-source:desktop-agents/load-test/detectors.yaml#setting/runtime/load-profile/load
+    source_kind: runtime-setting
+    source_authority: governance-authoritative
+    implementation_status: implementation-pending
+    projection_status: projected
+    runtime_admission: not-admitted
+    target_refs:
+      - control:LOAD-103
+    source_conflict_refs: []
+    rationale: Teslim edilen yük tavanı veya profil değeri mevcut algılayıcı şemasında alanı olmadığı için talimat düzeyindeki LOAD-103 kontrolüne aktarılır; çalıştırıcıda uygulanması beklemededir.
   - source_ref: governance-source:desktop-agents/observability/agent.md#instruction/document
     source_kind: instructions
     source_authority: governance-authoritative
@@ -2461,7 +2806,7 @@ package_acceptances:
     version: 0.31.0
     license: Apache-2.0
   - name: pyjwt
-    version: 2.13.0
+    version: 2.15.0
     license: MIT
   - name: pwdlib
     version: 0.3.1

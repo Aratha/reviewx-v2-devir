@@ -1,7 +1,7 @@
-schema_version: "1.4"
+schema_version: "1.5"
 kind: GovernanceAgentCatalog
 status: implementation
-as_of: "2026-08-31"
+as_of: "2026-10-05"
 
 source_lineage:
   locator: governance-source:desktop-agents
@@ -12,7 +12,7 @@ source_lineage:
 
 projection:
   status: implemented
-  reason: On dört kaynak rolden on üçü dört istemci için 52 deterministik danışman ajan yapıtı üretir; Denetleyici yalnız deterministik orkestrasyon bileşenidir.
+  reason: On beş kaynak rolden on dördü dört istemci için 56 deterministik danışman ajan yapıtı üretir; Denetleyici yalnız deterministik orkestrasyon bileşenidir.
 
 roles:
   - source_role_id: application-security
@@ -111,6 +111,18 @@ roles:
     status_reason: Tam Türkçe kanonik talimatlar ve kanonik politika paketi seçili istemcide çağrılabilir; algılayıcı kalibrasyonu, yürütücüsü ve çalışma zamanı kabulü yoktur.
     risk_tier: R1
     canonical_path: agents/bilgi-guvenligi
+  - source_role_id: load-test
+    target_agent_id: yuk-testi
+    classification: isolated-execution-agent
+    lifecycle: draft
+    local_discovery_status: available
+    source_authority: governance-authoritative
+    implementation_status: partially-implemented
+    projection_status: implemented
+    runtime_admission: not-admitted
+    status_reason: Yapay zekâ yönetişim ekibinin 2026-10-05 teslimine dayanan isteğe bağlı, yalnız açık çağrılı tasarım ve kanıt inceleme paketi seçili istemcide çağrılabilir; yalıtılmış çalıştırıcı, yük ölçütü denetimi ve çalışma zamanı kabulü yoktur.
+    risk_tier: R1
+    canonical_path: agents/yuk-testi
   - source_role_id: observability
     target_agent_id: gozlemlenebilirlik
     classification: custom-agent

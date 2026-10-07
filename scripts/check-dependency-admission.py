@@ -87,6 +87,34 @@ def requirements_inventory(path: Path, relative: str) -> list[str]:
     return result
 
 
+def python_hash_lock_inventory(path: Path, relative: str) -> list[str]:
+    """Bind each locked wheel's exact version and SHA-256 so a new artifact needs review."""
+    result: list[str] = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if not line.strip() or line.startswith("#"):
+            continue
+        match = re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s\\]+) \\", line)
+        if match is None:
+            fail(f"{relative}:{index}: locked wheel must use an exact == pin")
+        hashed = (
+            re.fullmatch(r"    --hash=sha256:([0-9a-f]{64})", lines[index])
+            if index < len(lines)
+            else None
+        )
+        if hashed is None:
+            fail(f"{relative}:{index}: locked wheel requires exactly one SHA-256 hash")
+        index += 1
+        name = match.group(1).lower().replace("_", "-")
+        result.append(f"wheel:{relative}:{name}={match.group(2)}@sha256:{hashed.group(1)}")
+    if not result:
+        fail(f"{relative}: hash lock inventory is empty")
+    return result
+
+
 def pyproject_inventory(path: Path, relative: str) -> list[str]:
     text = path.read_text(encoding="utf-8")
     groups: dict[str, list[str]] = {}
@@ -199,7 +227,14 @@ def build_inventory(root: Path, authorities: object) -> list[str]:
             fail("authority entries must be objects")
         kind = authority.get("kind")
         relative = authority.get("path")
-        if kind in {"npm", "requirements", "pyproject", "images-yaml", "alpine-lock"}:
+        if kind in {
+            "npm",
+            "requirements",
+            "python-hash-lock",
+            "pyproject",
+            "images-yaml",
+            "alpine-lock",
+        }:
             if not isinstance(relative, str):
                 fail(f"{kind} authority requires path")
             path = require_file(root, relative)
@@ -207,6 +242,8 @@ def build_inventory(root: Path, authorities: object) -> list[str]:
                 inventory.extend(npm_inventory(path, relative))
             elif kind == "requirements":
                 inventory.extend(requirements_inventory(path, relative))
+            elif kind == "python-hash-lock":
+                inventory.extend(python_hash_lock_inventory(path, relative))
             elif kind == "pyproject":
                 inventory.extend(pyproject_inventory(path, relative))
             elif kind == "alpine-lock":

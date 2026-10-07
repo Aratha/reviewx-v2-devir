@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:kt:agent-platform:agent-corporate-acceptance-evidence:1.0",
+  "$id": "urn:kt:agent-platform:agent-corporate-acceptance-evidence:1.1",
   "title": "Ajan Kurumsal Kabul Kanıtı",
   "type": "object",
   "additionalProperties": false,
@@ -35,7 +35,7 @@
     "expires_at"
   ],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"const": "1.1"},
     "kind": {"const": "AgentCorporateAcceptanceEvidence"},
     "local_discovery_state": {"const": "available-unadmitted"},
     "acceptance_status": {"const": "accepted"},
@@ -51,14 +51,14 @@
     "accepted_agent_ids": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 13,
+      "maxItems": 14,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/agentId"}
     },
     "agent_identities": {
       "type": "array",
-      "minItems": 13,
-      "maxItems": 13,
+      "minItems": 14,
+      "maxItems": 14,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/identityBinding"}
     },
@@ -105,7 +105,8 @@
         "kurumsal-mimari",
         "otomatik-duzeltme",
         "test-otomasyonu",
-        "uygulama-guvenligi"
+        "uygulama-guvenligi",
+        "yuk-testi"
       ]
     },
     "identityDescriptor": {

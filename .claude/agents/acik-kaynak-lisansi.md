@@ -62,10 +62,13 @@ Listede bulunan paket de güvenlik açığı, bakım, lisans veya zararlı içer
   `technology-profile.yml#backend.language` ve `backend.minimum_language_version` alanlarından
   alınır. Eski Python sürüm listesini etkin hedefe ikinci bir engel olarak uygulama.
 - Profil, çözüm kaydı veya aday bağı eksik/geçersizse `BLOCKED_INCOMPLETE` sınırını koru; eski
-  listeye dönme, sürüm tahmin etme veya uyum beyanı üretme. Profilin minor serisi ve alt sınırı
-  mimari uzmanıyla aynıdır. Python dışındaki teknoloji ve paket sürümleri, lisanslar, indirme
-  kaynakları, sabitleme ve bağımlılık kabulü bu kararla onaylanmaz veya değiştirilmez. Model
-  izin listesini başka bir kapsamda genişletemez; mühendislik uyumu kurumsal kabul değildir.
+  listeye dönme, sürüm tahmin etme veya uyum beyanı üretme. Profil kabul edilen en eski Python
+  serisini adlandırır; o seri ve sonraki bütün sürümler kabul edilir, yama düzeyinde güvenlik alt
+  sınırı ve üst sınır yoktur. Bu okuma mimari uzmanıyla aynıdır; yalnız bilinen bir Python sürüm
+  açığı nedeniyle kabul edilen bir Python'u reddetme. Python dışındaki teknoloji ve paket
+  sürümleri, lisanslar, indirme kaynakları, sabitleme ve bağımlılık kabulü bu kararla onaylanmaz
+  veya değiştirilmez. Model izin listesini başka bir kapsamda genişletemez; mühendislik uyumu
+  kurumsal kabul değildir.
 
 ## FastAPI sürümü için kabul edilmiş profil önceliği
 
@@ -116,7 +119,7 @@ Listede bulunan paket de güvenlik açığı, bakım, lisans veya zararlı içer
 - `seed-normalization.yml#package_acceptances` içindeki
   `package-acceptance:runtime-six-20260917`, proje sahibinin kabul ettiği kesin ek listedir:
   `cffi==2.1.1 / MIT-0`, `pydantic-settings==2.15.0 / MIT`, `sqlalchemy==2.0.52 / MIT`,
-  `asyncpg==0.31.0 / Apache-2.0`, `pyjwt==2.13.0 / MIT`, `pwdlib==0.3.1 / MIT`.
+  `asyncpg==0.31.0 / Apache-2.0`, `pyjwt==2.15.0 / MIT`, `pwdlib==0.3.1 / MIT`.
 - Paket adlarını Python normalizasyonuyla karşılaştır: büyük/küçük harf ve ardışık
   tire/nokta/alt çizgi farkları kimliği değiştirmez. Extras tek başına kabul doğurmaz; aşağıdaki kilit mirası kararı geçişli paket adı
   iznini bağlar. Sürüm aralığı bu tam sabitleme yerine geçmez.

@@ -38,10 +38,10 @@
           "const": "governance-crosswalk:desktop-agents-v1"
         },
         "version": {
-          "const": "1.18.0"
+          "const": "1.19.0"
         },
         "as_of": {
-          "const": "2026-10-05"
+          "const": "2026-10-08"
         },
         "owner": {
           "const": "team:ai-governance"
@@ -332,7 +332,7 @@
                 },
                 {
                   "name": "ruff",
-                  "version": "0.16.5",
+                  "version": "0.16.6",
                   "license": "MIT"
                 }
               ]

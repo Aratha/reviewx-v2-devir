@@ -147,7 +147,7 @@ Listede bulunan paket de güvenlik açığı, bakım, lisans veya zararlı içer
   `pip-tools==7.6.1 / BSD-3-Clause`,
   `pip==26.2.1 / MIT`,
   `setuptools==84.0.0 / MIT`,
-  `ruff==0.16.5 / MIT`,
+  `ruff==0.16.6 / MIT`,
 - Aynı adayın `requirements-dev.in` / `requirements-dev.txt` sabitlemesi, paket
   kimliği, lisans kanıtı ve kanonik karar/otorite bağı eşleşirse yalnız tarihsel
   `approved_packages` yokluğu bulgusunu kapat. Eksik veya farklı bağ

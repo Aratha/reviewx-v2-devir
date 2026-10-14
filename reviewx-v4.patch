@@ -722,7 +722,7 @@ index 0000000000000000000000000000000000000000..b01c17b51ca7ad3246c64e7b16d76995
 +        tick_seconds=float(settings.scheduler_tick_seconds),
 +    )
 diff --git a/app/backend/app/core/config.py b/app/backend/app/core/config.py
-index 1c552a211e8fef9ca44d584cf14faf5a10ac3db0..56eef762c92d63b91c0c8d217fbf1b7b9597449b 100644
+index f415f46b0eddd624b66af6dbd35d98a6609b98ed..8b03683e1ca53cb0f48dc175a64fc0b6c98d6dc1 100644
 --- a/app/backend/app/core/config.py
 +++ b/app/backend/app/core/config.py
 @@ -171,6 +171,26 @@ class Settings(BaseSettings):
@@ -2423,7 +2423,7 @@ index 0000000000000000000000000000000000000000..140df70d0089962b51b867aff00f6a6c
 +        removed_groups=tuple(group for key, group in old_groups.items() if key not in new_groups),
 +    )
 diff --git a/app/backend/app/domain/rule_set.py b/app/backend/app/domain/rule_set.py
-index cb5d2f77ec54e9d2087e8b78f7c8b1d27182aaaf..61ff5649d33a6e1b92df4a377eeb4885718f3792 100644
+index cb5d2f77ec54e9d2087e8b78f7c8b1d27182aaaf..1564e9e3d68d70f5bdd2b2f8ae33f609d26a0d05 100644
 --- a/app/backend/app/domain/rule_set.py
 +++ b/app/backend/app/domain/rule_set.py
 @@ -2,7 +2,9 @@
@@ -2518,7 +2518,7 @@ index cb5d2f77ec54e9d2087e8b78f7c8b1d27182aaaf..61ff5649d33a6e1b92df4a377eeb4885
  
 +    def select(
 +        self, rule_group_ids: Sequence[str], rule_codes: Sequence[str] = ()
-+    ) -> PublishedRuleSet:
++    ) -> "PublishedRuleSet":
 +        """The pinned version restricted to the selected groups and rules (rule-group-selection).
 +
 +        Raises ``RuleSetValidationError`` for an unknown group or rule, or an empty union.
@@ -2708,7 +2708,7 @@ index cb5d2f77ec54e9d2087e8b78f7c8b1d27182aaaf..61ff5649d33a6e1b92df4a377eeb4885
      return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 diff --git a/app/backend/app/domain/scheduled_review.py b/app/backend/app/domain/scheduled_review.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..4948ce175e981b470ef1182f39f67f4a4b773de0
+index 0000000000000000000000000000000000000000..476adc411d8eb87497e2f6a9a11146e75b3431cd
 --- /dev/null
 +++ b/app/backend/app/domain/scheduled_review.py
 @@ -0,0 +1,297 @@
@@ -2842,7 +2842,7 @@ index 0000000000000000000000000000000000000000..4948ce175e981b470ef1182f39f67f4a
 +        raise _invalid("Zaman dilimi geçersiz.")
 +    try:
 +        return ZoneInfo(key)
-+    except ZoneInfoNotFoundError, ValueError:
++    except (ZoneInfoNotFoundError, ValueError):
 +        raise _invalid("Zaman dilimi geçersiz.") from None
 +
 +
@@ -3018,7 +3018,7 @@ index 0000000000000000000000000000000000000000..614bf29ffcd5092fa7b9f7c38346de89
 +"""Outbound corporate e-mail (sql-review/PRDs/008-scheduled-review-email)."""
 diff --git a/app/backend/app/infrastructure/mail/smtp_client.py b/app/backend/app/infrastructure/mail/smtp_client.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..fbed3839d0306c98fc3bafcc36bd130610d80d45
+index 0000000000000000000000000000000000000000..a28ed8130d1b8e7ef3a8265386f97a18d1950666
 --- /dev/null
 +++ b/app/backend/app/infrastructure/mail/smtp_client.py
 @@ -0,0 +1,141 @@
@@ -3120,7 +3120,7 @@ index 0000000000000000000000000000000000000000..fbed3839d0306c98fc3bafcc36bd1306
 +            finally:
 +                try:
 +                    client.quit()
-+                except smtplib.SMTPException, OSError:
++                except (smtplib.SMTPException, OSError):
 +                    client.close()
 +        except MailDeliveryError:
 +            raise
@@ -3132,9 +3132,9 @@ index 0000000000000000000000000000000000000000..fbed3839d0306c98fc3bafcc36bd1306
 +            smtplib.SMTPDataError,
 +        ):
 +            raise MailDeliveryError("smtp_rejected") from None
-+        except ssl.SSLError, smtplib.SMTPNotSupportedError:
++        except (ssl.SSLError, smtplib.SMTPNotSupportedError):
 +            raise MailDeliveryError("smtp_tls_failed") from None
-+        except smtplib.SMTPServerDisconnected, OSError:
++        except (smtplib.SMTPServerDisconnected, OSError):
 +            raise MailDeliveryError("smtp_unreachable") from None
 +        except smtplib.SMTPException:
 +            raise MailDeliveryError("smtp_failed") from None
@@ -7685,7 +7685,7 @@ index 5c3a50ff42f30efbec57da588af9bd2be44a2bb9..35e69f0de40c4146a749974e613d5cc8
  
 diff --git a/app/backend/tests/fakes/smtp_server.py b/app/backend/tests/fakes/smtp_server.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..71ed025f6c3d68dcba31233d131a4739674baad2
+index 0000000000000000000000000000000000000000..db15ef0bf7889dca4a6cbdb4d92cb4bb3ae7e844
 --- /dev/null
 +++ b/app/backend/tests/fakes/smtp_server.py
 @@ -0,0 +1,120 @@
@@ -7724,7 +7724,7 @@ index 0000000000000000000000000000000000000000..71ed025f6c3d68dcba31233d131a4739
 +    connections: int = 0
 +    _server: asyncio.Server | None = None
 +
-+    async def start(self) -> FakeSmtpServer:
++    async def start(self) -> "FakeSmtpServer":
 +        self._server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
 +        return self
 +
@@ -7805,7 +7805,7 @@ index 0000000000000000000000000000000000000000..71ed025f6c3d68dcba31233d131a4739
 +                    return
 +                else:
 +                    await reply("502 not implemented")
-+        except ConnectionError, ssl.SSLError, asyncio.IncompleteReadError:
++        except (ConnectionError, ssl.SSLError, asyncio.IncompleteReadError):
 +            return
 +        finally:
 +            writer.close()
@@ -11294,7 +11294,7 @@ index 0000000000000000000000000000000000000000..b921495bc2a495e6399c4630012ac52f
 +    assert error.value.code == "smtp_address_not_allowed"
 +    assert relay.connections == 0
 diff --git a/app/backend/tests/integration/test_sql_connection_storage.py b/app/backend/tests/integration/test_sql_connection_storage.py
-index 14b901b3f297e348874f238bab3cbcf9a96f519a..cb76b104000466843f5eb322d3f5019a11b52c3c 100644
+index 367c0581a617319800e100b9f8dc0166303c77fd..7733335ad5956540dc51185349f33111c880e4d6 100644
 --- a/app/backend/tests/integration/test_sql_connection_storage.py
 +++ b/app/backend/tests/integration/test_sql_connection_storage.py
 @@ -34,6 +34,10 @@ from app.infrastructure.sql_server import queries

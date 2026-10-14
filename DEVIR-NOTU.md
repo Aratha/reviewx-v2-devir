@@ -1,17 +1,20 @@
-# DWH Code Review — 2. sürüm yetenekleri: kod devir notu (v3)
+# DWH Code Review — 2. sürüm yetenekleri: kod devir notu (v4)
 
 Hazırlanma: 2026-10-14. Bu not ve yama, kodu **kurumsal ortama** alacak kişi ve onun yapay zekâ oturumu
 içindir. Not deponun içinde değildir; depoya eklenmemelidir.
 
-Bu klasör `../v2-kod-2026-10-07/` paketinin ve GitHub'daki özel `reviewx-v2-devir` deposundaki paketin
-**yerini alır**. v2'deki ekip özelliği (003-team-scoping) ve girişte AD grup üyeliği okuma (001 Task 17)
-proje sahibinin kararıyla **kaldırıldı**; v3 bunları içermez.
+Bu klasör v2 ve v3 paketlerinin **yerini alır**. v4, kurumun güncel `main`'i olan **`fe83459`**
+("generation 51": Python alt sınırı 3.12, yeni bağımlılık seti) üzerine kuruldu; v3 ise eski `5f51a70`
+tabanındaydı. İçerik v3 ile aynıdır, ek olarak kod yeni `rules/20` şartına (Python 3.12'de olmayan dil
+özelliği kullanılmaz) uyarlandı: parantezsiz `except A, B:` yerine `except (A, B):` ve sınıfın kendisine
+tırnaksız ileri referans yerine tırnaklı referans (kurumun `fe83459`'da kendi kodunda yaptığı düzeltmenin
+aynısı). Ekip özelliği (003) ve AD grup üyeliği okuma (001 Task 17) yoktur.
 
 ## 1. Pakette ne var
 
 | Dosya | İçerik |
 |---|---|
-| `reviewx-v3.patch` | Deponun `main` dalındaki `5f51a70` kaydına göre bütün değişiklik: 145 dosya (76 değişen, 69 yeni) |
+| `reviewx-v4.patch` | Deponun `main` dalındaki `fe83459` kaydına göre bütün değişiklik: 145 dosya (76 değişen, 69 yeni) |
 | `DOSYALAR.txt` | Yamadaki dosyaların listesi ve durumu (M = değişen, A = yeni) |
 | `SHA256SUMS.txt` | Dosyaların SHA-256 özetleri |
 | `DEVIR-NOTU.md` | Bu not |
@@ -51,23 +54,30 @@ oturumunda yazıldı. Bu nedenle:
 - Yönetişim yüzeyine (rules/, AGENTS.md, CLAUDE.md, .kt-scaffold/, .claude/, agent-platform) yamada
   hiçbir değişiklik yoktur.
 
-**Yamanın `5f51a70` tabanlı temiz bir kopyaya uygulandığı hâlde** (Windows, Python 3.14.8, PostgreSQL
-17.10, Docker'sız) koşulan ve geçen denetimler:
+**Kurumun `fe83459` kopyasında, yama uygulanmış hâlde** (Windows, **Python 3.12.10**, kurumun gen51
+`requirements-dev.txt`'i hash'leriyle — Windows'ta tekerleği olmayan `uvloop` hariç —, PostgreSQL 17.10,
+Docker'sız) koşulan ve geçen denetimler:
 
-- Yamadaki 145 dosya çalışma kopyasıyla bayt bayt aynı.
+- Yama `fe83459`'un temiz bir kopyasına `git apply --check` ile uygulanıyor; 145 dosya bayt bayt aynı.
+  Tabandan beri değişen iki ortak dosya (`app/core/config.py`,
+  `tests/integration/test_sql_connection_storage.py`) üç yollu birleşmeyle çakışmasız birleşti.
+- Bütün `app.*` modülleri Python 3.12'de içe aktarılıyor.
+- `scripts/check-governance-drift.py` ve `scripts/check-dependency-admission.py`: güncel.
 - Arka uç `pytest -q` (gerçek PostgreSQL, boş veritabanından): 848 geçti, 1 kaldı. Kalan
   `test_config.py::test_otel_process_variables_stop_start_up[otel_sdk_disabled]` tabanda da kalıyordu
   (Windows'a özgü). `test_llm_adapter.py` Windows'ta TLS vakalarında takıldığı için dışarıda bırakıldı;
   kurumda mutlaka koşulmalıdır.
-- `ruff check`, `black --check`, `isort --check-only` (app, tests), `mypy app`: temiz.
+- `ruff check`, `black --check` (hedef `py312`), `isort --check-only` (app, tests), `mypy app`
+  (`python_version = 3.12`): temiz.
 - Göçler: `alembic upgrade head`, yeni sürümler için geri alma ve yeniden uygulama, `alembic check` temiz.
 - OpenAPI: uygulamadan dışa aktarılan sözleşme `specs/openapi/dwhcodereview-api.yaml` ile birebir aynı;
   `app/frontend/src/types/api.d.ts` bundan üretildi.
-- Ön yüz: `npm run typecheck`, `eslint`, `vite build` temiz; Vitest 201/201.
+- Ön yüz (gen51 kilit dosyasıyla `npm ci`): `npm run typecheck`, `eslint`, `vite build` temiz; Vitest
+  201/201; üretilen tipler sözleşmeyle aynı.
 - Yamada CRLF, sır/özel anahtar ve iç IP taraması temiz.
 
-Çalışma kopyasında ayrıca **tarayıcı senaryoları** yerel önizlemeye (Vite + uvicorn + PostgreSQL,
-Chromium) karşı koşuldu: `e2e/sql-review/run-all.mjs` 6/6 ve `e2e/auth/run-all.mjs` 1/1 geçti. Sınırlar:
+Aynı `fe83459` + yama ağacından, Python 3.12 ile çalışan yerel önizlemeye (Vite + uvicorn +
+PostgreSQL, Chromium) karşı **tarayıcı senaryoları** da koşuldu: `e2e/sql-review/run-all.mjs` 6/6 ve `e2e/auth/run-all.mjs` 1/1 geçti. Sınırlar:
 LLM adımlarında kurumun onaylı ucu yerine yerel, OpenAI uyumlu bir sahte uç kullanıldı (yavaş akış,
 Kural01 için NOLOCK bulgusu); SQL Server yoktu, bu yüzden 05 senaryosu daraltılmış dalını koştu. Kurum
 ortamında gerçek LLM ve test SQL Server ile yeniden koşulmalıdır.
@@ -90,20 +100,20 @@ Kurumsal ortamda, proje kökünde:
 ```sh
 git checkout main && git pull
 git switch -c feat/reviewx-v2
-git apply --check /yol/reviewx-v3.patch
-git apply /yol/reviewx-v3.patch
+git apply --check /yol/reviewx-v4.patch
+git apply /yol/reviewx-v4.patch
 git status
 ```
 
 `main` bu arada ilerlediyse ve `--check` çakışma gösterirse zorla uygulamayın:
-`git apply --3way /yol/reviewx-v3.patch` ile deneyin; kalanları güncel hâlle karşılaştırıp elle uzlaştırın.
+`git apply --3way /yol/reviewx-v4.patch` ile deneyin; kalanları güncel hâlle karşılaştırıp elle uzlaştırın.
 Göç numaraları (`202610050001`, `202610050002`, `202610140001`) `main`'e başka göç eklendiyse zinciri
 bozmayacak şekilde güncellenmelidir. Dal, commit ve PR proje sahibinindir.
 
 ## 4. Kurumsal oturumda yapılacaklar (sırayla)
 
-1. **Ortam:** Oturumu proje kökünde açın; kök `.venv` hazır, kancalar etkin; Docker çalışıyor; Python 3.14
-   (en az 3.14.7) ve Node 22 kurumsal katalogdan (`rules/05`).
+1. **Ortam:** Oturumu proje kökünde açın; kök `.venv` hazır, kancalar etkin; Docker çalışıyor; Python 3.12
+   veya daha yenisi (`technology-profile.yml`) ve Node 22 kurumsal katalogdan (`rules/05`).
 2. **Yamayı uygulayın** (3. bölüm) ve `python3 scripts/check-governance-drift.py` çalıştırın.
 3. **Veritabanı:** `scripts/db.sh apply`, `scripts/db.sh validate`, `scripts/db.sh status`.
 4. **Sözleşme:** `scripts/export-openapi.sh --check`, `scripts/generate-types.sh --check`.
@@ -170,5 +180,5 @@ bozmayacak şekilde güncellenmelidir. Dal, commit ve PR proje sahibinindir.
 
 ## 9. Geri dönüş noktası
 
-Değişiklik öncesi depo durumu `../geri-donus-2026-10-06/DWHCodeReview-5f51a70.bundle` dosyasındadır
-(bkz. oradaki `BENIOKU.md`). Yama yalnız `5f51a70`'a göre uygulanır; geri dönmek için dalı silmek yeterlidir.
+Yama kurumun `fe83459` kaydına göre üretildi ve yeni bir dala uygulanır; `main` değişmez. Geri dönmek
+için dalı silmek yeterlidir.

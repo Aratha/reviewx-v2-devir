@@ -85,13 +85,9 @@ class Proposals:
         assert restored.status_code == 200, restored.text
 
     async def proposer(self) -> RoleSession:
-        """A reviewer the super admin gave the proposal permission."""
+        """A reviewer; every reviewer may propose (Decision 9)."""
 
-        reviewer = await self.sessions.reviewer()
-        admin = await self.sessions.super_admin()
-        granted = await self.call("PUT", f"/rule-proposers/{reviewer.public_id}", admin)
-        assert granted.status_code == 204, granted.text
-        return reviewer
+        return await self.sessions.reviewer()
 
     async def propose_rule(self, session: RoleSession, **changes: Any) -> Any:
         body = {

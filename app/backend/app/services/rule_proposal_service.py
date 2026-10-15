@@ -1,4 +1,4 @@
-"""Rule and group proposals, publish requests and the proposal permission.
+"""Rule and group proposals and publish requests; every reviewer and rule manager proposes.
 
 sql-review/PRDs/009-rule-proposals Requirement 1-7. Every approval locks the tenant draft row
 first, the same lock a direct publish takes, so two approvals never publish the same version
@@ -9,7 +9,6 @@ the log.
 
 import logging
 from datetime import UTC, datetime
-from uuid import UUID
 
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,8 +66,6 @@ from app.schemas.rule_proposals.contracts import (
     RuleProposalDetail,
     RuleProposalItem,
     RuleProposalPage,
-    RuleProposerItem,
-    RuleProposerList,
     RuleSetDiffView,
 )
 from app.schemas.rule_set.contracts import RuleGroupItem
@@ -83,14 +80,6 @@ DEFAULT_PAGE_SIZE = 20
 
 def _unprocessable(code: str, message: str) -> ApplicationError:
     return ApplicationError(status.HTTP_422_UNPROCESSABLE_CONTENT, code, message)
-
-
-def _forbidden_proposal() -> ApplicationError:
-    return ApplicationError(
-        status.HTTP_403_FORBIDDEN,
-        "proposal_forbidden",
-        "Kural önerme yetkiniz yok; süper yöneticiden yetki isteyin.",
-    )
 
 
 def _decision_forbidden() -> ApplicationError:
@@ -207,65 +196,18 @@ class RuleProposalService:
     async def _scope(self, context: RequestContext) -> tuple[Tenant, User]:
         return await active_tenant(self.users, context), await acting_user(self.users, context)
 
-    async def _can_propose(self, context: RequestContext, tenant: Tenant, actor: User) -> bool:
-        return context.is_super_admin or await self.proposals.is_proposer(
-            tenant.tenant_id, actor.user_id
-        )
-
     async def _latest_rules(self, tenant_id: int) -> tuple[int | None, RuleGroups]:
         latest = await self.rules.latest_version(tenant_id)
         if latest is None:
             return None, RuleGroups()
         return latest.number, await self.rules.version_rules(latest)
 
-    # --- Capabilities and permission (Requirement 1, 7) ----------------------------------------
+    # --- Capabilities (Requirement 1, 7) -------------------------------------------------------
 
     async def capabilities(self, context: RequestContext) -> RuleProposalCapabilities:
-        tenant, actor = await self._scope(context)
-        return RuleProposalCapabilities(
-            can_propose=await self._can_propose(context, tenant, actor),
-            can_decide=context.is_super_admin,
-        )
-
-    async def proposers(self, context: RequestContext) -> RuleProposerList:
-        tenant, _ = await self._scope(context)
-        rows = await self.proposals.proposers(tenant.tenant_id)
-        return RuleProposerList(
-            items=[
-                RuleProposerItem(
-                    user_id=row.user.public_id,
-                    username=row.user.username,
-                    display_name=row.user.display_name,
-                    granted_by_name=row.granted_by_name,
-                    granted_at=row.proposer.created_at,
-                )
-                for row in rows
-            ]
-        )
-
-    async def set_proposer(self, context: RequestContext, user_id: UUID, *, granted: bool) -> None:
-        tenant, actor = await self._scope(context)
-        user = await self.users.get_in_tenant_for_update(user_id, tenant.tenant_id)
-        if user is None or (granted and not user.is_active):
-            raise ApplicationError(
-                status.HTTP_404_NOT_FOUND, "user_not_found", "Kullanıcı bulunamadı."
-            )
-        now = datetime.now(UTC)
-        if granted:
-            changed = await self.proposals.grant(
-                tenant.tenant_id, user.user_id, actor_user_id=actor.user_id, now=now
-            )
-        else:
-            changed = await self.proposals.revoke(
-                tenant.tenant_id, user.user_id, actor_user_id=actor.user_id, now=now
-            )
-        if changed:
-            log_event(
-                logger,
-                "rule_proposer.granted" if granted else "rule_proposer.revoked",
-                user_public_id=user.public_id,
-                actor_public_id=actor.public_id,
-            )
+        # Decision 9: every reviewer and rule manager proposes; only the super admin decides.
+        await self._scope(context)
+        return RuleProposalCapabilities(can_propose=True, can_decide=context.is_super_admin)
 
     # --- Proposals (Requirement 2-5) -----------------------------------------------------------
 
@@ -273,8 +215,6 @@ class RuleProposalService:
         self, context: RequestContext, body: RuleProposalCreate
     ) -> RuleProposalDetail:
         tenant, actor = await self._scope(context)
-        if not await self._can_propose(context, tenant, actor):
-            raise _forbidden_proposal()
         _, latest = await self._latest_rules(tenant.tenant_id)
         try:
             if body.kind == RuleProposalKind.RULE.value:

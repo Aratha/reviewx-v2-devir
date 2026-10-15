@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Link} from 'react-router';
 import {RuleGroupPicker} from '@/components/review/RuleGroupPicker';
 import {Alert} from '@/components/ui/Alert';
@@ -61,6 +61,15 @@ export default function ScheduledReviewsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // While a run waits or runs, its state is read again so "Sürüyor" turns into the outcome.
+  const anyOpen =
+    list.data?.items.some((item) => item.last_run?.state === 'queued' || item.last_run?.state === 'running') ?? false;
+  const reloadList = list.reload;
+  useEffect(() => {
+    if (!anyOpen) return;
+    const timer = window.setInterval(reloadList, 5000);
+    return () => window.clearInterval(timer);
+  }, [anyOpen, reloadList]);
 
   async function act(item: ScheduledReviewItem, action: () => Promise<unknown>, done: string) {
     setBusyId(item.id);
@@ -79,7 +88,7 @@ export default function ScheduledReviewsPage() {
 
   const data = list.data;
   return (
-    <div className="page">
+    <div className="page page-fill">
       <PageHeader
         title="Zamanlanmış incelemeler"
         description="Seçilen nesneler belirlenen periyotta arka planda incelenir; sonuç geçmişe kaydedilir ve alıcılara özet e-posta gider."
@@ -96,6 +105,7 @@ export default function ScheduledReviewsPage() {
       {data && (
         <Card
           title={`Tanımlar (${data.total})`}
+          className="card-fill"
           bodyClassName="table-wrap"
           footer={<Pager page={page} pageSize={PAGE_SIZE} total={data.total} onPage={setPage} />}
         >
@@ -136,6 +146,13 @@ export default function ScheduledReviewsPage() {
                     }
                     onRunNow={() =>
                       act(item, () => ScheduledReviewService.runNow(item.id), 'Koşum sıraya alındı.')
+                    }
+                    onStop={() =>
+                      act(
+                        item,
+                        () => ScheduledReviewService.stop(item.id),
+                        'Koşum durduruldu; bu koşum için e-posta gönderilmez.',
+                      )
                     }
                   />
                 ))}
@@ -188,6 +205,7 @@ function DefinitionRow({
   onDelete,
   onPause,
   onRunNow,
+  onStop,
 }: {
   item: ScheduledReviewItem;
   busy: boolean;
@@ -196,8 +214,11 @@ function DefinitionRow({
   onDelete: () => void;
   onPause: () => void;
   onRunNow: () => void;
+  onStop: () => void;
 }) {
   const last = item.last_run;
+  // Requirement 11: the owner and the super admin stop a queued or running run.
+  const open = last?.state === 'queued' || last?.state === 'running';
   return (
     <tr>
       <td>
@@ -223,7 +244,8 @@ function DefinitionRow({
       <td>
         <div className="stack-tight">
           {last ? (
-            <span>
+            <span className="row">
+              {open && <span className="pulse-dot" aria-hidden="true" />}
               {stateText({state: last.state, skip_reason: null})}
               {last.finding_count !== null && ` · ${formatNumber(last.finding_count)} bulgu`}
             </span>
@@ -257,6 +279,17 @@ function DefinitionRow({
           <Button size="sm" onClick={onHistory} aria-label={`${item.name} çalışma geçmişi`}>
             Geçmiş
           </Button>
+          {item.can_edit && open && (
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={onStop}
+              disabled={busy}
+              aria-label={`${item.name} koşumunu durdur`}
+            >
+              Durdur
+            </Button>
+          )}
           {item.can_run_now && (
             <Button size="sm" onClick={onRunNow} disabled={busy} aria-label={`${item.name} şimdi çalıştır`}>
               Şimdi çalıştır

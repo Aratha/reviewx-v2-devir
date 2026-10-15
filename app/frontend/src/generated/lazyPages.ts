@@ -14,4 +14,4 @@ export const SqlConnectionPage = lazy(() => import("@/pages/SqlConnectionPage"))
 export const LlmConnectionPage = lazy(() => import("@/pages/LlmConnectionPage"));
 export const LlmCallsPage = lazy(() => import("@/pages/LlmCallsPage"));
 export const UserAdministrationPage = lazy(() => import("@/pages/UserAdministrationPage"));
-
+export const AdminPage = lazy(() => import("@/pages/AdminPage"));

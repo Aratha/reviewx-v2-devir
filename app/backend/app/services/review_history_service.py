@@ -15,6 +15,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Literal
 
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -49,6 +50,7 @@ from app.schemas.review_runs.contracts import (
     ReviewRunDetail,
     ReviewRunPage,
     ReviewRunSummary,
+    RunCancelled,
 )
 from app.schemas.reviews.contracts import FindingItem, ObjectResultItem, RuleResultItem
 from app.services.request_scope import acting_user, active_tenant
@@ -61,6 +63,9 @@ from app.services.review_export import (
     results_csv_header,
     results_csv_rows,
 )
+
+if TYPE_CHECKING:
+    from app.services.review_run_service import ReviewRunRegistry
 
 logger = logging.getLogger("app.review_history")
 
@@ -438,6 +443,41 @@ class ReviewHistoryService:
             count=1,
             user_public_id=actor.public_id,
         )
+
+    async def cancel_run(
+        self, context: RequestContext, run_id: str, registry: "ReviewRunRegistry"
+    ) -> RunCancelled:
+        """ "Analizi durdur" by request: the owner or the super admin stops a running run.
+
+        The stream closing stops a run as well; this request does not depend on a proxy passing
+        that close on. Without a task in this process the run is ended as cancelled directly.
+        """
+
+        row, actor = await self._visible(context, run_id)
+        if row.run.owner_user_id != actor.user_id and not context.is_super_admin:
+            raise _not_owner()
+        if row.run.status != ReviewRunStatus.RUNNING.value:
+            raise ApplicationError(
+                status.HTTP_409_CONFLICT,
+                "review_run_not_running",
+                "Bu inceleme zaten bitmiş.",
+            )
+        outcome: Literal["cancelling", "cancelled"] = "cancelling"
+        if not registry.cancel(row.run.public_id):
+            await self.reviews.finish_run(
+                row.run.review_run_id,
+                status=ReviewRunStatus.CANCELLED,
+                finished_at=datetime.now(UTC),
+            )
+            outcome = "cancelled"
+        log_event(
+            logger,
+            "review_run.cancel_requested",
+            run_id=row.run.public_id,
+            outcome=outcome,
+            user_public_id=actor.public_id,
+        )
+        return RunCancelled(id=row.run.public_id, status=outcome)
 
     async def delete_own_runs(self, context: RequestContext) -> DeletedRuns:
         tenant_id, actor = await self._caller(context)

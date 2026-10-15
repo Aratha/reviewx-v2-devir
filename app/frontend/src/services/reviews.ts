@@ -7,6 +7,7 @@ import type {
   ReviewRunDetail,
   ReviewRunPage,
   ReviewStreamEvent,
+  RunCancelled,
 } from '@/types/sqlReview';
 
 export type ReviewEventHandler = (event: ReviewStreamEvent) => void;
@@ -88,6 +89,10 @@ export const ReviewService = {
       `/review-runs/${encodeURIComponent(runId)}?page=${page}&page_size=${pageSize}`,
       {signal},
     );
+  },
+  /** "Analizi durdur" by request (object-review Requirement 15, Decision 9). */
+  cancelRun(runId: string): Promise<RunCancelled> {
+    return apiRequest<RunCancelled>(`/review-runs/${encodeURIComponent(runId)}/cancel`, {method: 'POST'});
   },
   deleteRun(runId: string): Promise<void> {
     return apiRequest<void>(`/review-runs/${encodeURIComponent(runId)}`, {method: 'DELETE'});

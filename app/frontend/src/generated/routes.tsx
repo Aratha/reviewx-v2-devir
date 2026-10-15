@@ -3,60 +3,52 @@ import { Route } from "react-router";
 // PermissionRoute is intentionally pre-registered for generated protected routes.
 import { PermissionRoute } from "@/components/auth/PermissionRoute";
 import { RoleRoute } from "@/components/auth/RoleRoute";
+import { LibraryHub, MovedTo, ReviewHub } from "@/components/layout/Hubs";
 import {
-  LlmCallsPage,
-  LlmConnectionPage,
+  AdminPage,
   ObjectReviewPage,
   PublishedRulesPage,
-  ReviewHistoryPage,
-  RuleApprovalsPage,
   RuleProposalsPage,
-  RulesPage,
-  ScheduledReviewSettingsPage,
   ScheduledReviewsPage,
   ScriptReviewPage,
-  SqlConnectionPage,
-  UserAdministrationPage,
+  ReviewHistoryPage,
 } from "@/generated/lazyPages";
 // kt-scaffold:imports
 
 void Route;
 void PermissionRoute;
 
-/** sql-review and application-foundation pages; the backend authorizes every request. */
+/**
+ * sql-review and application-foundation pages; the backend authorizes every request. Reviews
+ * share "İnceleme", rules for readers share "Kural kitaplığı" and every administration screen
+ * lives on the single Yönetim page.
+ */
 export const GeneratedRoutes = (
   <>
     {/* kt-scaffold:routes */}
-    <Route path="/inceleme" element={<RoleRoute require="review"><ObjectReviewPage /></RoleRoute>} />
-    <Route path="/sql-inceleme" element={<RoleRoute require="review"><ScriptReviewPage /></RoleRoute>} />
-    <Route path="/gecmis" element={<RoleRoute require="review"><ReviewHistoryPage /></RoleRoute>} />
+    <Route path="/inceleme" element={<RoleRoute require="review"><ReviewHub><ObjectReviewPage /></ReviewHub></RoleRoute>} />
+    <Route path="/sql-inceleme" element={<RoleRoute require="review"><ReviewHub><ScriptReviewPage /></ReviewHub></RoleRoute>} />
     <Route
       path="/zamanlanmis-incelemeler"
-      element={<RoleRoute require="review"><ScheduledReviewsPage /></RoleRoute>}
+      element={<RoleRoute require="review"><ReviewHub><ScheduledReviewsPage /></ReviewHub></RoleRoute>}
     />
+    <Route path="/gecmis" element={<RoleRoute require="review"><ReviewHistoryPage /></RoleRoute>} />
     <Route
       path="/yayimlanmis-kurallar"
-      element={<RoleRoute require="review"><PublishedRulesPage /></RoleRoute>}
+      element={<RoleRoute require="review"><LibraryHub><PublishedRulesPage /></LibraryHub></RoleRoute>}
     />
-    <Route path="/kurallar" element={<RoleRoute require="manageRules"><RulesPage /></RoleRoute>} />
     <Route
       path="/kural-onerilerim"
-      element={<RoleRoute require="review"><RuleProposalsPage /></RoleRoute>}
+      element={<RoleRoute require="review"><LibraryHub><RuleProposalsPage /></LibraryHub></RoleRoute>}
     />
-    <Route
-      path="/kural-onaylari"
-      element={<RoleRoute require="administerUsers"><RuleApprovalsPage /></RoleRoute>}
-    />
-    <Route path="/ayarlar/sql" element={<RoleRoute require="manageRules"><SqlConnectionPage /></RoleRoute>} />
-    <Route path="/ayarlar/llm" element={<RoleRoute require="manageRules"><LlmConnectionPage /></RoleRoute>} />
-    <Route path="/llm-cagrilari" element={<RoleRoute require="manageRules"><LlmCallsPage /></RoleRoute>} />
-    <Route
-      path="/ayarlar/zamanlama"
-      element={<RoleRoute require="administerUsers"><ScheduledReviewSettingsPage /></RoleRoute>}
-    />
-    <Route
-      path="/kullanicilar"
-      element={<RoleRoute require="administerUsers"><UserAdministrationPage /></RoleRoute>}
-    />
+    <Route path="/yonetim" element={<AdminPage />} />
+    <Route path="/yonetim/:section" element={<AdminPage />} />
+    <Route path="/kurallar" element={<MovedTo section="kurallar" />} />
+    <Route path="/kural-onaylari" element={<MovedTo section="onaylar" />} />
+    <Route path="/ayarlar/sql" element={<MovedTo section="sql" />} />
+    <Route path="/ayarlar/llm" element={<MovedTo section="llm" />} />
+    <Route path="/llm-cagrilari" element={<MovedTo section="llm-cagrilari" />} />
+    <Route path="/ayarlar/zamanlama" element={<MovedTo section="zamanlama" />} />
+    <Route path="/kullanicilar" element={<MovedTo section="kullanicilar" />} />
   </>
 );

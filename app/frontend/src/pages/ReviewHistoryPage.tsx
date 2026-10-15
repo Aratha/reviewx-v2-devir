@@ -14,22 +14,13 @@ import {useAuth} from '@/contexts/AuthContext';
 import {useResource} from '@/hooks/useResource';
 import {describeError, messageForCode} from '@/lib/errorMessages';
 import {formatDateTime} from '@/lib/format';
-import {applyFalsePositive, hasStoredSql} from '@/lib/reviewResults';
-import type {Tone} from '@/lib/utils';
+import {RUN_STATUS as STATUS, applyFalsePositive, hasStoredSql} from '@/lib/reviewResults';
 import {ReviewService} from '@/services/reviews';
-import type {ReviewRunDetail, ReviewRunStatus, ReviewRunSummary} from '@/types/sqlReview';
+import type {ReviewRunDetail, ReviewRunSummary} from '@/types/sqlReview';
 
 const PAGE_SIZE = 50;
 /** Objects of a run shown per page of its results (review-history-export Requirement 3). */
 const RESULTS_PAGE_SIZE = 50;
-
-const STATUS: Record<ReviewRunStatus, {label: string; tone: Tone}> = {
-  running: {label: 'Sürüyor', tone: 'warning'},
-  completed: {label: 'Tamamlandı', tone: 'success'},
-  failed: {label: 'Hata', tone: 'danger'},
-  cancelled: {label: 'Durduruldu', tone: 'neutral'},
-  interrupted: {label: 'Yarıda kesildi', tone: 'warning'},
-};
 
 type Scope = 'mine' | 'all';
 type PendingDelete = {kind: 'one'; run: ReviewRunSummary} | {kind: 'all'};
@@ -85,10 +76,10 @@ export default function ReviewHistoryPage() {
 
   const data = runs.data;
   return (
-    <div className="page">
+    <div className="page page-fill">
       <PageHeader
         title="İnceleme geçmişi"
-        description="Biten incelemeleriniz sunucuda saklanır ve hangi bilgisayardan girerseniz girin burada görünür. Kayıtlar saklama süresi dolunca kendiliğinden silinir."
+        description="Biten incelemeleriniz sunucuda saklanır; soldan seçin, sonuçları sağda görün. Kayıtlar saklama süresi dolunca silinir."
         actions={
           <>
             <Button onClick={runs.reload}>Yenile</Button>
@@ -119,7 +110,7 @@ export default function ReviewHistoryPage() {
         </fieldset>
       )}
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
-      <div className="master-detail">
+      <div className="master-detail fill-row">
         <Card
           title={`Kayıtlar${data ? ` (${data.total})` : ''}`}
           footer={data ? <Pager page={page} pageSize={PAGE_SIZE} total={data.total} onPage={setPage} /> : undefined}

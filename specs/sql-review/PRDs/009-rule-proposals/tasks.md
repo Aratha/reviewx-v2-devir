@@ -52,3 +52,9 @@ Yerel kanıt (2026-10-14, kişisel makine): `pytest` (gerçek PostgreSQL 17) 848
 
 Kalite kapıları, yönetilen inceleme ve proje kancaları yalnız kurumsal ortamda, proje kökünde açılan
 oturumda çalışır. Bu görevlerin L1/L2 kanıtı oradan alınmalıdır.
+
+## 1.1.0 revizyonu (2026-10-15)
+
+- [x] T-D6.1 Decision 6: öneri yetkisi kalktı; `/rule-proposers` uçları, hizmet ve depo yöntemleri silindi; `capabilities` her inceleyici ve kural yöneticisine `can_propose: true` döner.
+- [x] T-D6.2 Acceptance 3: `test_every_reviewer_and_rule_manager_proposes_without_a_permission`.
+- [x] T-D6.3 Ön yüz: "Öneri yetkisi" sekmesi kalktı; Kural önerilerim her kullanıcıya açık; e2e 06.

@@ -146,11 +146,24 @@ class ReviewRunRegistry:
 
     def __init__(self) -> None:
         self._tasks: set[asyncio.Task[None]] = set()
+        self._by_run: dict[str, asyncio.Task[None]] = {}
         self.shutting_down = False
 
-    def track(self, task: asyncio.Task[None]) -> None:
+    def track(self, task: asyncio.Task[None], run_public_id: str | None = None) -> None:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+        if run_public_id is not None:
+            self._by_run[run_public_id] = task
+            task.add_done_callback(lambda _: self._by_run.pop(run_public_id, None))
+
+    def cancel(self, run_public_id: str) -> bool:
+        """Requirement 15 by request: stop the run's task in this process; False if none runs."""
+
+        task = self._by_run.get(run_public_id)
+        if task is None or task.done():
+            return False
+        task.cancel()
+        return True
 
     async def shutdown(self, timeout: float = 5.0) -> None:
         self.shutting_down = True
@@ -336,7 +349,7 @@ class ReviewExecution:
 
         if self.task is None:
             self.task = asyncio.create_task(self._run(self._queue.put))
-            self._runtime.registry.track(self.task)
+            self._runtime.registry.track(self.task, self._plan.run_public_id)
 
     def cancel(self) -> None:
         """Requirement 15: stop starting calls, close running ones, store the run cancelled."""
@@ -351,13 +364,26 @@ class ReviewExecution:
         """
 
         self.start()
+        task = self.task
+        assert task is not None
         try:
             while True:
+                if task.done() and self._queue.empty():
+                    # A run stopped by request ends without a final event; so does its reader.
+                    return
+                getter = asyncio.ensure_future(self._queue.get())
                 try:
-                    event = await asyncio.wait_for(self._queue.get(), idle_seconds)
-                except TimeoutError:
-                    yield None
+                    await asyncio.wait(
+                        {getter, task}, timeout=idle_seconds, return_when=asyncio.FIRST_COMPLETED
+                    )
+                finally:
+                    if not getter.done():
+                        getter.cancel()
+                if not getter.done() or getter.cancelled():
+                    if not task.done():
+                        yield None
                     continue
+                event = getter.result()
                 yield event
                 if isinstance(event, (CompleteEvent, ErrorEvent)):
                     return

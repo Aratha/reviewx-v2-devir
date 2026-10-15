@@ -3,7 +3,6 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import RuleApprovalsPage from './RuleApprovalsPage';
 import {RuleProposalService} from '@/services/ruleProposals';
 import {RuleSetService} from '@/services/ruleSet';
-import {UserAdminService} from '@/services/userAdmin';
 import {apiError, renderWithSession} from '@/test/render';
 import type {
   PublishRequestDetail,
@@ -174,32 +173,9 @@ describe('rule approvals page (rule-proposals Requirement 1, 5-7)', () => {
     expect(await screen.findByText(/Taslak bu istekten sonra değişti/)).toBeInTheDocument();
   });
 
-  it('grants and revokes the proposal permission', async () => {
-    vi.spyOn(RuleProposalService, 'proposers').mockResolvedValue({
-      items: [
-        {user_id: 'u-1', username: 'ayse', display_name: 'Ayşe İnceleyici', granted_by_name: 'Yönetici', granted_at: '2026-10-14T08:00:00Z'},
-      ],
-    });
-    vi.spyOn(UserAdminService, 'list').mockResolvedValue({
-      items: [
-        {public_id: 'u-1', username: 'ayse', display_name: 'Ayşe İnceleyici', email: 'a@x', role: 'inceleyici', is_active: true, is_super_admin: false, account_type: 'directory', last_login_at: null},
-        {public_id: 'u-2', username: 'can', display_name: 'Can Kural', email: 'c@x', role: 'kural-yoneticisi', is_active: true, is_super_admin: false, account_type: 'directory', last_login_at: null},
-      ],
-      page: 1,
-      size: 20,
-      total: 2,
-    } as Awaited<ReturnType<typeof UserAdminService.list>>);
-    const grant = vi.spyOn(RuleProposalService, 'grant').mockResolvedValue(undefined);
-    const revoke = vi.spyOn(RuleProposalService, 'revoke').mockResolvedValue(undefined);
+  it('has no permission list: every reviewer may propose (Decision 6)', async () => {
     renderWithSession(<RuleApprovalsPage />, {role: 'super_admin'});
-    fireEvent.click(await screen.findByRole('tab', {name: 'Öneri yetkisi'}));
-    fireEvent.click(await screen.findByRole('button', {name: 'Ayşe İnceleyici yetkisini kaldır'}));
-    await waitFor(() => expect(revoke).toHaveBeenCalledWith('u-1'));
-    fireEvent.change(screen.getByLabelText('Kullanıcı ara'), {target: {value: 'a'}});
-    fireEvent.click(screen.getByRole('button', {name: 'Ara'}));
-    const results = await screen.findByRole('list', {name: 'Arama sonuçları'});
-    expect(within(results).getByText('Yetkili')).toBeInTheDocument();
-    fireEvent.click(within(results).getByRole('button', {name: 'Can Kural kullanıcısına yetki ver'}));
-    await waitFor(() => expect(grant).toHaveBeenCalledWith('u-2'));
+    await screen.findByRole('tab', {name: /Kural önerileri/});
+    expect(screen.queryByRole('tab', {name: 'Öneri yetkisi'})).toBeNull();
   });
 });

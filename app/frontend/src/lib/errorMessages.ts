@@ -47,6 +47,7 @@ const MESSAGES: Record<string, string> = {
   schedule_invalid: 'Ad, nesne seçimi veya periyot geçersiz.',
   recipient_invalid: 'Alıcı e-posta adreslerinden biri geçersiz veya alıcı yok.',
   recipient_domain_not_allowed: 'Alıcı yalnız kurum e-posta alan adlarından olabilir.',
+  email_test_too_soon: 'Deneme e-postası için birkaç saniye bekleyin.',
   schedule_name_duplicate: 'Aynı adla ikinci bir zamanlanmış inceleme tanımlanamaz.',
   scheduled_review_not_found: 'Zamanlanmış inceleme bulunamadı.',
   scheduled_review_running: 'Bu tanımın bir koşumu sırada bekliyor veya sürüyor.',

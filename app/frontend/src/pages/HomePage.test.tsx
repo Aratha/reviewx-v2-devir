@@ -1,10 +1,12 @@
 import {screen, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import HomePage from './HomePage';
+import {ReviewService} from '@/services/reviews';
 import {RuleProposalService} from '@/services/ruleProposals';
 import {renderWithSession} from '@/test/render';
 
 function capabilities(canPropose: boolean, canDecide: boolean, pending = 0) {
+  vi.spyOn(ReviewService, 'runs').mockResolvedValue({items: [], page: 1, page_size: 5, total: 0});
   vi.spyOn(RuleProposalService, 'capabilities').mockResolvedValue({can_propose: canPropose, can_decide: canDecide});
   vi.spyOn(RuleProposalService, 'list').mockResolvedValue({items: [], page: 1, page_size: 1, total: pending});
   vi.spyOn(RuleProposalService, 'publishRequests').mockResolvedValue({items: [], page: 1, page_size: 1, total: 0});

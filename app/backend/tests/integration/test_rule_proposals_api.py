@@ -30,40 +30,22 @@ async def proposals(auth: AuthHarness, role_sessions: RoleSessions) -> AsyncIter
 # --- Permission (Requirement 1) ---------------------------------------------------------------
 
 
-async def test_the_super_admin_grants_lists_and_revokes_the_permission(
+async def test_every_reviewer_and_rule_manager_proposes_without_a_permission(
     proposals: Proposals, role_sessions: RoleSessions
 ) -> None:
+    # Decision 9: no permission list; only the super admin decides.
     admin = await role_sessions.super_admin()
-    reviewer = await role_sessions.reviewer()
-
-    before = await proposals.call("GET", "/rule-proposals/capabilities", reviewer)
-    assert before.json() == {"can_propose": False, "can_decide": False}
-    refused = await proposals.propose_rule(reviewer)
-    assert refused.status_code == 403
-    assert refused.json()["detail"]["code"] == "proposal_forbidden"
-
-    granted = await proposals.call("PUT", f"/rule-proposers/{reviewer.public_id}", admin)
-    again = await proposals.call("PUT", f"/rule-proposers/{reviewer.public_id}", admin)
-    assert (granted.status_code, again.status_code) == (204, 204)
-    listed = await proposals.call("GET", "/rule-proposers", admin)
-    assert reviewer.public_id in [item["user_id"] for item in listed.json()["items"]]
-    after = await proposals.call("GET", "/rule-proposals/capabilities", reviewer)
-    assert after.json() == {"can_propose": True, "can_decide": False}
+    for session in (await role_sessions.reviewer(), await role_sessions.rule_manager()):
+        capabilities = await proposals.call("GET", "/rule-proposals/capabilities", session)
+        assert capabilities.json() == {"can_propose": True, "can_decide": False}
+        created = await proposals.propose_rule(session)
+        assert created.status_code == 201, created.text
     decider = await proposals.call("GET", "/rule-proposals/capabilities", admin)
     assert decider.json() == {"can_propose": True, "can_decide": True}
-
-    revoked = await proposals.call("DELETE", f"/rule-proposers/{reviewer.public_id}", admin)
-    assert revoked.status_code == 204
-    assert (await proposals.propose_rule(reviewer)).status_code == 403
-    listed = await proposals.call("GET", "/rule-proposers", admin)
-    assert reviewer.public_id not in [item["user_id"] for item in listed.json()["items"]]
-
-    unknown = await proposals.call("PUT", f"/rule-proposers/{uuid4()}", admin)
-    assert unknown.status_code == 404
-    for method in ("GET", "PUT"):
-        path = "/rule-proposers" if method == "GET" else f"/rule-proposers/{reviewer.public_id}"
-        forbidden = await proposals.call(method, path, reviewer)
-        assert forbidden.status_code == 403
+    # The former permission endpoints are gone.
+    reviewer = await role_sessions.reviewer()
+    gone = await proposals.call("PUT", f"/rule-proposers/{reviewer.public_id}", admin)
+    assert gone.status_code in (404, 405)
 
 
 # --- Proposals (Requirement 2-4) --------------------------------------------------------------

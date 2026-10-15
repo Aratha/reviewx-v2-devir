@@ -28,8 +28,6 @@ export type PublishRequestPage = Schemas['PublishRequestPage'];
 export type PublishRequestStatus = Schemas['PublishRequestItem']['status'];
 export type RuleSetDiffView = Schemas['RuleSetDiffView'];
 export type DiffRuleItem = Schemas['DiffRuleItem'];
-export type RuleProposerItem = Schemas['RuleProposerItem'];
-export type RuleProposerList = Schemas['RuleProposerList'];
 
 export type SqlConnectionView = Schemas['SqlConnectionView'];
 export type SqlConnectionChange = Schemas['SqlConnectionChange'];
@@ -69,3 +67,7 @@ export type ScheduledRunItem = Schemas['ScheduledRunItem'];
 export type ScheduledRunPage = Schemas['ScheduledRunPage'];
 export type ScheduledRunQueued = Schemas['ScheduledRunQueued'];
 export type ScheduledReviewSettings = Schemas['ScheduledReviewSettings'];
+export type ScheduledEmailStatus = Schemas['ScheduledEmailStatus'];
+export type ScheduledEmailTestResult = Schemas['ScheduledEmailTestResult'];
+export type RunCancelled = Schemas['RunCancelled'];
+export type ScheduledRunStopped = Schemas['ScheduledRunStopped'];

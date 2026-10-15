@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth.dependencies import CurrentContext, require_any_role
+from app.api.integrations import get_review_registry
 from app.api.validation import envelope_validation_route
 from app.db.session import get_db
 from app.domain.models.role import ROLE_REVIEWER, ROLE_RULE_MANAGER
@@ -21,6 +22,7 @@ from app.schemas.review_runs.contracts import (
     ReviewRunDetail,
     ReviewRunPage,
     ReviewRunScopeValue,
+    RunCancelled,
 )
 from app.services.review_history_service import (
     DEFAULT_PAGE_SIZE,
@@ -30,6 +32,7 @@ from app.services.review_history_service import (
     ExportFile,
     ReviewHistoryService,
 )
+from app.services.review_run_service import ReviewRunRegistry
 
 router = APIRouter(
     prefix="/review-runs",
@@ -116,6 +119,26 @@ async def delete_review_run(run_id: RunId, context: CurrentContext, service: Ser
 
     await service.delete_run(context, run_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{run_id}/cancel",
+    response_model=RunCancelled,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        **_OWNER_ONLY,
+        409: {"description": "review_run_not_running: koşum bitmiş"},
+    },
+)
+async def cancel_review_run(
+    run_id: RunId,
+    context: CurrentContext,
+    service: Service,
+    registry: Annotated[ReviewRunRegistry, Depends(get_review_registry)],
+) -> RunCancelled:
+    """ "Analizi durdur": stop a running run of the caller (the super admin: any run)."""
+
+    return await service.cancel_run(context, run_id, registry)
 
 
 @router.put(

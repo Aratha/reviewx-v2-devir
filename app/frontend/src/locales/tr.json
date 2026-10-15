@@ -33,7 +33,7 @@
   "home.overview.authority": "Yetki",
   "home.overview.superAdmin": "Süper yönetici",
   "home.empty.title": "İncelemeye başlayın",
-  "home.empty.body": "Soldaki menüden bir veritabanı nesnesini ya da yapıştırdığınız SQL metnini yayımlanmış kurallara göre inceleyebilir, geçmiş incelemelerinizi açabilirsiniz.",
+  "home.empty.body": "Üstteki menüden bir veritabanı nesnesini ya da yapıştırdığınız SQL metnini yayımlanmış kurallara göre inceleyebilir, geçmiş incelemelerinizi açabilirsiniz.",
   "routing.notFound.title": "Sayfa bulunamadı",
   "routing.notFound.home": "Ana sayfaya dön",
   "auth.login.usernameHint": "Örnek: ad.soyad",

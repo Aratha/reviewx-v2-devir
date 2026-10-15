@@ -22,7 +22,10 @@ function kindLabel(session: ReviewSessionState): string {
 }
 
 function finishedLine(session: ReviewSessionState): string {
-  if (session.phase === 'cancelled') return 'İnceleme durduruldu.';
+  if (session.phase === 'cancelled')
+    return session.stopConfirmed
+      ? 'İnceleme durduruldu. Sunucu durdurmayı doğruladı; LLM çağrıları kesildi.'
+      : 'İnceleme durduruldu.';
   if (session.phase === 'failed') return 'İnceleme hata ile sona erdi.';
   return 'İnceleme tamamlandı.';
 }
@@ -54,14 +57,18 @@ function LiveReviewDialog() {
       onClose={running ? undefined : closeWindows}
       headerActions={
         running ? (
-          <Button variant="danger" onClick={stop}>
-            Analizi durdur
+          <Button variant="danger" onClick={stop} disabled={session.stopping} busy={session.stopping}>
+            {session.stopping ? 'Durduruluyor…' : 'Analizi durdur'}
           </Button>
         ) : undefined
       }
       footer={
         running ? (
-          <p className="subtle grow">Analiz sürüyor; pencereyi kapatmak için bitmesini bekleyin veya durdurun.</p>
+          <p className="subtle grow" role="status">
+            {session.stopping
+              ? 'Durdurma isteği sunucuya gönderildi; LLM çağrıları kesiliyor…'
+              : 'Analiz sürüyor; pencereyi kapatmak için bitmesini bekleyin veya durdurun.'}
+          </p>
         ) : (
           <>
             <p className="grow" role="status">

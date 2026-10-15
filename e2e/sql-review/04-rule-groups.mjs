@@ -1,4 +1,5 @@
-import {withBrowser, baseUrl, accounts, message, signIn, apiStatus, apiPrefix, sessionToken} from '../shared/harness.mjs';
+import {withBrowser, baseUrl, accounts, signIn, apiStatus, apiPrefix, sessionToken} from '../shared/harness.mjs';
+import {mainMenu, openAdminSection, openLibrary, openReview} from './navigation.mjs';
 
 /**
  * rule-group-selection Acceptance 4 (local): the rule manager defines two named groups, puts one
@@ -27,8 +28,7 @@ function formatRuleId(value) {
 }
 
 async function openScriptPage(page) {
-  await page.getByRole('navigation', {name: message('shell.navigation')}).getByRole('link', {name: 'SQL betiği incelemesi'}).click();
-  await page.getByRole('heading', {name: 'SQL betiği incelemesi', level: 1}).waitFor();
+  await openReview(page, 'SQL betiği', 'SQL betiği incelemesi');
 }
 
 async function addGroup(page, index, name) {
@@ -80,8 +80,7 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
   let changed = false;
   try {
     // Rule manager: two groups, rule A in both and rule B in the second, save and publish.
-    await manager.getByRole('navigation', {name: message('shell.navigation')}).getByRole('link', {name: 'Kurallar', exact: true}).click();
-    await manager.getByRole('heading', {name: 'Kurallar', level: 1}).waitFor();
+    await openAdminSection(manager, 'Kurallar');
     const before = await apiStatus(manager, '/rule-set');
     assert.equal(before.status, 200);
     const previousVersion = before.body.latest_version.number;
@@ -121,11 +120,13 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
     assert.ok(single, 'the version keeps an ungrouped critical rule');
 
     // Reviewer: the groups are listed on the published-rules page and offered on the review page.
-    const nav = reviewer.getByRole('navigation', {name: message('shell.navigation')});
-    await nav.getByRole('link', {name: 'Yayımlanmış kurallar'}).click();
-    const groupsCard = reviewer.getByRole('region', {name: 'Kural grupları'});
-    await groupsCard.getByText(GROUP_A).waitFor();
-    await groupsCard.getByText(GROUP_B).waitFor();
+    const nav = mainMenu(reviewer);
+    await openLibrary(reviewer, 'Yayımlanmış kurallar');
+    const shelves = reviewer.getByRole('navigation', {name: 'Kural grupları'});
+    await shelves.getByRole('button', {name: new RegExp(GROUP_A)}).waitFor();
+    await shelves.getByRole('button', {name: new RegExp(GROUP_B)}).click();
+    // The chosen group's rules run top to bottom on the right.
+    await reviewer.getByRole('region', {name: GROUP_B}).getByRole('heading', {name: GROUP_B}).waitFor();
 
     await openScriptPage(reviewer);
     await reviewer.getByText('Hiçbir kural seçilmezse tüm kurallar çalışır.').waitFor();
@@ -187,7 +188,7 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
     assert.deepEqual(resultA.rule_group_names, [GROUP_A, GROUP_B]);
 
     // The history detail and the CSV carry the selection and every group name as well.
-    await nav.getByRole('link', {name: 'İnceleme geçmişi'}).click();
+    await nav.getByRole('link', {name: 'Geçmiş'}).click();
     await reviewer.getByRole('button', {name: new RegExp(`^${LABEL_GROUP} — Tamamlandı`)}).click();
     await reviewer.getByText(`Seçilen kurallar: ${single}, ${ruleA}`).waitFor();
     const csv = await exportText(reviewer, `/review-runs/${grouped.id}/exports/csv`);
@@ -250,5 +251,10 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
     }
   }
 }, {
-  expectedServerErrors: llmBaseUrl ? [] : [/^503 POST .*\/api\/dwhcodereview\/v1\/script-reviews$/],
+  // "İnceleme" opens the object review first; without a SQL Server connection its database list
+  // answers 503 by contract before the switch moves to the script review.
+  expectedServerErrors: [
+    /^503 GET .*\/api\/dwhcodereview\/v1\/databases\?/,
+    ...(llmBaseUrl ? [] : [/^503 POST .*\/api\/dwhcodereview\/v1\/script-reviews$/]),
+  ],
 });

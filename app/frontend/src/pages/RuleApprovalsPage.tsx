@@ -15,22 +15,20 @@ import {formatDateTime} from '@/lib/format';
 import {displaySummary} from '@/lib/rules';
 import {RuleProposalService} from '@/services/ruleProposals';
 import {RuleSetService} from '@/services/ruleSet';
-import {UserAdminService} from '@/services/userAdmin';
 import type {
   PublishRequestItem,
   RuleProposalItem,
   RuleSetVersionDetail,
-  UserSummary,
 } from '@/types/sqlReview';
 
-type Tab = 'rule' | 'group' | 'publish' | 'proposers';
+type Tab = 'rule' | 'group' | 'publish';
 const REASON_LIMIT = 500;
 
 /**
  * "Kural onayları" (sql-review rule-proposals Requirement 1, 5-7): the super admin reads every
  * pending rule proposal, group proposal and publish request in detail, approves it — which
- * publishes a new version at once — or rejects it with a reason the requester sees, and manages
- * who may propose. The backend checks the super admin on every request.
+ * publishes a new version at once — or rejects it with a reason the requester sees. Every
+ * reviewer and rule manager may propose (Decision 6). The backend checks the super admin on every request.
  */
 export default function RuleApprovalsPage() {
   const [tab, setTab] = useState<Tab>('rule');
@@ -88,7 +86,6 @@ export default function RuleApprovalsPage() {
           {id: 'rule', label: 'Kural önerileri', count: ruleItems.length, attention: true},
           {id: 'group', label: 'Grup önerileri', count: groupItems.length, attention: true},
           {id: 'publish', label: 'Yayın istekleri', count: publishCount, attention: true},
-          {id: 'proposers', label: 'Öneri yetkisi'},
         ]}
       />
       {(tab === 'rule' || tab === 'group') && proposals.status === 'error' && (
@@ -107,7 +104,6 @@ export default function RuleApprovalsPage() {
         <ErrorState message={describeError(requests.error)} onRetry={requests.reload} />
       )}
       {tab === 'publish' && requests.data && <RequestQueue items={requests.data.items} onDecided={refresh} />}
-      {tab === 'proposers' && <ProposerAdmin />}
       <ApprovalFlow role="decider" />
     </div>
   );
@@ -314,110 +310,5 @@ function Decision({
         )}
       </div>
     </div>
-  );
-}
-
-function ProposerAdmin() {
-  const searchId = useId();
-  const [generation, setGeneration] = useState(0);
-  const proposers = useResource(`rule-proposers:${generation}`, (signal) => RuleProposalService.proposers(signal));
-  const [query, setQuery] = useState('');
-  const [found, setFound] = useState<UserSummary[] | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const holders = new Set(proposers.data?.items.map((item) => item.user_id) ?? []);
-
-  async function search() {
-    setError(null);
-    try {
-      const page = await UserAdminService.list({page: 1, size: 20, q: query.trim() || undefined});
-      setFound(page.items.filter((user) => user.is_active && !user.is_super_admin));
-    } catch (failure) {
-      setError(describeError(failure));
-    }
-  }
-
-  async function change(userId: string, grant: boolean) {
-    setBusy(userId);
-    setError(null);
-    try {
-      await (grant ? RuleProposalService.grant(userId) : RuleProposalService.revoke(userId));
-      setGeneration((value) => value + 1);
-    } catch (failure) {
-      setError(describeError(failure));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <section className="card card-body stack" aria-label="Öneri yetkisi">
-      <p className="subtle">Yetki verilen kullanıcılar yeni kural ve grup önerebilir; öneriler bu sayfaya düşer.</p>
-      {error && <Alert tone="error">{error}</Alert>}
-      {proposers.status === 'error' && <ErrorState message={describeError(proposers.error)} onRetry={proposers.reload} />}
-      {proposers.data && proposers.data.items.length === 0 && <p className="muted">Henüz yetki verilmiş kullanıcı yok.</p>}
-      {proposers.data && proposers.data.items.length > 0 && (
-        <ul className="list stack-tight" aria-label="Yetkili kullanıcılar">
-          {proposers.data.items.map((item) => (
-            <li key={item.user_id} className="row">
-              <span className="grow">
-                {item.display_name} <span className="subtle">({item.username})</span>
-              </span>
-              <Button
-                size="sm"
-                variant="danger-outline"
-                busy={busy === item.user_id}
-                onClick={() => void change(item.user_id, false)}
-                aria-label={`${item.display_name} yetkisini kaldır`}
-              >
-                Yetkiyi kaldır
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="row">
-        <div className="field grow">
-          <label className="field-label" htmlFor={searchId}>
-            Kullanıcı ara
-          </label>
-          <input
-            id={searchId}
-            className="input"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void search();
-            }}
-          />
-        </div>
-        <Button onClick={() => void search()}>Ara</Button>
-      </div>
-      {found !== null && found.length === 0 && <p className="muted">Eşleşen etkin kullanıcı yok.</p>}
-      {found !== null && found.length > 0 && (
-        <ul className="list stack-tight" aria-label="Arama sonuçları">
-          {found.map((user) => (
-            <li key={user.public_id} className="row">
-              <span className="grow">
-                {user.display_name} <span className="subtle">({user.username})</span>
-              </span>
-              {holders.has(user.public_id) ? (
-                <Badge tone="success">Yetkili</Badge>
-              ) : (
-                <Button
-                  size="sm"
-                  busy={busy === user.public_id}
-                  onClick={() => void change(user.public_id, true)}
-                  aria-label={`${user.display_name} kullanıcısına yetki ver`}
-                >
-                  Yetki ver
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }

@@ -17,15 +17,15 @@ const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
   manager: {
     title: 'Taslak nasıl yayımlanır?',
     steps: [
-      {title: 'Taslağı düzenleyin', where: 'Kurallar', text: 'Kural ekleyin, tek cümlelik özet yazın, gruplara atayın.'},
+      {title: 'Taslağı düzenleyin', where: 'Yönetim → Kurallar', text: 'Kural ekleyin, tek cümlelik özet yazın, gruplara atayın.'},
       {
         title: 'Onaya gönderin',
-        where: 'Kurallar → Onaya gönder',
+        where: 'Yönetim → Kurallar → Onaya gönder',
         text: 'Değişiklikler kaydedilir ve yayın isteği süper yöneticiye düşer.',
       },
       {
         title: 'Süper yönetici inceler',
-        where: 'Kural onayları → Yayın istekleri',
+        where: 'Yönetim → Kural onayları',
         text: 'Yayımlanmış sürüme göre eklenen, değişen ve silinen kuralları görür.',
       },
       {
@@ -40,17 +40,17 @@ const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
     steps: [
       {
         title: 'Öneriyi yazın',
-        where: 'Kural önerilerim → Kural öner / Grup öner',
+        where: 'Kural kitaplığı → Kural önerilerim',
         text: 'Kural için tek cümlelik özet ve ayrıntılı metin zorunludur.',
       },
       {
         title: 'Onaya düşer',
-        where: 'Süper yönetici → Kural onayları',
+        where: 'Süper yönetici: Yönetim → Kural onayları',
         text: 'Öneri "Bekliyor" durumunda süper yöneticinin onay listesine girer.',
       },
       {
         title: 'Karar',
-        where: 'Kural önerilerim → Önerilerim',
+        where: 'Kural kitaplığı → Kural önerilerim',
         text: 'Onaylanırsa yeni sürümde herkesin kullanımına açılır; reddedilirse gerekçe görünür.',
       },
     ],
@@ -60,7 +60,7 @@ const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
     steps: [
       {
         title: 'Gelen işler',
-        where: 'Bu sayfa',
+        where: 'Yönetim → Kural onayları',
         text: 'Yetkili kullanıcıların kural ve grup önerileri ile kural yöneticilerinin yayın istekleri buraya düşer.',
       },
       {
@@ -75,7 +75,7 @@ const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
       },
       {
         title: 'Yetki verin',
-        where: 'Öneri yetkisi',
+        where: 'Kural onayları → Öneri yetkisi',
         text: 'Kimlerin kural ve grup önerebileceğini belirleyin.',
       },
     ],

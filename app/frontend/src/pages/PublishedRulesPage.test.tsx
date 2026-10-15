@@ -1,4 +1,4 @@
-import {fireEvent, screen, waitFor} from '@testing-library/react';
+import {fireEvent, screen, waitFor, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import PublishedRulesPage from './PublishedRulesPage';
 import {RuleSetService} from '@/services/ruleSet';
@@ -71,12 +71,18 @@ describe('published rules page', () => {
 });
 
 describe('published rules page — named rule groups (rule-group-selection Requirement 3)', () => {
-  it('shows the frozen groups and each rule\'s group read-only', async () => {
+  it('lists the frozen groups on the left and shows a chosen group\'s rules', async () => {
     mockVersions();
     vi.spyOn(RuleSetService, 'latest').mockResolvedValue(version(2, 'İkinci metin'));
     renderWithSession(<PublishedRulesPage />, {role: 'inceleyici'});
-    expect(await screen.findByText('Güvenlik: Erişim kuralları')).toBeInTheDocument();
-    expect(screen.getAllByText('Güvenlik').length).toBeGreaterThan(0);
+    const shelves = await screen.findByRole('navigation', {name: 'Kural grupları'});
+    expect(within(shelves).getByRole('button', {name: /Tüm kurallar/})).toHaveAttribute('aria-pressed', 'true');
+    const group = within(shelves).getByRole('button', {name: /Güvenlik/});
+    expect(within(group).getByText('Erişim kuralları')).toBeInTheDocument();
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-pressed', 'true');
+    const rules = screen.getByRole('region', {name: 'Güvenlik'});
+    expect(within(rules).getByRole('heading', {name: 'Güvenlik'})).toBeInTheDocument();
     expect(screen.queryByRole('button', {name: /grubunu sil/})).toBeNull();
   });
 });

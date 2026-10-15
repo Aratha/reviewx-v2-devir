@@ -7,7 +7,6 @@ import type {
   RuleProposalCreate,
   RuleProposalDetail,
   RuleProposalPage,
-  RuleProposerList,
 } from '@/types/sqlReview';
 
 type Scope = 'mine' | 'pending' | 'all';
@@ -61,14 +60,5 @@ export const RuleProposalService = {
   },
   rejectRequest(id: string, reason: string): Promise<PublishRequestDetail> {
     return post<PublishRequestDetail>(`/rule-set/publish-requests/${encodeURIComponent(id)}/reject`, {reason});
-  },
-  proposers(signal?: AbortSignal): Promise<RuleProposerList> {
-    return apiRequest<RuleProposerList>('/rule-proposers', {signal});
-  },
-  grant(userId: string): Promise<void> {
-    return apiRequest<void>(`/rule-proposers/${encodeURIComponent(userId)}`, {method: 'PUT'});
-  },
-  revoke(userId: string): Promise<void> {
-    return apiRequest<void>(`/rule-proposers/${encodeURIComponent(userId)}`, {method: 'DELETE'});
   },
 };

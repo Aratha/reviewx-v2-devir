@@ -164,15 +164,3 @@ class PublishRequestPage(BaseModel):
     page: int
     page_size: int
     total: int
-
-
-class RuleProposerItem(BaseModel):
-    user_id: str = Field(description="public_id of the user.")
-    username: str
-    display_name: str
-    granted_by_name: str | None
-    granted_at: datetime
-
-
-class RuleProposerList(BaseModel):
-    items: list[RuleProposerItem]

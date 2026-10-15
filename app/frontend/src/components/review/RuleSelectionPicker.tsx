@@ -16,10 +16,13 @@ export function RuleSelectionPicker({
   value,
   disabled,
   onChange,
+  plain = false,
 }: {
   value: string[];
   disabled: boolean;
   onChange: (ruleCodes: string[]) => void;
+  /** Without its own card, for a side panel that frames it. */
+  plain?: boolean;
 }) {
   const latest = useResource('rule-set-version:latest', (signal) => RuleSetService.latest(signal));
   const [search, setSearch] = useState('');
@@ -55,7 +58,7 @@ export function RuleSelectionPicker({
   }
 
   return (
-    <fieldset className="card card-body picker" role="group" aria-labelledby={legendId}>
+    <fieldset className={plain ? 'picker' : 'card card-body picker'} role="group" aria-labelledby={legendId}>
       <div className="picker-head">
         <legend id={legendId} className="picker-title">
           Kurallar

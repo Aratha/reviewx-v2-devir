@@ -1,13 +1,12 @@
-"""Rule proposal, publish request and proposal permission endpoints (sql-review 009-rule-proposals).
+"""Rule proposal and publish request endpoints (sql-review 009-rule-proposals).
 
-Every endpoint checks the caller on the server: proposals need the proposal permission, decisions
-and the permission list need the super admin, publish requests need the rule manager role.
+Every endpoint checks the caller on the server: any reviewer or rule manager proposes (Decision 9),
+decisions need the super admin, publish requests need the rule manager role.
 """
 
 from typing import Annotated
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import dependencies
@@ -27,7 +26,6 @@ from app.schemas.rule_proposals.contracts import (
     RuleProposalCreate,
     RuleProposalDetail,
     RuleProposalPage,
-    RuleProposerList,
 )
 from app.services.rule_proposal_service import (
     DEFAULT_PAGE_SIZE,
@@ -50,10 +48,6 @@ requests_router = APIRouter(
     route_class=_ROUTE,
     responses=_ERRORS,
 )
-proposers_router = APIRouter(
-    prefix="/rule-proposers", tags=["rule-proposals"], route_class=_ROUTE, responses=_ERRORS
-)
-
 AnyReviewRole = [Depends(require_any_role(ROLE_REVIEWER, ROLE_RULE_MANAGER))]
 RuleManager = [Depends(require_any_role(ROLE_RULE_MANAGER))]
 SuperAdmin = [Depends(dependencies.require_super_admin())]
@@ -218,31 +212,3 @@ async def reject_publish_request(
     """Reject a pending publish request with a reason the rule manager sees."""
 
     return await service.reject_request(context, request_id, body.reason)
-
-
-# --- Proposal permission --------------------------------------------------------------------------
-
-
-@proposers_router.get("", response_model=RuleProposerList, dependencies=SuperAdmin)
-async def list_proposers(context: CurrentContext, service: Service) -> RuleProposerList:
-    """Users holding the "kural önerebilir" permission (Requirement 1)."""
-
-    return await service.proposers(context)
-
-
-@proposers_router.put("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=SuperAdmin)
-async def grant_proposer(user_id: UUID, context: CurrentContext, service: Service) -> Response:
-    """Grant the permission to an active user of the tenant."""
-
-    await service.set_proposer(context, user_id, granted=True)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@proposers_router.delete(
-    "/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=SuperAdmin
-)
-async def revoke_proposer(user_id: UUID, context: CurrentContext, service: Service) -> Response:
-    """Revoke the permission; the user's pending proposals stay for a decision."""
-
-    await service.set_proposer(context, user_id, granted=False)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

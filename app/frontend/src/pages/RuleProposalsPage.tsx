@@ -69,16 +69,28 @@ export default function RuleProposalsPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-fill">
       <PageHeader
         title="Kural önerilerim"
         description="Önerdiğiniz kural veya grup, süper yönetici onaylayınca yeni sürümle herkesin kullanımına açılır."
       />
-      <Tabs label="Kural önerileri" items={TABS} value={tab} onChange={setTab} />
-      {tab === 'rule' && <RuleProposalForm version={latest.data} onSent={proposed} />}
-      {tab === 'group' && <GroupProposalForm version={latest.data} onSent={proposed} />}
-      {tab === 'history' && <ProposalHistory key={sent} />}
-      <ApprovalFlow role="proposer" />
+      <div className="workspace">
+        <section className="pane" aria-label="Öneriler">
+          <div className="pane-head pane-tabs">
+            <Tabs label="Kural önerileri" items={TABS} value={tab} onChange={setTab} />
+          </div>
+          <div className="pane-body">
+            {tab === 'rule' && <RuleProposalForm version={latest.data} onSent={proposed} />}
+            {tab === 'group' && <GroupProposalForm version={latest.data} onSent={proposed} />}
+            {tab === 'history' && <ProposalHistory key={sent} />}
+          </div>
+        </section>
+        <aside className="pane" aria-label="Öneri akışı">
+          <div className="pane-body">
+            <ApprovalFlow role="proposer" />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

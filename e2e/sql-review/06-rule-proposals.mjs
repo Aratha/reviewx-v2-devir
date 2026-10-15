@@ -1,4 +1,5 @@
-import {withBrowser, accounts, message, signIn, apiStatus} from '../shared/harness.mjs';
+import {withBrowser, accounts, signIn, apiStatus} from '../shared/harness.mjs';
+import {openAdminSection, openLibrary} from './navigation.mjs';
 
 const STAMP = Date.now();
 const RULE_SUMMARY = `E2E öneri özeti ${STAMP}.`;
@@ -6,10 +7,6 @@ const RULE_TEXT = `E2E öneri ayrıntısı ${STAMP}: geçici tablolar işlem son
 const REJECTED_SUMMARY = `E2E reddedilecek öneri ${STAMP}.`;
 const REJECTION = `E2E ret gerekçesi ${STAMP}`;
 const GROUP_NAME = `E2E öneri grubu ${STAMP}`;
-
-function nav(page) {
-  return page.getByRole('navigation', {name: message('shell.navigation')});
-}
 
 async function proposeRule(page, summary, text) {
   const form = page.getByRole('form', {name: 'Yeni kural önerisi'});
@@ -20,41 +17,26 @@ async function proposeRule(page, summary, text) {
 }
 
 /**
- * rule-proposals Acceptance 4 (local): the super admin gives a reviewer the "kural önerebilir"
- * permission; the reviewer proposes a rule with its summary and detailed text, and a group holding
+ * rule-proposals Acceptance 4 (local): a reviewer, without any permission (Decision 6), proposes a rule with its summary and detailed text, and a group holding
  * that rule once it is published; the super admin reads the detailed text and approves both, so
  * the rule and the group appear in new versions; a rejected proposal shows its reason to the
- * reviewer. The scenario revokes the permission, removes its rule and group from the draft and
- * publishes again in `finally`.
+ * reviewer. The scenario removes its rule and group from the draft and publishes again in
+ * `finally`.
  */
-await withBrowser('rule proposals: permission, proposal, approval and rejection', async ({page, assert, newPage}) => {
+await withBrowser('rule proposals: everyone proposes, approval and rejection', async ({page, assert, newPage}) => {
   const admin = page;
   await signIn(admin, accounts.superAdmin);
   const reviewer = await newPage();
   await signIn(reviewer, accounts.reviewer);
-  const me = (await apiStatus(reviewer, '/auth/me')).body;
-  const reviewerId = me?.user?.public_id ?? me?.public_id;
-  assert.ok(reviewerId, 'the reviewer has a public id');
-  let granted = false;
   let changed = false;
   try {
     const previous = (await apiStatus(admin, '/rule-set/versions/latest')).body.number;
-    assert.equal(await nav(reviewer).getByRole('link', {name: 'Kural önerilerim'}).count(), 0);
+    // Super admin: there is no permission list any more.
+    await openAdminSection(admin, 'Kural onayları');
+    assert.equal(await admin.getByRole('tab', {name: 'Öneri yetkisi'}).count(), 0);
 
-    // Super admin: grant the permission from "Kural onayları".
-    await nav(admin).getByRole('link', {name: /Kural onayları/}).click();
-    await admin.getByRole('heading', {name: 'Kural onayları', level: 1}).waitFor();
-    await admin.getByRole('tab', {name: 'Öneri yetkisi'}).click();
-    await admin.getByLabel('Kullanıcı ara').fill(accounts.reviewer.username);
-    await admin.getByRole('button', {name: 'Ara', exact: true}).click();
-    await admin.getByRole('list', {name: 'Arama sonuçları'}).getByRole('button', {name: /yetki ver$/}).first().click();
-    await admin.getByRole('list', {name: 'Yetkili kullanıcılar'}).waitFor();
-    granted = true;
-
-    // Reviewer: the menu now offers proposals; a rule needs both the summary and the text.
-    await reviewer.reload();
-    await nav(reviewer).getByRole('link', {name: 'Kural önerilerim'}).click();
-    await reviewer.getByRole('heading', {name: 'Kural önerilerim', level: 1}).waitFor();
+    // Reviewer: the rule library offers proposals at once; a rule needs the summary and the text.
+    await openLibrary(reviewer, 'Kural önerilerim');
     const form = reviewer.getByRole('form', {name: 'Yeni kural önerisi'});
     await form.getByLabel('Ayrıntılı kural metni (zorunlu)').fill(RULE_TEXT);
     assert.equal(await form.getByRole('button', {name: 'Öneriyi gönder'}).isDisabled(), true);
@@ -131,10 +113,6 @@ await withBrowser('rule proposals: permission, proposal, approval and rejection'
         body: {base_revision: saved.body.revision},
       });
       assert.ok([200, 201].includes(republished.status));
-    }
-    if (granted) {
-      const revoked = await apiStatus(admin, `/rule-proposers/${reviewerId}`, {method: 'DELETE'});
-      assert.equal(revoked.status, 204);
     }
   }
 });

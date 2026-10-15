@@ -12,7 +12,6 @@ from app.domain.models.rule_proposal import (
     ProposalStatus,
     PublishRequestStatus,
     RuleProposal,
-    RuleProposer,
     RulePublishRequest,
 )
 from app.domain.models.user import User
@@ -32,87 +31,11 @@ class PublishRequestRow:
     decided_by_name: str | None
 
 
-@dataclass(frozen=True, slots=True)
-class ProposerRow:
-    proposer: RuleProposer
-    user: User
-    granted_by_name: str | None
-
-
 class RuleProposalRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     # --- Proposal permission (Requirement 1) ----------------------------------------------------
-
-    async def is_proposer(self, tenant_id: int, user_id: int) -> bool:
-        found = await self.session.scalar(
-            select(RuleProposer.user_id).where(
-                RuleProposer.tenant_id == tenant_id,
-                RuleProposer.user_id == user_id,
-                RuleProposer.is_deleted.is_(False),
-            )
-        )
-        return found is not None
-
-    async def proposers(self, tenant_id: int) -> list[ProposerRow]:
-        granter = aliased(User)
-        rows = await self.session.execute(
-            select(RuleProposer, User, granter.display_name)
-            .join(User, User.user_id == RuleProposer.user_id)
-            .outerjoin(granter, granter.user_id == RuleProposer.granted_by_user_id)
-            .where(
-                RuleProposer.tenant_id == tenant_id,
-                RuleProposer.is_deleted.is_(False),
-                User.is_deleted.is_(False),
-            )
-            .order_by(func.lower(User.display_name), User.user_id)
-        )
-        return [ProposerRow(proposer, user, name) for proposer, user, name in rows.all()]
-
-    async def grant(
-        self, tenant_id: int, user_id: int, *, actor_user_id: int, now: datetime
-    ) -> bool:
-        """Grant or revive the permission; False when it was already held."""
-
-        row = await self.session.get(RuleProposer, (tenant_id, user_id), with_for_update=True)
-        if row is None:
-            self.session.add(
-                RuleProposer(
-                    tenant_id=tenant_id,
-                    user_id=user_id,
-                    granted_by_user_id=actor_user_id,
-                    created_by=actor_user_id,
-                    updated_by=actor_user_id,
-                )
-            )
-            await self.session.flush()
-            return True
-        if not row.is_deleted:
-            return False
-        row.is_deleted = False
-        row.deleted_at = None
-        row.deleted_by = None
-        row.granted_by_user_id = actor_user_id
-        row.created_at = now
-        row.updated_by = actor_user_id
-        await self.session.flush()
-        return True
-
-    async def revoke(
-        self, tenant_id: int, user_id: int, *, actor_user_id: int, now: datetime
-    ) -> bool:
-        """Soft-delete the permission; False when it was not held. Pending proposals stay."""
-
-        row = await self.session.get(RuleProposer, (tenant_id, user_id), with_for_update=True)
-        if row is None or row.is_deleted:
-            return False
-        row.is_deleted = True
-        row.deleted_at = now
-        row.deleted_by = actor_user_id
-        row.updated_by = actor_user_id
-        await self.session.flush()
-        return True
 
     # --- Proposals ------------------------------------------------------------------------------
 

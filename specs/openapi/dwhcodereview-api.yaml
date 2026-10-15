@@ -2669,56 +2669,6 @@
         ],
         "type": "object"
       },
-      "RuleProposerItem": {
-        "properties": {
-          "display_name": {
-            "type": "string"
-          },
-          "granted_at": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "granted_by_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "user_id": {
-            "description": "public_id of the user.",
-            "type": "string"
-          },
-          "username": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id",
-          "username",
-          "display_name",
-          "granted_by_name",
-          "granted_at"
-        ],
-        "type": "object"
-      },
-      "RuleProposerList": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/RuleProposerItem"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object"
-      },
       "RuleResultItem": {
         "properties": {
           "code_snippet": {
@@ -3220,6 +3170,28 @@
         ],
         "type": "object"
       },
+      "RunCancelled": {
+        "description": "Answer of a stop request; the run is stored as cancelled when its task has ended.",
+        "properties": {
+          "id": {
+            "description": "public_id of the run.",
+            "type": "string"
+          },
+          "status": {
+            "description": "'cancelling' = the running task was told to stop; 'cancelled' = no task ran for it in this process, so the run was ended as cancelled at once.",
+            "enum": [
+              "cancelling",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
       "RunStartedEvent": {
         "properties": {
           "all_rules": {
@@ -3322,6 +3294,95 @@
           "frequency",
           "hour",
           "minute"
+        ],
+        "type": "object"
+      },
+      "ScheduledEmailStatus": {
+        "description": "Whether the summary e-mail can leave this deployment (Requirement 10, Decision 13).",
+        "properties": {
+          "allowed_domains": {
+            "description": "Corporate domains a recipient may use.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scheduler_enabled": {
+            "description": "The in-process scheduler runs in this deployment.",
+            "type": "boolean"
+          },
+          "smtp_configured": {
+            "description": "The SMTP relay host and the sender are set.",
+            "type": "boolean"
+          },
+          "smtp_security": {
+            "description": "Encryption the relay must use.",
+            "enum": [
+              "starttls",
+              "tls"
+            ],
+            "type": "string"
+          },
+          "suggested_recipient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's own address when its domain is allowed; otherwise null."
+          }
+        },
+        "required": [
+          "scheduler_enabled",
+          "smtp_configured",
+          "smtp_security",
+          "allowed_domains",
+          "suggested_recipient"
+        ],
+        "type": "object"
+      },
+      "ScheduledEmailTest": {
+        "properties": {
+          "recipient": {
+            "description": "One corporate address that receives the test e-mail (Decision 14).",
+            "maxLength": 1000,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient"
+        ],
+        "type": "object"
+      },
+      "ScheduledEmailTestResult": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable failure code such as smtp_unreachable, smtp_tls_failed, smtp_auth_failed, smtp_rejected, smtp_address_not_allowed or smtp_failed."
+          },
+          "status": {
+            "description": "'sent' = the relay accepted it; 'failed' = see error_code; 'not_configured' = no SMTP relay in this deployment.",
+            "enum": [
+              "sent",
+              "failed",
+              "not_configured"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
         ],
         "type": "object"
       },
@@ -3811,6 +3872,27 @@
         },
         "required": [
           "id"
+        ],
+        "type": "object"
+      },
+      "ScheduledRunStopped": {
+        "properties": {
+          "id": {
+            "description": "public_id of the stopped run record.",
+            "type": "string"
+          },
+          "state": {
+            "description": "'cancelling' = the running review was told to stop and ends as cancelled; 'cancelled' = the run had not started or no task ran for it, so it ended at once.",
+            "enum": [
+              "cancelling",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state"
         ],
         "type": "object"
       },
@@ -5409,6 +5491,67 @@
         ]
       }
     },
+    "/api/dwhcodereview/v1/review-runs/{run_id}/cancel": {
+      "post": {
+        "description": "\"Analizi durdur\": stop a running run of the caller (the super admin: any run).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCancelled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Ko\u015fumun sahibi de\u011fil"
+          },
+          "404": {
+            "description": "Ko\u015fum yok, s\u00fcresi dolmu\u015f veya g\u00f6rme yetkisi yok"
+          },
+          "409": {
+            "description": "review_run_not_running: ko\u015fum bitmi\u015f"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Cancel Review Run",
+        "tags": [
+          "review-runs"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/review-runs/{run_id}/exports/csv": {
       "get": {
         "description": "The results as a CSV file (Requirement 7 and 9).",
@@ -6076,131 +6219,6 @@
           }
         ],
         "summary": "Withdraw Proposal",
-        "tags": [
-          "rule-proposals"
-        ]
-      }
-    },
-    "/api/dwhcodereview/v1/rule-proposers": {
-      "get": {
-        "description": "Users holding the \"kural \u00f6nerebilir\" permission (Requirement 1).",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RuleProposerList"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "401": {
-            "description": "Oturum yok"
-          },
-          "403": {
-            "description": "Yetki yok"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": [],
-            "tenant": []
-          }
-        ],
-        "summary": "List Proposers",
-        "tags": [
-          "rule-proposals"
-        ]
-      }
-    },
-    "/api/dwhcodereview/v1/rule-proposers/{user_id}": {
-      "delete": {
-        "description": "Revoke the permission; the user's pending proposals stay for a decision.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "user_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "description": "Oturum yok"
-          },
-          "403": {
-            "description": "Yetki yok"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": [],
-            "tenant": []
-          }
-        ],
-        "summary": "Revoke Proposer",
-        "tags": [
-          "rule-proposals"
-        ]
-      },
-      "put": {
-        "description": "Grant the permission to an active user of the tenant.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "user_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "401": {
-            "description": "Oturum yok"
-          },
-          "403": {
-            "description": "Yetki yok"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": [],
-            "tenant": []
-          }
-        ],
-        "summary": "Grant Proposer",
         "tags": [
           "rule-proposals"
         ]
@@ -6899,6 +6917,88 @@
         ]
       }
     },
+    "/api/dwhcodereview/v1/scheduled-review-settings/email": {
+      "get": {
+        "description": "Whether the summary e-mail can leave this deployment (Requirement 10).",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledEmailStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Read Scheduled Email Status",
+        "tags": [
+          "scheduled-reviews"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/scheduled-review-settings/email/test": {
+      "post": {
+        "description": "Send one test message to one corporate address through the SMTP relay (Decision 14).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduledEmailTest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledEmailTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "422": {
+            "description": "recipient_invalid veya recipient_domain_not_allowed"
+          },
+          "429": {
+            "description": "email_test_too_soon"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Send Scheduled Test Email",
+        "tags": [
+          "scheduled-reviews"
+        ]
+      }
+    },
     "/api/dwhcodereview/v1/scheduled-reviews": {
       "get": {
         "description": "Own definitions; the super admin sees every definition of the tenant (Decision 3).",
@@ -7426,6 +7526,67 @@
           }
         ],
         "summary": "List Scheduled Review Runs",
+        "tags": [
+          "scheduled-reviews"
+        ]
+      }
+    },
+    "/api/dwhcodereview/v1/scheduled-reviews/{schedule_id}/stop": {
+      "post": {
+        "description": "Durdur: end the definition's queued or running run (owner or super admin).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledRunStopped"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Oturum yok"
+          },
+          "403": {
+            "description": "Rol yetkisi yok"
+          },
+          "404": {
+            "description": "Tan\u0131m yok veya g\u00f6rme yetkisi yok"
+          },
+          "409": {
+            "description": "scheduled_review_not_running: s\u0131rada veya s\u00fcren ko\u015fum yok"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "tenant": []
+          }
+        ],
+        "summary": "Stop Scheduled Review Run",
         "tags": [
           "scheduled-reviews"
         ]

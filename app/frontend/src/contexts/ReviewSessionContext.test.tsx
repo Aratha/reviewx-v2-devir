@@ -3,6 +3,7 @@ import {useLocation} from 'react-router';
 import {describe, expect, it, vi} from 'vitest';
 import {useReviewSession} from './ReviewSessionContext';
 import {ReviewWindows} from '@/components/review/ReviewWindows';
+import {ReviewService} from '@/services/reviews';
 import {renderWithSession} from '@/test/render';
 import {eventStreamResponse, liveResult, objectRunEvents} from '@/test/reviewEvents';
 import type {ReviewStreamEvent} from '@/types/sqlReview';
@@ -139,6 +140,7 @@ describe('review session', () => {
     const recent = within(live).getByRole('region', {name: 'Son biten nesneler'});
     expect(within(recent).getAllByRole('region')).toHaveLength(20);
     expect(within(recent).getByText('Biten nesnelerden yalnız son 20 tanesi listelenir.')).toBeInTheDocument();
+    vi.spyOn(ReviewService, 'cancelRun').mockResolvedValue({id: 'run-1', status: 'cancelling'});
     fireEvent.click(within(live).getByRole('button', {name: 'Analizi durdur'}));
     await phase('cancelled');
   });
@@ -158,10 +160,20 @@ describe('review session', () => {
     expect(screen.getByRole('dialog', {name: 'Canlı inceleme'})).toBeInTheDocument();
     expect(within(live).queryByRole('button', {name: 'Kapat'})).toBeNull();
 
+    // object-review Decision 9: the stop is a request to the server, then the stream closes.
+    let confirm: (value: {id: string; status: 'cancelling'}) => void = () => undefined;
+    const cancel = vi
+      .spyOn(ReviewService, 'cancelRun')
+      .mockReturnValue(new Promise((resolve) => (confirm = resolve)));
     fireEvent.click(within(live).getByRole('button', {name: 'Analizi durdur'}));
+    expect(await within(live).findByRole('button', {name: 'Durduruluyor…'})).toBeDisabled();
+    expect(within(live).getByText(/Durdurma isteği sunucuya gönderildi/)).toBeInTheDocument();
+    const runId = cancel.mock.calls[0][0];
+    confirm({id: runId, status: 'cancelling'});
     await phase('cancelled');
     expect(signal?.aborted).toBe(true);
-    expect(within(live).getAllByText('İnceleme durduruldu.').length).toBeGreaterThan(0);
+    expect(within(live).getByText(/Sunucu durdurmayı doğruladı; LLM çağrıları kesildi/)).toBeInTheDocument();
+    expect(within(live).getAllByText(/İnceleme durduruldu\./).length).toBeGreaterThan(0);
     expect(within(live).queryByRole('button', {name: 'Sonuçları göster'})).toBeNull();
     fireEvent.click(within(live).getByRole('button', {name: 'Kapat'}));
     expect(screen.queryByRole('dialog')).toBeNull();

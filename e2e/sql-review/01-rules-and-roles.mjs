@@ -1,12 +1,12 @@
 import {withBrowser, baseUrl, accounts, message, signIn, apiStatus} from '../shared/harness.mjs';
+import {openAdminSection, openLibrary} from './navigation.mjs';
 
 const STAMP = Date.now();
 const MARKER = `E2E geçici kural ${STAMP}: ayrıntılı metin yalnız süper yöneticiye görünür.`;
 const SUMMARY = `E2E geçici kural özeti ${STAMP}.`;
 
 async function openApprovals(admin) {
-  await admin.getByRole('navigation', {name: message('shell.navigation')}).getByRole('link', {name: /Kural onayları/}).click();
-  await admin.getByRole('heading', {name: 'Kural onayları', level: 1}).waitFor();
+  await openAdminSection(admin, 'Kural onayları');
 }
 
 /**
@@ -23,8 +23,7 @@ await withBrowser('rules edit, approval and publish, reviewer read-only', async 
   await signIn(admin, accounts.superAdmin);
   let added = false;
   try {
-    await page.getByRole('navigation', {name: message('shell.navigation')}).getByRole('link', {name: 'Kurallar', exact: true}).click();
-    await page.getByRole('heading', {name: 'Kurallar', level: 1}).waitFor();
+    await openAdminSection(page, 'Kurallar');
     const before = await apiStatus(page, '/rule-set');
     assert.equal(before.status, 200);
     const previous = before.body.latest_version.number;
@@ -73,13 +72,14 @@ await withBrowser('rules edit, approval and publish, reviewer read-only', async 
     await signIn(reviewer, accounts.reviewer);
     const nav = reviewer.getByRole('navigation', {name: message('shell.navigation')});
     assert.equal(await nav.getByRole('link', {name: 'Kurallar', exact: true}).count(), 0);
+    assert.equal(await nav.getByRole('link', {name: /^Yönetim/}).count(), 0);
     await reviewer.goto(baseUrl + '/kurallar');
     await reviewer.getByRole('heading', {name: message('access.forbidden.title')}).waitFor();
     const draft = await apiStatus(reviewer, '/rule-set');
     assert.equal(draft.status, 403);
     assert.equal(draft.body.detail.code, 'forbidden');
 
-    await nav.getByRole('link', {name: 'Yayımlanmış kurallar'}).click();
+    await openLibrary(reviewer, 'Yayımlanmış kurallar');
     await reviewer.getByText(SUMMARY).waitFor();
     assert.equal(await reviewer.getByText(MARKER).count(), 0);
     await reviewer.getByText(new RegExp(`^Sürüm ${previous + 1} · .* · yayımlayan: `)).waitFor();

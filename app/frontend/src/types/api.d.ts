@@ -1254,6 +1254,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/review-runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Review Run
+         * @description "Analizi durdur": stop a running run of the caller (the super admin: any run).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    run_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RunCancelled"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşumun sahibi değil */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Koşum yok, süresi dolmuş veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description review_run_not_running: koşum bitmiş */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/review-runs/{run_id}/exports/csv": {
         parameters: {
             query?: never;
@@ -1986,167 +2064,6 @@ export interface paths {
             };
         };
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dwhcodereview/v1/rule-proposers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Proposers
-         * @description Users holding the "kural önerebilir" permission (Requirement 1).
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Successful Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["RuleProposerList"];
-                    };
-                };
-                /** @description Oturum yok */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Yetki yok */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dwhcodereview/v1/rule-proposers/{user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Grant Proposer
-         * @description Grant the permission to an active user of the tenant.
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Successful Response */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Oturum yok */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Yetki yok */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Validation Error */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["HTTPValidationError"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /**
-         * Revoke Proposer
-         * @description Revoke the permission; the user's pending proposals stay for a decision.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    user_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Successful Response */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Oturum yok */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Yetki yok */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Validation Error */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["HTTPValidationError"];
-                    };
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2947,6 +2864,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dwhcodereview/v1/scheduled-review-settings/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Scheduled Email Status
+         * @description Whether the summary e-mail can leave this deployment (Requirement 10).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScheduledEmailStatus"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/scheduled-review-settings/email/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Scheduled Test Email
+         * @description Send one test message to one corporate address through the SMTP relay (Decision 14).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ScheduledEmailTest"];
+                };
+            };
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScheduledEmailTestResult"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description recipient_invalid veya recipient_domain_not_allowed */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description email_test_too_soon */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dwhcodereview/v1/scheduled-reviews": {
         parameters: {
             query?: never;
@@ -3527,6 +3568,84 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dwhcodereview/v1/scheduled-reviews/{schedule_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Scheduled Review Run
+         * @description Durdur: end the definition's queued or running run (owner or super admin).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    schedule_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScheduledRunStopped"];
+                    };
+                };
+                /** @description Oturum yok */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Rol yetkisi yok */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Tanım yok veya görme yetkisi yok */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description scheduled_review_not_running: sırada veya süren koşum yok */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4451,18 +4570,6 @@ export interface components {
             page_size: number;
             total: number;
         };
-        RuleProposerItem: {
-            display_name: string;
-            /** Format: date-time */
-            granted_at: string;
-            granted_by_name: string | null;
-            /** @description public_id of the user. */
-            user_id: string;
-            username: string;
-        };
-        RuleProposerList: {
-            items: components["schemas"]["RuleProposerItem"][];
-        };
         RuleResultItem: {
             code_snippet: string;
             decision_basis: string | null;
@@ -4587,6 +4694,16 @@ export interface components {
             schema: string;
             type_code: string;
         };
+        /** @description Answer of a stop request; the run is stored as cancelled when its task has ended. */
+        RunCancelled: {
+            /** @description public_id of the run. */
+            id: string;
+            /**
+             * @description 'cancelling' = the running task was told to stop; 'cancelled' = no task ran for it in this process, so the run was ended as cancelled at once.
+             * @enum {string}
+             */
+            status: "cancelling" | "cancelled";
+        };
         RunStartedEvent: {
             /**
              * @description True when neither a group nor a rule was selected.
@@ -4621,6 +4738,35 @@ export interface components {
             timezone: string;
             /** @description 0 = Monday to 6 = Sunday; only for weekly. */
             weekday?: number | null;
+        };
+        /** @description Whether the summary e-mail can leave this deployment (Requirement 10, Decision 13). */
+        ScheduledEmailStatus: {
+            /** @description Corporate domains a recipient may use. */
+            allowed_domains: string[];
+            /** @description The in-process scheduler runs in this deployment. */
+            scheduler_enabled: boolean;
+            /** @description The SMTP relay host and the sender are set. */
+            smtp_configured: boolean;
+            /**
+             * @description Encryption the relay must use.
+             * @enum {string}
+             */
+            smtp_security: "starttls" | "tls";
+            /** @description The caller's own address when its domain is allowed; otherwise null. */
+            suggested_recipient: string | null;
+        };
+        ScheduledEmailTest: {
+            /** @description One corporate address that receives the test e-mail (Decision 14). */
+            recipient: string;
+        };
+        ScheduledEmailTestResult: {
+            /** @description Stable failure code such as smtp_unreachable, smtp_tls_failed, smtp_auth_failed, smtp_rejected, smtp_address_not_allowed or smtp_failed. */
+            error_code?: string | null;
+            /**
+             * @description 'sent' = the relay accepted it; 'failed' = see error_code; 'not_configured' = no SMTP relay in this deployment.
+             * @enum {string}
+             */
+            status: "sent" | "failed" | "not_configured";
         };
         ScheduledReviewDetail: {
             can_edit: boolean;
@@ -4727,6 +4873,15 @@ export interface components {
              * @constant
              */
             state: "queued";
+        };
+        ScheduledRunStopped: {
+            /** @description public_id of the stopped run record. */
+            id: string;
+            /**
+             * @description 'cancelling' = the running review was told to stop and ends as cancelled; 'cancelled' = the run had not started or no task ran for it, so it ended at once.
+             * @enum {string}
+             */
+            state: "cancelling" | "cancelled";
         };
         ScriptReviewRequest: {
             label?: string | null;

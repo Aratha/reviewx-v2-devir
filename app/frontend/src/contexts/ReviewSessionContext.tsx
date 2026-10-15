@@ -110,7 +110,8 @@ function reducer(state: ReviewSessionState, action: Action): ReviewSessionState 
     case 'stopConfirmed':
       return {...state, stopConfirmed: true};
     case 'show':
-      if (state.phase === 'running' && action.view !== 'live') return state;
+      // A running review may be sent to the background (the dock) but has no results yet.
+      if (state.phase === 'running' && action.view === 'results') return state;
       if (action.view === 'results' && state.results.length === 0) return state;
       return {...state, view: action.view, resultsFromLive: action.view === 'results' && Boolean(action.fromLive)};
     case 'clear':

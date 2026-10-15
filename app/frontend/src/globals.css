@@ -279,7 +279,7 @@ a { color: var(--color-primary); }
 .topbar-brand { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-fg); text-decoration: none; flex: none; }
 .topbar-brand .brand-mark { width: 2rem; height: 2rem; }
 .topbar-brand-name { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.03em; }
-.topnav { display: flex; align-items: center; gap: 0.15rem; min-width: 0; flex: 1; }
+.topnav { display: flex; align-items: center; gap: 0.15rem; min-width: 0; flex: 1; overflow: hidden; }
 .topnav a {
   position: relative; display: inline-flex; align-items: center; gap: 0.45rem;
   padding: 0.45rem 0.75rem; border-radius: 999px;
@@ -447,7 +447,7 @@ dl.facts dd { margin: var(--space-1) 0 0; font-weight: 700; overflow-wrap: anywh
 
 /* ---------- Review ---------- */
 .progress { height: 0.5rem; border-radius: 999px; background: var(--color-surface-sunken); overflow: hidden; }
-.progress > span { display: block; height: 100%; background: var(--color-primary); transition: width 0.3s ease; }
+.progress > span { display: block; height: 100%; background: var(--gradient-brand); transition: width 0.3s ease; }
 .pulse-dot { width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--color-warning); flex: none; }
 @media (prefers-reduced-motion: no-preference) { .pulse-dot { animation: pulse 1.4s ease-in-out infinite; } }
 @keyframes pulse { 50% { opacity: 0.35; } }
@@ -787,8 +787,7 @@ details.rule-details[open] > summary { margin-bottom: var(--space-2); }
 .pane-side .pane-body { display: flex; flex-direction: column; overflow: hidden; }
 .pane-side .picker { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .pane-side .picker > * { flex: none; }
-.pane-side .picker .chip-row { max-height: 7.5rem; overflow: auto; }
-.pane-side .option-list { flex: 1 1 auto; min-height: 6rem; max-height: none; }
+.pane-side .picker-body { flex: 1 1 auto; min-height: 6rem; overflow: auto; margin: 0 calc(-1 * var(--space-1)); padding: 0 var(--space-1); }
 .pane-side .pane-foot { background: var(--color-surface); }
 
 .filter-bar {
@@ -869,7 +868,7 @@ details.rule-details[open] > summary { margin-bottom: var(--space-2); }
   .pane, .fill-row > *, .home-main, .home-side, .admin .admin-panel { max-height: none; overflow: visible; }
   .pane-body, .card-fill > .card-body, .card-fill > .table-wrap { overflow: visible; }
   .pane-side .pane-body { overflow: visible; }
-  .pane-side .option-list { max-height: 24rem; overflow: auto; }
+  .pane-side .picker-body { max-height: 26rem; overflow: auto; }
 }
 
 /* Cards inside a pane lose their own frame; the pane frames them. */
@@ -908,4 +907,69 @@ details.rule-details[open] > summary { margin-bottom: var(--space-2); }
   .schedule-actions { grid-column: auto; grid-row: auto; justify-content: flex-start; max-width: none; }
   .schedule-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Rule picker: groups one under another; a group opens to its rules. */
+.picker-body .option-list { max-height: none; }
+.card .picker-body { max-height: 26rem; overflow: auto; }
+.group-list { display: grid; gap: var(--space-2); }
+.group-section { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow: hidden; }
+.group-section.has-choice { border-color: var(--color-primary); }
+.group-head { display: flex; align-items: center; gap: var(--space-2); padding-left: var(--space-3); }
+.group-head input { width: 1.05rem; height: 1.05rem; flex: none; accent-color: var(--color-primary); cursor: pointer; }
+.group-toggle {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-2);
+  padding: 0.6rem var(--space-3) 0.6rem var(--space-1); border: 0; background: transparent; color: var(--color-fg); text-align: left;
+}
+.group-toggle:hover { color: var(--color-primary); }
+.group-name { font-weight: 700; font-size: 0.92rem; }
+.group-desc { font-size: 0.78rem; color: var(--color-fg-subtle); }
+.group-count {
+  flex: none; min-width: 2.2rem; padding: 0.1rem 0.45rem; border-radius: 999px; text-align: center;
+  background: var(--color-surface-sunken); font-size: 0.75rem; font-weight: 800; color: var(--color-fg-muted);
+}
+.has-choice .group-count { background: var(--color-primary); color: var(--color-primary-fg); }
+.group-chevron { flex: none; color: var(--color-fg-subtle); transition: transform 0.15s ease; }
+.group-toggle[aria-expanded="true"] .group-chevron { transform: rotate(90deg); color: var(--color-primary); }
+.option-list.nested { border: 0; border-top: 1px solid var(--color-border); border-radius: 0; background: var(--color-surface-muted); }
+.option-list.nested .option-row { padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5); }
+
+/* A running review stays in sight on every page while its window is closed. */
+.review-dock {
+  position: fixed; right: clamp(0.75rem, 2vw, 1.5rem); bottom: clamp(0.75rem, 2vw, 1.5rem); z-index: 40;
+  width: min(22rem, calc(100vw - 1.5rem)); display: grid; gap: var(--space-2); padding: var(--space-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius-xl); background: var(--color-surface);
+  box-shadow: var(--shadow-lg); border-top: 3px solid var(--color-accent);
+}
+.review-dock p { margin: 0; }
+.review-dock-head { display: flex; align-items: center; gap: var(--space-2); }
+.review-dock-percent { font-weight: 800; color: var(--color-primary); }
+@media (prefers-reduced-motion: no-preference) {
+  .review-dock { animation: dock-in 0.2s ease-out; }
+  @keyframes dock-in { from { transform: translateY(0.75rem); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+
+/* The live review pill in the top bar: short, coloured by outcome. */
+.review-pill { border: 1px solid var(--color-border); border-radius: 999px; font-weight: 800; }
+.review-pill.is-running { color: var(--color-warning); border-color: var(--color-warning-border); background: var(--color-warning-soft); }
+.review-pill.is-completed { color: var(--color-success); border-color: var(--color-success-border); background: var(--color-success-soft); }
+.review-pill.is-failed { color: var(--color-danger); border-color: var(--color-danger-border); background: var(--color-danger-soft); }
+
+/* Master and detail fill the height; a record's delete sits beside it. */
+.fill-row { align-items: stretch; }
+.fill-row .list-item { display: flex; align-items: flex-start; gap: var(--space-2); }
+.fill-row .list-item > .list-button { flex: 1 1 auto; min-width: 0; }
+.fill-row .list-item-actions { flex: none; padding: var(--space-3) var(--space-3) 0 0; }
+.fill-row.master-detail { grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr); }
+
+/* The rules page keeps its group list on one line until it is edited. */
+.group-manager .card-header { gap: var(--space-3); flex-wrap: wrap; }
+.group-manager-names { flex: 1 1 auto; min-width: 0; }
+.group-manager-names .chip { cursor: default; gap: 0.35rem; }
+
+/* Controls in a title row keep their natural width and sit on one line. */
+.page-actions { align-items: center; }
+.page-actions .select, .page-actions .input { width: auto; }
+.page-actions > .field-label { margin: 0; }
+.settings-grid { display: grid; gap: var(--space-4); grid-template-columns: minmax(15rem, 1fr) minmax(0, 2fr); align-items: start; }
+@media (max-width: 72rem) { .settings-grid { grid-template-columns: minmax(0, 1fr); } }
 

@@ -253,6 +253,9 @@ describe('rules page — named rule groups (rule-group-selection Requirement 1, 
   it('shows each group with its rule count and each rule with its group', async () => {
     await renderPage();
     const groups = screen.getByRole('region', {name: /Kural grupları/});
+    // Folded: one line of names with their rule counts; the list opens for editing.
+    expect(within(within(groups).getByRole('list', {name: 'Gruplar'})).getByText('Performans')).toBeInTheDocument();
+    fireEvent.click(within(groups).getByRole('button', {name: 'Grupları düzenle'}));
     expect(within(groups).getByLabelText('Kural grubu 1 adı')).toHaveValue('Performans');
     expect(within(groups).getByText('1 kural')).toBeInTheDocument();
     expect(within(column(/Kritik/)).getByText('Performans')).toBeInTheDocument();
@@ -282,6 +285,7 @@ describe('rules page — named rule groups (rule-group-selection Requirement 1, 
   it('removes the memberships of a removed group', async () => {
     const save = vi.spyOn(RuleSetService, 'saveDraft').mockResolvedValue(workspace({revision: 5}));
     await renderPage();
+    fireEvent.click(screen.getByRole('button', {name: 'Grupları düzenle'}));
     fireEvent.click(screen.getByRole('button', {name: 'Performans grubunu sil'}));
     expect(within(column(/Kritik/)).queryByText('Performans')).toBeNull();
     fireEvent.click(screen.getByRole('button', {name: 'Taslağı kaydet'}));

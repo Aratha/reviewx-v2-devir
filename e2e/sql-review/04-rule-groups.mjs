@@ -163,7 +163,10 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
 
     // Group A ticked at once plus one single rule: exactly those rules run, each once.
     await reviewer.getByLabel(`${GROUP_A} (1 kural)`).check();
+    // The ungrouped rule is found with the search, which lists matches as one list.
+    await reviewer.getByLabel('Kural ara').fill(single);
     await ruleBox(reviewer, single).check();
+    await reviewer.getByLabel('Kural ara').fill('');
     await reviewer.getByText(`2 / ${allRuleIds.length} kural seçildi.`).waitFor();
     await reviewer.getByLabel('Sonuçlarda görünecek ad (isteğe bağlı)').fill(LABEL_GROUP);
     await reviewer.getByLabel('SQL').fill(SQL);
@@ -199,7 +202,8 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
     await openScriptPage(reviewer);
     await reviewer.getByLabel(`${GROUP_A} (1 kural)`).waitFor();
     assert.equal(await reviewer.getByLabel(`${GROUP_A} (1 kural)`).isChecked(), false);
-    assert.equal(await ruleBox(reviewer, single).isChecked(), false);
+    // The ungrouped rule sits in the closed 'Grupsuz' group, which is not ticked either.
+    assert.equal(await reviewer.getByLabel(/^Grupsuz \(\d+ kural\)$/).isChecked(), false);
     await reviewer.getByLabel('Sonuçlarda görünecek ad (isteğe bağlı)').fill(LABEL_ALL);
     await reviewer.getByLabel('SQL').fill(SQL);
     await reviewer.getByRole('button', {name: 'Kurallara göre incele'}).click();

@@ -75,6 +75,8 @@ export default function ReviewHistoryPage() {
   }
 
   const data = runs.data;
+  // One screen: without a choice the newest finished run is open on the right.
+  const shownId = selectedId ?? data?.items.find((run) => run.status !== 'running')?.id ?? null;
   return (
     <div className="page page-fill">
       <PageHeader
@@ -130,7 +132,7 @@ export default function ReviewHistoryPage() {
                   <RunRow
                     run={run}
                     showOwner={effectiveScope === 'all'}
-                    selected={run.id === selectedId}
+                    selected={run.id === shownId}
                     onSelect={() => setSelectedId(run.id)}
                   />
                   {run.owned && run.status !== 'running' && (
@@ -150,12 +152,12 @@ export default function ReviewHistoryPage() {
             </ul>
           )}
         </Card>
-        {selectedId === null ? (
+        {shownId === null ? (
           <Card title="Sonuçlar">
             <EmptyState title="Soldan bir inceleme seçin." />
           </Card>
         ) : (
-          <RunDetail key={selectedId} runId={selectedId} />
+          <RunDetail key={shownId} runId={shownId} />
         )}
       </div>
       {pendingDelete && (

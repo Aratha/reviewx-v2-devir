@@ -4,7 +4,6 @@ import {RuleSetDiff} from '@/components/rules/RuleSetDiff';
 import {Alert} from '@/components/ui/Alert';
 import {Badge} from '@/components/ui/Badge';
 import {Button} from '@/components/ui/Button';
-import {Icon, type IconName} from '@/components/ui/Icon';
 import {PageHeader} from '@/components/ui/PageHeader';
 import {EmptyState, ErrorState, LoadingState} from '@/components/ui/States';
 import {Tabs} from '@/components/ui/Tabs';
@@ -43,11 +42,6 @@ export default function RuleApprovalsPage() {
   const ruleItems = proposals.data?.items.filter((item) => item.kind === 'rule') ?? [];
   const groupItems = proposals.data?.items.filter((item) => item.kind === 'group') ?? [];
   const publishCount = requests.data?.items.length ?? 0;
-  const stats: {id: Tab; icon: IconName; label: string; count: number}[] = [
-    {id: 'rule', icon: 'lightbulb', label: 'Bekleyen kural önerisi', count: ruleItems.length},
-    {id: 'group', icon: 'listChecks', label: 'Bekleyen grup önerisi', count: groupItems.length},
-    {id: 'publish', icon: 'send', label: 'Bekleyen yayın isteği', count: publishCount},
-  ];
   const refresh = () => {
     setGeneration((value) => value + 1);
     notifyRuleApprovalsChanged();
@@ -59,25 +53,6 @@ export default function RuleApprovalsPage() {
         title="Kural onayları"
         description="Onayladığınız öneri veya yayın isteği hemen yeni sürüm olarak yayımlanır; ret gerekçesi isteyene görünür."
       />
-      <div className="stat-grid">
-        {stats.map((stat) => (
-          <button
-            key={stat.id}
-            type="button"
-            className={`stat${stat.count > 0 ? ' is-attention' : ''}`}
-            onClick={() => setTab(stat.id)}
-            aria-label={`${stat.label}: ${stat.count}`}
-          >
-            <span className="stat-icon">
-              <Icon name={stat.icon} />
-            </span>
-            <span>
-              <span className="stat-value">{stat.count}</span>
-              <span className="stat-label">{stat.label}</span>
-            </span>
-          </button>
-        ))}
-      </div>
       <Tabs
         label="Kural onayları"
         value={tab}

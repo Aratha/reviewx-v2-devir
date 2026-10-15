@@ -179,6 +179,25 @@ describe('review session', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('sends a running review to the background, keeps it in a dock and stops it from there', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) =>
+      openStream(objectRunEvents().slice(0, 6), init?.signal),
+    );
+    const cancel = vi.spyOn(ReviewService, 'cancelRun').mockResolvedValue({id: 'run-1', status: 'cancelling'});
+    renderWithSession(<Starter />);
+    fireEvent.click(screen.getByRole('button', {name: 'start script'}));
+    const live = await screen.findByRole('dialog', {name: 'Canlı inceleme'});
+    await within(live).findByText('Kural 0 / 2');
+    fireEvent.click(within(live).getByRole('button', {name: 'Arka planda sürdür'}));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const dock = screen.getByRole('complementary', {name: 'Süren inceleme'});
+    expect(within(dock).getByRole('progressbar', {name: 'İnceleme ilerlemesi'})).toBeInTheDocument();
+    fireEvent.click(within(dock).getByRole('button', {name: 'Analizi durdur'}));
+    await phase('cancelled');
+    expect(cancel).toHaveBeenCalled();
+    expect(screen.queryByRole('complementary', {name: 'Süren inceleme'})).toBeNull();
+  });
+
   it('reports a lost connection when the stream ends without a final event', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(eventStreamResponse(objectRunEvents().slice(0, 5)));
     renderWithSession(<Starter />);

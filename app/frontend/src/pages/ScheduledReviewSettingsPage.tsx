@@ -28,15 +28,19 @@ export default function ScheduledReviewSettingsPage() {
         title="Zamanlama ve e-posta"
         description="Zamanlanmış koşumların aynı anda kaçının çalışacağını belirleyin; özet e-postanın bu ortamdan çıkıp çıkamadığını görün ve deneyin."
       />
-      {settings.status === 'error' && <ErrorState message={describeError(settings.error)} onRetry={settings.reload} />}
-      {settings.data === undefined && settings.status !== 'error' && <LoadingState label="Ayar yükleniyor…" />}
-      {settings.data && (
-        <SettingsForm
-          initial={settings.data.max_concurrent_runs}
-          onSaved={(value) => settings.replace({max_concurrent_runs: value})}
-        />
-      )}
-      <EmailCard />
+      <div className="settings-grid">
+        <div>
+          {settings.status === 'error' && <ErrorState message={describeError(settings.error)} onRetry={settings.reload} />}
+          {settings.data === undefined && settings.status !== 'error' && <LoadingState label="Ayar yükleniyor…" />}
+          {settings.data && (
+            <SettingsForm
+              initial={settings.data.max_concurrent_runs}
+              onSaved={(value) => settings.replace({max_concurrent_runs: value})}
+            />
+          )}
+        </div>
+        <EmailCard />
+      </div>
     </div>
   );
 }

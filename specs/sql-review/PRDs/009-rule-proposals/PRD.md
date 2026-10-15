@@ -140,7 +140,7 @@ formu yayımlanmış kuralları özetleriyle aranabilir listede seçtirir. Tüm 
   veren, karar zamanı, ret gerekçesi, yayımlanan sürüm, yeni kural kodu), **yayın isteği** (kiracı,
   `public_id`, isteyen, taslak revizyonu, durum, karar veren, karar zamanı, ret gerekçesi, yayımlanan sürüm)
   ve **kural önericisi** (kiracı, kullanıcı, yetkiyi veren, zaman). 1.1.0 ile kural önericisi tablosu
-  kullanılmaz; sonraki göçte kaldırılır.
+  kullanılmaz; geçmiş kayıtlar sessizce silinmesin diye tablo yerinde ve salt okunur kalır.
 - Kural özetinin taslak ve sürüm kurallarındaki sütunu [rule-management](../001-rule-management/PRD.md)
   revizyonundadır ve aynı göçte eklenir.
 - Göç genişleticidir; geri alma, öneri veya yayın isteği kaydı varken veri kaybını bildirip durur.
@@ -214,7 +214,7 @@ formu yayımlanmış kuralları özetleriyle aranabilir listede seçtirir. Tüm 
 - Decision 7: Yayın isteği (Requirement 6) kaldırılır: [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md)
   Decision 14 ile kural yöneticisi rolü kalktı; taslağı süper yönetici düzenler ve doğrudan yayımlar.
   `/rule-set/publish-requests` uçları ve "Yayın istekleri" sekmesi kalkar; yayın isteği tablosu
-  sonraki göçte kaldırılır. Kural onaylarında yalnız kural ve grup önerileri kalır. Proje sahibinin
+  geçmiş kayıtlar sessizce silinmesin diye yerinde kalır, artık yazılmaz. Kural onaylarında yalnız kural ve grup önerileri kalır. Proje sahibinin
   2026-10-15 kararı.
 
 ## Açık sorular

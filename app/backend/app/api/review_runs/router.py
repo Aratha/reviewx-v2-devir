@@ -100,13 +100,15 @@ async def read_review_run(
     service: Service,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=MAX_RESULTS_PAGE_SIZE)] = DEFAULT_RESULTS_PAGE_SIZE,
+    with_sql: Annotated[bool, Query()] = False,
 ) -> ReviewRunDetail:
     """One page of the stored objects with their results and false-positive marks.
 
-    Never the SQL text (Requirement 3); ``object_count`` is the total number of objects.
+    The SQL text only with ``with_sql`` (Requirement 3, 13), for the code view; whoever reads
+    the run may download the same text as the SQL export. ``object_count`` is the total.
     """
 
-    return await service.detail(context, run_id, page=page, page_size=page_size)
+    return await service.detail(context, run_id, page=page, page_size=page_size, with_sql=with_sql)
 
 
 @router.delete(

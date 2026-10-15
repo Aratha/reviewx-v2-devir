@@ -1040,13 +1040,15 @@ export interface paths {
          * Read Review Run
          * @description One page of the stored objects with their results and false-positive marks.
          *
-         *     Never the SQL text (Requirement 3); ``object_count`` is the total number of objects.
+         *     The SQL text only with ``with_sql`` (Requirement 3, 13), for the code view; whoever reads
+         *     the run may download the same text as the SQL export. ``object_count`` is the total.
          */
         get: {
             parameters: {
                 query?: {
                     page?: number;
                     page_size?: number;
+                    with_sql?: boolean;
                 };
                 header?: never;
                 path: {
@@ -3837,6 +3839,8 @@ export interface components {
             parse_warning: string | null;
             rule_results: components["schemas"]["RuleResultItem"][];
             schema: string;
+            /** @description The reviewed SQL text; in the history only when asked for with with_sql (review-history-export Requirement 13), null when it was not stored. */
+            source_sql?: string | null;
             type_code: string;
         };
         ObjectReviewRequest: {

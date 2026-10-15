@@ -191,7 +191,7 @@ function ObjectResultCard({
     ruleMatches(rule, findingsForRule(result, rule.rule_id), filter),
   );
   const orphans = orphanFindings(result);
-  const sql = 'source_sql' in result ? (result as {source_sql?: string | null}).source_sql : null;
+  const sql = result.source_sql ?? null;
   const marks = useMemo(() => lineMarks(result.findings, result.rule_results), [result]);
   const [focus, setFocus] = useState<{line: number; seq: number} | null>(null);
   const jump = (line: number) => setFocus((current) => ({line, seq: (current?.seq ?? 0) + 1}));
@@ -247,7 +247,7 @@ function ObjectResultCard({
             </div>
           )}
           </div>
-          {sql && <SqlCodeView sql={sql} marks={marks} focus={focus} label={`${objectTitle(result)} SQL metni`} />}
+          {sql && <SqlCodeView sql={sql} marks={marks} focus={focus} label="İncelenen SQL" />}
         </div>
         </JumpContext.Provider>
       )}

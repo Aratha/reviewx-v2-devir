@@ -1278,6 +1278,17 @@
           "schema": {
             "type": "string"
           },
+          "source_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reviewed SQL text; in the history only when asked for with with_sql (review-history-export Requirement 13), null when it was not stored."
+          },
           "type_code": {
             "type": "string"
           }
@@ -4966,7 +4977,7 @@
         ]
       },
       "get": {
-        "description": "One page of the stored objects with their results and false-positive marks.\n\nNever the SQL text (Requirement 3); ``object_count`` is the total number of objects.",
+        "description": "One page of the stored objects with their results and false-positive marks.\n\nThe SQL text only with ``with_sql`` (Requirement 3, 13), for the code view; whoever reads\nthe run may download the same text as the SQL export. ``object_count`` is the total.",
         "parameters": [
           {
             "in": "path",
@@ -4997,6 +5008,15 @@
               "maximum": 200,
               "minimum": 1,
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_sql",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],

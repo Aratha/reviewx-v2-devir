@@ -180,7 +180,7 @@ def _finding_item(finding: ReviewFinding) -> FindingItem:
     )
 
 
-def _object_results(results: RunResults) -> list[ObjectResultItem]:
+def _object_results(results: RunResults, *, with_sql: bool = False) -> list[ObjectResultItem]:
     items: list[ObjectResultItem] = []
     for item in results.objects:
         rule_results = results.rule_results.get(item.review_run_object_id, [])
@@ -200,6 +200,7 @@ def _object_results(results: RunResults) -> list[ObjectResultItem]:
                     for result in rule_results
                     for finding in results.findings.get(result.review_rule_result_id, [])
                 ],
+                source_sql=item.source_sql if with_sql else None,
             )
         )
     return items
@@ -338,17 +339,31 @@ class ReviewHistoryService:
         return (await self.reviews.headings_of_runs([row.run.review_run_id]))[row.run.review_run_id]
 
     async def detail(
-        self, context: RequestContext, run_id: str, *, page: int, page_size: int
+        self,
+        context: RequestContext,
+        run_id: str,
+        *,
+        page: int,
+        page_size: int,
+        with_sql: bool = False,
     ) -> ReviewRunDetail:
-        """One page of the stored objects of a run, in selection order (Requirement 3)."""
+        """One page of the stored objects of a run, in selection order (Requirement 3).
+
+        ``with_sql`` adds each object's reviewed SQL for the code view (Requirement 13); whoever
+        may read the run may download the same text as the SQL export.
+        """
 
         row, actor = await self._visible(context, run_id, recipient_reads=True)
         completed = row.run.status == ReviewRunStatus.COMPLETED.value
         results = (
             _object_results(
                 await self.reviews.results_of_run(
-                    row.run.review_run_id, offset=(page - 1) * page_size, limit=page_size
-                )
+                    row.run.review_run_id,
+                    offset=(page - 1) * page_size,
+                    limit=page_size,
+                    with_sql=with_sql,
+                ),
+                with_sql=with_sql,
             )
             if completed
             else []

@@ -227,7 +227,7 @@ const KIND_BADGES: Record<ReviewRunSummary['kind'], {tone: 'info' | 'primary' | 
 function RunDetail({runId}: {runId: string}) {
   const [resultsPage, setResultsPage] = useState(1);
   const detail = useResource(`run:${runId}:${resultsPage}`, (signal) =>
-    ReviewService.run(runId, resultsPage, RESULTS_PAGE_SIZE, signal),
+    ReviewService.run(runId, resultsPage, RESULTS_PAGE_SIZE, signal, true),
   );
   const run = detail.data;
   if (detail.status === 'error')

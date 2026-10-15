@@ -33,7 +33,7 @@ export default function PublishedRulesPage() {
     <div className="page page-fill">
       <PageHeader
         title="Yayımlanmış kurallar"
-        description="İncelemeler en son yayımlanmış sürümü kullanır. Soldan bir grup seçin; kuralları sağda alt alta görün."
+        description="İncelemeler en son yayımlanmış sürümü kullanır; her kural tek cümlelik özetiyle."
         actions={
           !noVersion && (
             <div className="field field-inline">
@@ -104,22 +104,33 @@ function Library({
   const same = (target: Shelf) =>
     target.kind === shelf.kind && (target.kind !== 'group' || (shelf.kind === 'group' && shelf.id === target.id));
 
+  const grouped = version.groups.length > 0;
+  const searchBox = (
+    <>
+      <label className="sr-only" htmlFor={searchId}>
+        Kural ara
+      </label>
+      <input
+        id={searchId}
+        className="input"
+        type="search"
+        value={search}
+        placeholder="Kural01 veya kural metni…"
+        onChange={(event) => onSearch(event.target.value)}
+      />
+    </>
+  );
+  const versionLine = (
+    <>
+      Sürüm {version.number} · {formatDateTime(version.published_at)} · yayımlayan: {publisherName(version)}
+    </>
+  );
+
   return (
-    <div className="workspace workspace-library">
+    <div className={grouped ? 'workspace workspace-library' : 'workspace workspace-single'}>
+      {grouped && (
       <nav className="pane" aria-label="Kural grupları">
-        <div className="pane-head">
-          <label className="sr-only" htmlFor={searchId}>
-            Kural ara
-          </label>
-          <input
-            id={searchId}
-            className="input"
-            type="search"
-            value={search}
-            placeholder="Kural01 veya kural metni…"
-            onChange={(event) => onSearch(event.target.value)}
-          />
-        </div>
+        <div className="pane-head">{searchBox}</div>
         <ul className="pane-body list shelf-list">
           <ShelfButton pressed={same({kind: 'all'})} onSelect={() => setShelf({kind: 'all'})} label="Tüm kurallar" total={rules.length} />
           {version.groups.map((item) => (
@@ -136,17 +147,18 @@ function Library({
             <ShelfButton pressed={same({kind: 'ungrouped'})} onSelect={() => setShelf({kind: 'ungrouped'})} label="Grupsuz" total={ungrouped} />
           )}
         </ul>
-        <div className="pane-foot subtle">
-          Sürüm {version.number} · {formatDateTime(version.published_at)} · yayımlayan: {publisherName(version)}
-        </div>
+        <div className="pane-foot subtle">{versionLine}</div>
       </nav>
+      )}
 
       <section className="pane" aria-label={title ?? 'Kurallar'}>
         <div className="pane-head shelf-head">
           <div className="grow">
             <h2 className="section-title">{title}</h2>
             {group?.description && <p className="subtle">{group.description}</p>}
+            {!grouped && <p className="subtle">{versionLine}</p>}
           </div>
+          {!grouped && <div className="shelf-search">{searchBox}</div>}
           <span className="row">
             <Badge tone="danger">{visible.filter((rule) => critical.has(rule.id)).length} kritik</Badge>
             <Badge tone="info">{visible.filter((rule) => !critical.has(rule.id)).length} normal</Badge>

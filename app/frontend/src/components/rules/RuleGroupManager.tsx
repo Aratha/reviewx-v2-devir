@@ -30,14 +30,17 @@ export function RuleGroupManager({
   const problemId = useId();
   const bodyId = useId();
   const [opened, setOpened] = useState(false);
-  const open = opened || groups.length === 0 || problem !== null;
+  const open = opened || problem !== null;
   return (
     <section className="card group-manager" aria-labelledby={headingId}>
       <header className="card-header">
         <h2 id={headingId}>
           Kural grupları <span className="subtle">({groups.length})</span>
         </h2>
-        {!open && (
+        {!open && groups.length === 0 && (
+          <span className="subtle group-manager-names">Grup yok. Kuralları gruplamak isterseniz “+ Grup” ile adını siz verin.</span>
+        )}
+        {!open && groups.length > 0 && (
           <ul className="list chip-row group-manager-names" aria-label="Gruplar">
             {groups.map((group) => (
               <li key={group.id} className="chip">

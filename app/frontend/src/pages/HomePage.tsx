@@ -1,5 +1,6 @@
 import {useEffect} from "react";
 import {Link} from "react-router";
+import {QualityPulse} from "@/components/review/QualityPulse";
 import {ApprovalFlow} from "@/components/rules/ApprovalFlow";
 import {Badge} from "@/components/ui/Badge";
 import {Icon, type IconName} from "@/components/ui/Icon";
@@ -122,7 +123,8 @@ export default function HomePage() {
           )}
         </div>
 
-        <aside className="home-side" aria-label="Kural değişiklikleri">
+        <aside className="home-side" aria-label="Durum">
+          {access.review && <QualityPulse />}
           {menu.canDecide && (
             <section className="stack" aria-labelledby="home-approvals">
               <div className="section-head">

@@ -14,9 +14,7 @@ import {config} from "@/lib/config";
 import {describeError} from "@/lib/errorMessages";
 import {formatDateTime, formatNumber} from "@/lib/format";
 import {RUN_STATUS} from "@/lib/reviewResults";
-import {REQUEST_STATUS} from "@/lib/ruleProposals";
 import {ReviewService} from "@/services/reviews";
-import {RuleProposalService} from "@/services/ruleProposals";
 
 interface Action {
   to: string;
@@ -46,7 +44,6 @@ export default function HomePage() {
   const {user, access} = useAuth();
   const {t} = useIntl();
   const menu = useRuleProposalMenu(access.review, "home");
-  const ruleManager = access.manageRules && !user?.is_super_admin;
   useEffect(() => {
     document.title = config.productName;
   }, []);
@@ -63,7 +60,7 @@ export default function HomePage() {
       ? [{to: "/kural-onerilerim", icon: "lightbulb" as const, title: "Kural önerilerim", text: "Kural veya grup önerin, kararı izleyin."}]
       : []),
     ...(access.manageRules
-      ? [{to: "/yonetim/kurallar", icon: "pencil" as const, title: "Kurallar", text: user?.is_super_admin ? "Taslağı düzenleyin ve yayımlayın." : "Taslağı düzenleyin, onaya gönderin."}]
+      ? [{to: "/yonetim/kurallar", icon: "pencil" as const, title: "Kurallar", text: "Taslağı düzenleyin ve yayımlayın."}]
       : []),
   ];
 
@@ -140,11 +137,8 @@ export default function HomePage() {
               </Link>
             </section>
           )}
-          {ruleManager && <LatestRequestStat />}
           {menu.canDecide ? (
             <ApprovalFlow role="decider" />
-          ) : ruleManager ? (
-            <ApprovalFlow role="manager" />
           ) : menu.canPropose ? (
             <ApprovalFlow role="proposer" />
           ) : null}
@@ -193,26 +187,6 @@ function RecentReviews() {
           </ul>
         )}
       </div>
-    </section>
-  );
-}
-
-/** The rule manager's latest publish request, as on the rules page. */
-function LatestRequestStat() {
-  const latest = useResource("publish-requests:home", (signal) => RuleProposalService.publishRequests(null, 1, 1, signal));
-  const request = latest.data?.items[0];
-  if (!request) return null;
-  return (
-    <section className="stack" aria-labelledby="home-request">
-      <h2 id="home-request" className="section-title">Son yayın isteğiniz</h2>
-      <Link to="/yonetim/kurallar" className={`stat${request.status === "bekliyor" ? " is-attention" : ""}`}>
-        <span className="stat-icon"><Icon name="send" /></span>
-        <span>
-          <span className="stat-label">Durum</span>
-          <strong>{REQUEST_STATUS[request.status]}</strong>
-          {request.rejection_reason && <span className="stat-label">Gerekçe: {request.rejection_reason}</span>}
-        </span>
-      </Link>
     </section>
   );
 }

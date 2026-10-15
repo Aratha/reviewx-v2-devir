@@ -25,7 +25,7 @@ görünür.
 - **Test ortamında** kurum hesabınızla girersiniz: kullanıcı adı `ad.soyad` biçimindedir, parola kurum
   parolanızdır. Parolanız uygulamada saklanmaz; yalnız o anki doğrulama için kurum dizinine
   (kurumun kullanıcı hesaplarını tutan sistem, Active Directory) gönderilir. İlk girişinizde kaydınız
-  kendiliğinden açılır ve rolünüz **İnceleyici** olur.
+  kendiliğinden açılır ve **Kullanıcı** olarak başlarsınız.
 - **Yerelde** kurum dizini kapalıdır. Yerel kurulumda açtığınız test hesabıyla girersiniz.
 
 Oturum kapanma kuralları:
@@ -54,24 +54,18 @@ Kaynak: [dizin girişi PRD'si](../../specs/application-foundation/PRDs/001-direc
 
 Her kullanıcının tek rolü vardır. Menüde yalnız rolünüzün açabildiği sayfalar görünür.
 
-| Menü | Sayfa | İnceleyici | Kural yöneticisi | Süper yönetici |
-|---|---|:---:|:---:|:---:|
-| Genel | Ana sayfa | ✓ | ✓ | ✓ |
-| İnceleme | Nesne incelemesi | ✓ | ✓ | ✓ |
-| İnceleme | SQL betiği incelemesi | ✓ | ✓ | ✓ |
-| İnceleme | İnceleme geçmişi | Kendi incelemeleri | Herkesinki (salt okunur) | Herkesinki (salt okunur) |
-| İnceleme | Yayımlanmış kurallar | ✓ | ✓ | ✓ |
-| Yönetim | Kurallar | — | ✓ | ✓ |
-| Yönetim | SQL bağlantısı | — | Yalnız yerelde | Yerelde ve test ortamında |
-| Yönetim | LLM bağlantısı | — | Yalnız yerelde | Yalnız yerelde |
-| Yönetim | LLM çağrıları | — | ✓ | ✓ |
-| Yönetim | Kullanıcılar | — | — | ✓ |
+| Menü | Sayfa | Kullanıcı | Süper yönetici |
+|---|---|:---:|:---:|
+| Ana sayfa | Ana sayfa | ✓ | ✓ |
+| İnceleme | Nesneler, SQL betiği, Zamanlanmış | ✓ | ✓ |
+| Geçmiş | İnceleme geçmişi | Kendi incelemeleri | Herkesinki (salt okunur) |
+| Kural kitaplığı | Yayımlanmış kurallar, Kural önerilerim | ✓ | ✓ |
+| Yönetim | Kurallar, Kural onayları, SQL ve LLM bağlantısı, LLM çağrıları, Zamanlama ve e-posta, Kullanıcılar | — | ✓ |
 
-- **İnceleyici:** İnceleme yapar, kendi sonuçlarını görür, işaretler ve indirir.
-- **Kural yöneticisi:** İnceleyicinin yaptığı her şeye ek olarak kuralları düzenler ve yayımlar,
-  herkesin incelemesini salt okunur görür, yapay zekâ çağrılarının özetini izler.
-- **Süper yönetici:** Rolleri atayan uygulama yöneticisidir; kural yöneticisinin yaptıklarını da
-  yapabilir. Test ortamında SQL Server bağlantısını o girer.
+- **Kullanıcı:** İnceleme yapar, kendi sonuçlarını görür, işaretler ve indirir; yeni kural ve kural
+  grubu önerir.
+- **Süper yönetici:** Kuralları düzenler ve yayımlar, önerileri onaylar ya da gerekçesiyle reddeder,
+  bağlantıları ve kullanıcıları yönetir, herkesin incelemesini salt okunur görür.
 
 Menüde bir sayfanın görünmemesi tek güvence değildir; sunucu her istekte rolünüzü ayrıca denetler.
 
@@ -194,7 +188,7 @@ Model bazen gerçekte sorun olmayan bir yeri ihlal diye gösterir. Buna **yanlı
 - Bir bulgunun ya da bulgusu olmayan bir "İhlal var" sonucunun yanındaki **Yanlış pozitif** kutusunu
   işaretleyin. İşaret sunucuda saklanır; sayfayı yenileseniz de, başka bilgisayardan girseniz de
   korunur.
-- Yalnız incelemeyi başlatan kişi işaret koyup kaldırabilir. Kural yöneticisi başkasının incelemesindeki
+- Yalnız incelemeyi başlatan kişi işaret koyup kaldırabilir. Süper yönetici başkasının incelemesindeki
   işaretleri görür ama değiştiremez.
 - İşaretli bulgular CSV dosyasında `false_positive` sütununda `true` olarak kalır; SQL dosyasındaki
   düzeltme listesine yazılmaz.
@@ -212,8 +206,8 @@ girin aynı kayıtları görürsünüz.
 - Durumlar: **Tamamlandı**, **Hata**, **Durduruldu** (siz durdurdunuz), **Yarıda kesildi** (uygulama
   inceleme sürerken yeniden başladı) ve **Sürüyor**. Durdurulan ve yarıda kesilen incelemenin sonucu
   saklanmaz.
-- İnceleyici yalnız kendi incelemelerini görür; başka bir inceleyici sizin kayıtlarınızı göremez.
-- Kural yöneticisi sayfanın üstünde **Benim incelemelerim** ile **Tüm incelemeler** arasında seçim yapar.
+- Kullanıcı yalnız kendi incelemelerini görür; başka bir kullanıcı sizin kayıtlarınızı göremez.
+- Süper yönetici sayfanın üstünde **Benim incelemelerim** ile **Tüm incelemeler** arasında seçim yapar.
   Başkasının incelemesi "Bu inceleme başka bir kullanıcıya ait; yalnız okunabilir." notuyla açılır.
 - **Sil** yalnız sizin bitmiş incelemenizi, **Tümünü sil** yalnız sizin bitmiş incelemelerinizi siler;
   ikisi de önce onay sorar. Silme; sonuçları, işaretleri ve saklanan SQL metnini kalıcı olarak kaldırır.
@@ -242,7 +236,7 @@ indir** düğmesi kapalıdır ve "SQL indirme kapalı: bu inceleme için saklanm
 
 - İncelemeler, sonuçları, işaretleri ve incelenen SQL metni, incelemenin bitişinden **90 gün** sonra
   kendiliğinden silinir. Silme günde en az bir kez çalışır.
-- İncelenen SQL metnini yalnız incelemeyi başlatan kişi ve kural yöneticisi görebilir. Metin uygulama
+- İncelenen SQL metnini yalnız incelemeyi başlatan kişi ve süper yönetici görebilir. Metin uygulama
   günlüklerine yazılmaz.
 - Yapay zekâ çağrılarının özetleri (zaman, model, süre, sonuç) de 90 gün saklanır. Bu özetlerde SQL
   metni ve model yanıtı yoktur.
@@ -259,7 +253,7 @@ SQL Server'ın adresi ya da okuma hesabı bu ortamda henüz verilmemiştir. Uygu
 - **SQL betiği incelemesi** SQL Server'a hiç bağlanmadığı için normal çalışır. İncelemek istediğiniz
   kodu kopyalayıp oraya yapıştırabilirsiniz.
 - Test ortamında bağlantıyı süper yönetici **Yönetim → SQL bağlantısı** sayfasından girer
-  ([yönetici kılavuzu](yonetici-kilavuzu.md#sql-server-ve-llm-ayarları)). Yerelde kural yöneticisi
+  ([yönetici kılavuzu](yonetici-kilavuzu.md#sql-server-ve-llm-ayarları)). Yerelde süper yönetici
   kendi ayarını girer ([yerel kurulum](yerel-kurulum.md#sql-server-ve-yapay-zekâ-modeline-bağlanmak)).
 
 Kaynak: [SQL Server bağlantısı PRD'si](../../specs/sql-review/PRDs/002-sql-server-connection/PRD.md).
@@ -268,7 +262,7 @@ Kaynak: [SQL Server bağlantısı PRD'si](../../specs/sql-review/PRDs/002-sql-se
 
 | İleti | Ne yapmalı |
 |---|---|
-| Henüz yayımlanmış kural yok; inceleme başlatılamaz. | Kural yöneticisinin kuralları yayımlamasını bekleyin. |
+| Henüz yayımlanmış kural yok; inceleme başlatılamaz. | Süper yöneticinin kuralları yayımlamasını bekleyin. |
 | Sistem veritabanları incelenemez. | `master`, `tempdb`, `model` ve `msdb` SQL Server'ın kendi veritabanlarıdır; inceleme için başka bir veritabanı seçin. |
 | SQL Server'a ulaşılamadı. / SQL Server zamanında yanıt vermedi. | **Listeyi yenile** ile yeniden deneyin; sürerse yöneticinize bildirin. |
 | Tanım alınamadı (nesne yok veya yetki yok). | Nesne silinmiş ya da okuma hesabının onu görme yetkisi yok. Diğer nesneler incelenmeye devam eder. |

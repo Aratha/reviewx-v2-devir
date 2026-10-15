@@ -54,34 +54,6 @@ class ProposedGroup:
     rule_codes: tuple[str, ...]
 
 
-@dataclass(frozen=True, slots=True)
-class RuleSetDiff:
-    """What a publish request changes against the latest published version (Requirement 6).
-
-    Rules carry their priority; a changed rule is listed with its published and draft form.
-    """
-
-    added_rules: tuple[tuple[RulePriorityGroup, Rule], ...] = ()
-    changed_rules: tuple[tuple[RulePriorityGroup, Rule, RulePriorityGroup, Rule], ...] = ()
-    removed_rules: tuple[tuple[RulePriorityGroup, Rule], ...] = ()
-    added_groups: tuple[RuleGroup, ...] = ()
-    changed_groups: tuple[tuple[RuleGroup, RuleGroup], ...] = ()
-    removed_groups: tuple[RuleGroup, ...] = ()
-
-    @property
-    def is_empty(self) -> bool:
-        return not any(
-            (
-                self.added_rules,
-                self.changed_rules,
-                self.removed_rules,
-                self.added_groups,
-                self.changed_groups,
-                self.removed_groups,
-            )
-        )
-
-
 def validate_rule_proposal(
     *,
     summary: str,
@@ -187,54 +159,4 @@ def with_group_proposal(
         critical=tuple(joined(rule) for rule in rules.critical),
         normal=tuple(joined(rule) for rule in rules.normal),
         rule_groups=(*rules.rule_groups, RuleGroup(group_id, proposal.name, proposal.description)),
-    )
-
-
-def _by_code(rules: RuleGroups) -> dict[str, tuple[RulePriorityGroup, Rule]]:
-    return {rule.code: (tier, rule) for tier, members in rules.grouped() for rule in members}
-
-
-def diff_rule_sets(published: RuleGroups | None, draft: RuleGroups) -> RuleSetDiff:
-    """The rules and groups a publish request adds, changes and removes (Requirement 6).
-
-    A rule changes when its priority, text, summary, flag or group memberships differ; a move
-    inside its priority alone is not listed. A group changes when its name or description differ.
-    """
-
-    before = _by_code(published or RuleGroups())
-    after = _by_code(draft)
-    old_groups = {group.public_id: group for group in (published or RuleGroups()).rule_groups}
-    new_groups = {group.public_id: group for group in draft.rule_groups}
-
-    def same(left: tuple[RulePriorityGroup, Rule], right: tuple[RulePriorityGroup, Rule]) -> bool:
-        (left_tier, left_rule), (right_tier, right_rule) = left, right
-        return left_tier is right_tier and (
-            left_rule.text,
-            left_rule.summary,
-            left_rule.requires_metadata,
-            set(left_rule.rule_group_ids),
-        ) == (
-            right_rule.text,
-            right_rule.summary,
-            right_rule.requires_metadata,
-            set(right_rule.rule_group_ids),
-        )
-
-    return RuleSetDiff(
-        added_rules=tuple(entry for code, entry in after.items() if code not in before),
-        changed_rules=tuple(
-            (*before[code], *entry)
-            for code, entry in after.items()
-            if code in before and not same(before[code], entry)
-        ),
-        removed_rules=tuple(entry for code, entry in before.items() if code not in after),
-        added_groups=tuple(group for key, group in new_groups.items() if key not in old_groups),
-        changed_groups=tuple(
-            (old_groups[key], group)
-            for key, group in new_groups.items()
-            if key in old_groups
-            and (old_groups[key].name, old_groups[key].description)
-            != (group.name, group.description)
-        ),
-        removed_groups=tuple(group for key, group in old_groups.items() if key not in new_groups),
     )

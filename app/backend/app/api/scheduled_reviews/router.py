@@ -20,7 +20,7 @@ from app.api.integrations import get_review_registry
 from app.api.validation import envelope_validation_route
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.domain.models.role import ROLE_REVIEWER, ROLE_RULE_MANAGER
+from app.domain.models.role import ROLE_REVIEWER
 from app.schemas.scheduled_reviews.contracts import (
     ScheduledEmailStatus,
     ScheduledEmailTest,
@@ -64,7 +64,7 @@ router = APIRouter(
     prefix="/scheduled-reviews",
     tags=["scheduled-reviews"],
     route_class=envelope_validation_route(status.HTTP_422_UNPROCESSABLE_CONTENT),
-    dependencies=[Depends(require_any_role(ROLE_REVIEWER, ROLE_RULE_MANAGER))],
+    dependencies=[Depends(require_any_role(ROLE_REVIEWER))],
     responses=_RESPONSES,
 )
 settings_router = APIRouter(

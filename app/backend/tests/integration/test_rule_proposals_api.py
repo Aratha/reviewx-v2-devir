@@ -30,12 +30,12 @@ async def proposals(auth: AuthHarness, role_sessions: RoleSessions) -> AsyncIter
 # --- Permission (Requirement 1) ---------------------------------------------------------------
 
 
-async def test_every_reviewer_and_rule_manager_proposes_without_a_permission(
+async def test_every_user_proposes_without_a_permission(
     proposals: Proposals, role_sessions: RoleSessions
 ) -> None:
     # Decision 9: no permission list; only the super admin decides.
     admin = await role_sessions.super_admin()
-    for session in (await role_sessions.reviewer(), await role_sessions.rule_manager()):
+    for session in (await role_sessions.reviewer(), await role_sessions.reviewer()):
         capabilities = await proposals.call("GET", "/rule-proposals/capabilities", session)
         assert capabilities.json() == {"can_propose": True, "can_decide": False}
         created = await proposals.propose_rule(session)
@@ -161,10 +161,12 @@ async def test_an_approved_rule_is_published_at_once_and_written_to_the_draft(
     )
     assert saved.status_code == 200, saved.text
 
-    by_manager = await proposals.call("POST", f"/rule-proposals/{proposal['id']}/approve", manager)
+    by_proposer = await proposals.call(
+        "POST", f"/rule-proposals/{proposal['id']}/approve", proposer
+    )
     approved = await proposals.call("POST", f"/rule-proposals/{proposal['id']}/approve", admin)
 
-    assert by_manager.status_code == 403
+    assert by_proposer.status_code == 403
     assert approved.status_code == 200, approved.text
     decision = approved.json()
     assert decision["status"] == "onaylandi"

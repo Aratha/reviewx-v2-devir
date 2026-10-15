@@ -32,7 +32,7 @@ function count(value: number | null): string {
 }
 
 /**
- * LLM call summaries for the rule manager (sql-review llm-connection Requirement 10, 11): only
+ * LLM call summaries for the super admin (sql-review llm-connection Requirement 10, 11): only
  * metadata such as model, duration and token counts; never prompts, SQL or model answers.
  */
 export default function LlmCallsPage() {

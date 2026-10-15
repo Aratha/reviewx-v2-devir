@@ -13,6 +13,8 @@ ve süzgece uyan bütün nesnelerin tek adımda seçilebilmesi kararıyla (Decis
 kararlarıyla kabul etti. 1.3.0 revizyonunu (Requirement 15, Decision 9: açık
 durdurma isteği) proje sahibi 2026-10-15'te kabul etti.
 
+**1.x revizyon notu (2026-10-15):** [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md) 1.3.0 Decision 14 ile `kural-yoneticisi` rolü kaldırıldı; kullanıcılar `inceleyici` (arayüzde "Kullanıcı") ve süper yöneticidir. Bu belgede kural yöneticisine verilen yetkiler (taslağı düzenleme ve yayımlama, bağlantı ayarları, LLM çağrı özetleri, tüm incelemeleri görme) süper yöneticidedir; "inceleyici" geçen yerler her kullanıcıyı anlatır.
+
 ## Amaç
 
 İnceleyici, SQL Server'daki bir veya daha çok veritabanından nesne (saklı yordam, görünüm, fonksiyon)

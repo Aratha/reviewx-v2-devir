@@ -10,7 +10,6 @@ from app.domain.rule_proposal import (
     ProposalConflictError,
     ProposedGroup,
     ProposedRule,
-    diff_rule_sets,
     validate_group_proposal,
     validate_rule_proposal,
     with_group_proposal,
@@ -181,45 +180,3 @@ def test_on_the_draft_rules_the_draft_no_longer_has_are_skipped() -> None:
 
 
 # --- Publish request difference (Requirement 6) -------------------------------------------------
-
-
-def test_the_difference_lists_added_changed_and_removed_rules_and_groups() -> None:
-    published = _published()
-    draft = RuleGroups(
-        critical=(
-            Rule("Kural01", "NOLOCK yok", rule_group_ids=("grp-sec",), summary="Kısa özet."),
-            Rule("Kural13", "yeni kural"),
-        ),
-        normal=(
-            Rule("Kural05", "adlandırma", rule_group_ids=("grp-perf",)),
-            Rule("Kural02", "SELECT * yok"),
-        ),
-        rule_groups=(RuleGroup("grp-perf", "Hız"), RuleGroup("grp-new", "Yeni")),
-    )
-
-    diff = diff_rule_sets(published, draft)
-
-    assert [rule.code for _, rule in diff.added_rules] == ["Kural13"]
-    assert [(before.code, after.code) for _, before, _, after in diff.changed_rules] == [
-        ("Kural01", "Kural01"),
-        ("Kural02", "Kural02"),
-    ]
-    # Kural02 moved from critical to normal; Kural05 is unchanged.
-    assert [(before_tier, after_tier) for before_tier, _, after_tier, _ in diff.changed_rules] == [
-        (RulePriorityGroup.CRITICAL, RulePriorityGroup.CRITICAL),
-        (RulePriorityGroup.CRITICAL, RulePriorityGroup.NORMAL),
-    ]
-    assert diff.removed_rules == ()
-    assert [group.public_id for group in diff.added_groups] == ["grp-new"]
-    assert [(b.name, a.name) for b, a in diff.changed_groups] == [("Performans", "Hız")]
-    assert [group.public_id for group in diff.removed_groups] == ["grp-sec"]
-    assert not diff.is_empty
-
-
-def test_without_a_published_version_every_draft_rule_is_added() -> None:
-    draft = RuleGroups(critical=(Rule("Kural01", "x"),))
-
-    diff = diff_rule_sets(None, draft)
-
-    assert [rule.code for _, rule in diff.added_rules] == ["Kural01"]
-    assert diff_rule_sets(draft, draft).is_empty

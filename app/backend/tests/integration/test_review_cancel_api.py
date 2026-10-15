@@ -75,11 +75,9 @@ async def test_a_running_run_without_a_task_here_ends_cancelled_at_once(
         )
         await session.commit()
 
-    manager = await review_env.sessions.rule_manager()
-    # The rule manager reads every run but stops only their own.
-    by_manager = await _cancel(review_env, run_id, manager)
-    assert by_manager.status_code == 403
-    assert by_manager.json()["detail"]["code"] == "review_run_not_owner"
+    # Another user does not see the run; its owner stops it.
+    other = await review_env.sessions.reviewer()
+    assert (await _cancel(review_env, run_id, other)).status_code == 404
     stopped = await _cancel(review_env, run_id, reviewer)
     assert stopped.json() == {"id": run_id, "status": "cancelled"}
     ended = await run_of(run_id)

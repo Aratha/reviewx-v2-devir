@@ -4,13 +4,7 @@ import RuleApprovalsPage from './RuleApprovalsPage';
 import {RuleProposalService} from '@/services/ruleProposals';
 import {RuleSetService} from '@/services/ruleSet';
 import {apiError, renderWithSession} from '@/test/render';
-import type {
-  PublishRequestDetail,
-  PublishRequestItem,
-  RuleProposalDetail,
-  RuleProposalItem,
-  RuleSetVersionDetail,
-} from '@/types/sqlReview';
+import type {RuleProposalDetail, RuleProposalItem, RuleSetVersionDetail} from '@/types/sqlReview';
 
 const VERSION: RuleSetVersionDetail = {
   number: 4,
@@ -57,39 +51,6 @@ function proposalDetail(base: RuleProposalItem, overrides: Partial<RuleProposalD
   };
 }
 
-const REQUEST: PublishRequestItem = {
-  id: 'r-1',
-  status: 'bekliyor',
-  requester_name: 'Mehmet Kural',
-  created_at: '2026-10-14T11:00:00Z',
-  draft_revision: 9,
-  draft_changed: false,
-  decided_by_name: null,
-  decided_at: null,
-  rejection_reason: null,
-  published_version_number: null,
-  owned: false,
-};
-
-const REQUEST_DETAIL: PublishRequestDetail = {
-  ...REQUEST,
-  diff: {
-    added_rules: [
-      {id: 'Kural14', text: 'Yeni ayrıntılı metin.', summary: 'Yeni özet.', requires_metadata: false, rule_group_ids: [], priority: 'normal'},
-    ],
-    changed_rules: [
-      {
-        before: {id: 'Kural01', text: 'Eski metin.', summary: '', requires_metadata: false, rule_group_ids: [], priority: 'critical'},
-        after: {id: 'Kural01', text: 'Değişen metin.', summary: '', requires_metadata: false, rule_group_ids: [], priority: 'critical'},
-      },
-    ],
-    removed_rules: [],
-    added_groups: [],
-    changed_groups: [],
-    removed_groups: [{id: 'grp-old', name: 'Eski grup', description: ''}],
-  },
-};
-
 function pending(items: RuleProposalItem[]) {
   return {items, page: 1, page_size: 100, total: items.length};
 }
@@ -104,8 +65,6 @@ describe('rule approvals page (rule-proposals Requirement 1, 5-7)', () => {
         ? proposalDetail(rule)
         : proposalDetail(group, {priority: null, requires_metadata: false, rule_group_ids: [], rule_codes: ['Kural01', 'Kural77'], rationale: ''}),
     );
-    vi.spyOn(RuleProposalService, 'publishRequests').mockResolvedValue({items: [REQUEST], page: 1, page_size: 100, total: 1});
-    vi.spyOn(RuleProposalService, 'publishRequest').mockResolvedValue(REQUEST_DETAIL);
     vi.spyOn(RuleSetService, 'latest').mockResolvedValue(VERSION);
   });
 
@@ -144,33 +103,6 @@ describe('rule approvals page (rule-proposals Requirement 1, 5-7)', () => {
     const card = await screen.findByRole('listitem', {name: 'Veri kalitesi'});
     expect(await within(card).findByText('NOLOCK kullanılmamalıdır.')).toBeInTheDocument();
     expect(within(card).getByText('yayımlanmış sürümde artık yok')).toBeInTheDocument();
-  });
-
-  it('shows the difference of a publish request and approves it', async () => {
-    const approve = vi.spyOn(RuleProposalService, 'approveRequest').mockResolvedValue({...REQUEST_DETAIL, status: 'onaylandi', diff: null});
-    renderWithSession(<RuleApprovalsPage />, {role: 'super_admin'});
-    fireEvent.click(await screen.findByRole('tab', {name: 'Yayın istekleri (1)'}));
-    const added = await screen.findByRole('region', {name: 'Eklenen kurallar'});
-    expect(within(added).getByText('Yeni özet.')).toBeInTheDocument();
-    expect(within(added).getByText('Yeni ayrıntılı metin.')).toBeInTheDocument();
-    const changed = screen.getByRole('region', {name: 'Değişen kurallar'});
-    expect(within(changed).getByText('Eski metin.')).toBeInTheDocument();
-    expect(within(changed).getAllByText('Değişen metin.').length).toBeGreaterThan(0);
-    expect(within(screen.getByRole('region', {name: 'Silinen gruplar'})).getByText('Eski grup')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: 'Yayın isteği onayla'}));
-    await waitFor(() => expect(approve).toHaveBeenCalledWith('r-1'));
-  });
-
-  it('warns that a request whose draft changed cannot be approved', async () => {
-    vi.mocked(RuleProposalService.publishRequests).mockResolvedValue({
-      items: [{...REQUEST, draft_changed: true}],
-      page: 1,
-      page_size: 100,
-      total: 1,
-    });
-    renderWithSession(<RuleApprovalsPage />, {role: 'super_admin'});
-    fireEvent.click(await screen.findByRole('tab', {name: 'Yayın istekleri (1)'}));
-    expect(await screen.findByText(/Taslak bu istekten sonra değişti/)).toBeInTheDocument();
   });
 
   it('has no permission list: every reviewer may propose (Decision 6)', async () => {

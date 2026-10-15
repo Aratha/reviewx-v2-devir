@@ -69,7 +69,7 @@ describe('review history page', () => {
 
   it('lets the rule manager switch to all runs, which are read-only when owned by others', async () => {
     vi.mocked(ReviewService.run).mockResolvedValue(detail({owned: false, owner_display_name: 'Başka Kişi'}));
-    renderWithSession(<ReviewHistoryPage />, {role: 'kural-yoneticisi'});
+    renderWithSession(<ReviewHistoryPage />, {role: 'super_admin'});
     await screen.findByText('DWH · 1 nesne');
     fireEvent.click(screen.getByLabelText('Tüm incelemeler'));
     await waitFor(() => expect(ReviewService.runs).toHaveBeenLastCalledWith('all', 1, 50, expect.any(AbortSignal)));

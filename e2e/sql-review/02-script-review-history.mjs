@@ -22,7 +22,7 @@ async function openScriptPage(page) {
 
 await withBrowser('script review, live progress, stop, history and exports', async ({page, assert, newPage}) => {
   const manager = page;
-  await signIn(manager, accounts.ruleManager);
+  await signIn(manager, accounts.superAdmin);
   const previous = (await apiStatus(manager, '/llm-connection')).body;
   const reviewer = await newPage();
   await signIn(reviewer, accounts.reviewer);
@@ -37,7 +37,7 @@ await withBrowser('script review, live progress, stop, history and exports', asy
       return;
     }
 
-    // Rule manager points the running backend at the LLM endpoint (local environment only).
+    // The super admin points the running backend at the LLM endpoint (local environment only).
     await manager.goto(baseUrl + '/ayarlar/llm');
     await manager.getByLabel('İstek biçimi').selectOption('openai');
     await manager.getByLabel('Temel adres').fill(llmBaseUrl);

@@ -13,6 +13,8 @@ ayrı boyut kalması (Decision 2), grupların kurum geneli olması (Decision 3),
 durması (Decision 4), yeni ölçüm eklenmemesi (Decision 5) ve tek tek kural seçimi (Decision 6) kararlarıyla
 kabul etti.
 
+**1.x revizyon notu (2026-10-15):** [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md) 1.3.0 Decision 14 ile `kural-yoneticisi` rolü kaldırıldı; kullanıcılar `inceleyici` (arayüzde "Kullanıcı") ve süper yöneticidir. Bu belgede kural yöneticisine verilen yetkiler (taslağı düzenleme ve yayımlama, bağlantı ayarları, LLM çağrı özetleri, tüm incelemeleri görme) süper yöneticidedir; "inceleyici" geçen yerler her kullanıcıyı anlatır.
+
 ## Amaç
 
 İnceleyici, bir inceleme koşumunu başlatırken **kural kümesinin tamamı yerine** bir veya daha çok

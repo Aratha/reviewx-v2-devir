@@ -13,15 +13,10 @@ from app.api.auth import dependencies
 from app.api.auth.dependencies import CurrentContext, require_any_role
 from app.api.validation import envelope_validation_route
 from app.db.session import get_db
-from app.domain.models.role import ROLE_REVIEWER, ROLE_RULE_MANAGER
-from app.domain.models.rule_proposal import PublishRequestStatus
+from app.domain.models.role import ROLE_REVIEWER
 from app.schemas.rule_proposals.contracts import (
     DecisionReason,
     ProposalScopeValue,
-    PublishRequestCreate,
-    PublishRequestDetail,
-    PublishRequestPage,
-    PublishRequestStatusValue,
     RuleProposalCapabilities,
     RuleProposalCreate,
     RuleProposalDetail,
@@ -42,14 +37,7 @@ _ROUTE = envelope_validation_route(status.HTTP_422_UNPROCESSABLE_CONTENT)
 proposals_router = APIRouter(
     prefix="/rule-proposals", tags=["rule-proposals"], route_class=_ROUTE, responses=_ERRORS
 )
-requests_router = APIRouter(
-    prefix="/rule-set/publish-requests",
-    tags=["rule-proposals"],
-    route_class=_ROUTE,
-    responses=_ERRORS,
-)
-AnyReviewRole = [Depends(require_any_role(ROLE_REVIEWER, ROLE_RULE_MANAGER))]
-RuleManager = [Depends(require_any_role(ROLE_RULE_MANAGER))]
+AnyReviewRole = [Depends(require_any_role(ROLE_REVIEWER))]
 SuperAdmin = [Depends(dependencies.require_super_admin())]
 ProposalId = Annotated[str, Path(min_length=1, max_length=64)]
 Page = Annotated[int, Query(ge=1)]
@@ -146,69 +134,3 @@ async def reject_proposal(
     """Reject a pending proposal with a reason its proposer sees (Requirement 5)."""
 
     return await service.reject(context, proposal_id, body.reason)
-
-
-# --- Publish requests -----------------------------------------------------------------------------
-
-
-@requests_router.post(
-    "",
-    response_model=PublishRequestDetail,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=RuleManager,
-)
-async def create_publish_request(
-    body: PublishRequestCreate, context: CurrentContext, service: Service
-) -> PublishRequestDetail:
-    """Send the current draft revision for approval; it replaces a pending request."""
-
-    return await service.create_request(context, body.base_revision)
-
-
-@requests_router.get("", response_model=PublishRequestPage, dependencies=RuleManager)
-async def list_publish_requests(
-    context: CurrentContext,
-    service: Service,
-    status_filter: Annotated[PublishRequestStatusValue | None, Query(alias="status")] = None,
-    page: Page = 1,
-    page_size: PageSize = DEFAULT_PAGE_SIZE,
-) -> PublishRequestPage:
-    """Publish requests: all for the super admin, the caller's own for a rule manager."""
-
-    return await service.list_requests(
-        context,
-        status_filter=None if status_filter is None else PublishRequestStatus(status_filter),
-        page=page,
-        page_size=page_size,
-    )
-
-
-@requests_router.get("/{request_id}", response_model=PublishRequestDetail, dependencies=RuleManager)
-async def read_publish_request(
-    request_id: ProposalId, context: CurrentContext, service: Service
-) -> PublishRequestDetail:
-    """One request with the draft's difference from the latest version while pending."""
-
-    return await service.request(context, request_id)
-
-
-@requests_router.post(
-    "/{request_id}/approve", response_model=PublishRequestDetail, dependencies=SuperAdmin
-)
-async def approve_publish_request(
-    request_id: ProposalId, context: CurrentContext, service: Service
-) -> PublishRequestDetail:
-    """Publish the requested draft revision; a changed draft makes the request stale."""
-
-    return await service.approve_request(context, request_id)
-
-
-@requests_router.post(
-    "/{request_id}/reject", response_model=PublishRequestDetail, dependencies=SuperAdmin
-)
-async def reject_publish_request(
-    request_id: ProposalId, body: DecisionReason, context: CurrentContext, service: Service
-) -> PublishRequestDetail:
-    """Reject a pending publish request with a reason the rule manager sees."""
-
-    return await service.reject_request(context, request_id, body.reason)

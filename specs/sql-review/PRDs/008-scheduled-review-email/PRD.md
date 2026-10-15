@@ -18,6 +18,8 @@ reddederse bu revizyon geri alınır. Proje sahibi 1.2.0'ı 2026-10-15'te onayla
 (Requirement 11, Decision 15: zamanlanmış koşumu durdurma) proje sahibi 2026-10-15'te "zamanlanmış
 incelemeler kısmında durduramıyorum" bildirimiyle kabul etti.
 
+**1.x revizyon notu (2026-10-15):** [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md) 1.3.0 Decision 14 ile `kural-yoneticisi` rolü kaldırıldı; kullanıcılar `inceleyici` (arayüzde "Kullanıcı") ve süper yöneticidir. Bu belgede kural yöneticisine verilen yetkiler (taslağı düzenleme ve yayımlama, bağlantı ayarları, LLM çağrı özetleri, tüm incelemeleri görme) süper yöneticidedir; "inceleyici" geçen yerler her kullanıcıyı anlatır.
+
 ## Amaç
 
 İnceleyici (veya kural yöneticisi), bir **zamanlanmış inceleme tanımı** oluşturur: hangi nesnelerin,

@@ -5,10 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth.dependencies import CurrentContext, require_any_role
+from app.api.auth.dependencies import (
+    CurrentContext,
+    require_any_role,
+    require_super_admin,
+)
 from app.api.validation import envelope_validation_route
 from app.db.session import get_db
-from app.domain.models.role import ROLE_REVIEWER, ROLE_RULE_MANAGER
+from app.domain.models.role import ROLE_REVIEWER
 from app.schemas.rule_set.contracts import (
     RuleSetDraftUpdate,
     RuleSetPublishRequest,
@@ -29,8 +33,9 @@ router = APIRouter(
     responses={401: {"description": "Oturum yok"}, 403: {"description": "Rol yetkisi yok"}},
 )
 
-RuleManager = [Depends(require_any_role(ROLE_RULE_MANAGER))]
-AnyReviewRole = [Depends(require_any_role(ROLE_REVIEWER, ROLE_RULE_MANAGER))]
+# directory-login Decision 14: the draft and publishing are the super admin's.
+RuleManager = [Depends(require_super_admin())]
+AnyReviewRole = [Depends(require_any_role(ROLE_REVIEWER))]
 
 
 def get_rule_set_service(session: Annotated[AsyncSession, Depends(get_db)]) -> RuleSetService:

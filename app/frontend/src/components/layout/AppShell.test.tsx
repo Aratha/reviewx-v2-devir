@@ -65,15 +65,9 @@ function connectionViews(editable: boolean) {
   proposalMenu(false, false);
 }
 
-function proposalMenu(canPropose: boolean, canDecide: boolean, pending = {proposals: 0, requests: 0}) {
+function proposalMenu(canPropose: boolean, canDecide: boolean, pending = 0) {
   vi.spyOn(RuleProposalService, 'capabilities').mockResolvedValue({can_propose: canPropose, can_decide: canDecide});
-  vi.spyOn(RuleProposalService, 'list').mockResolvedValue({items: [], page: 1, page_size: 1, total: pending.proposals});
-  vi.spyOn(RuleProposalService, 'publishRequests').mockResolvedValue({
-    items: [],
-    page: 1,
-    page_size: 1,
-    total: pending.requests,
-  });
+  vi.spyOn(RuleProposalService, 'list').mockResolvedValue({items: [], page: 1, page_size: 1, total: pending});
 }
 
 describe('application shell', () => {
@@ -89,11 +83,19 @@ describe('application shell', () => {
     expect(ConnectionService.sql).not.toHaveBeenCalled();
   });
 
-  it('gives the rule manager Yönetim with rules, editable connections and LLM calls on one page', async () => {
-    renderApp('kural-yoneticisi', '/yonetim');
+  it('gives the super admin every administration screen on one Yönetim page', async () => {
+    renderApp('super_admin', '/yonetim');
     await screen.findByRole('link', {name: 'SQL bağlantısı'});
     expect(menuLinks()).toEqual(['Ana sayfa', 'İnceleme', 'Geçmiş', 'Kural kitaplığı', 'Yönetim']);
-    expect(railLinks()).toEqual(['Genel durum', 'Kurallar', 'SQL bağlantısı', 'LLM bağlantısı', 'LLM çağrıları']);
+    expect(railLinks()).toEqual([
+      'Genel durum',
+      'Kurallar',
+      'SQL bağlantısı',
+      'LLM bağlantısı',
+      'LLM çağrıları',
+      'Zamanlama ve e-posta',
+      'Kullanıcılar',
+    ]);
     expect(screen.getByRole('heading', {name: 'Yönetim', level: 1})).toBeInTheDocument();
   });
 
@@ -101,10 +103,10 @@ describe('application shell', () => {
     vi.restoreAllMocks();
     pageViews();
     connectionViews(false);
-    renderApp('kural-yoneticisi', '/yonetim');
+    renderApp('super_admin', '/yonetim');
     await openRail();
     await waitFor(() => expect(ConnectionService.llm).toHaveBeenCalled());
-    expect(railLinks()).toEqual(['Genel durum', 'Kurallar', 'LLM çağrıları']);
+    expect(railLinks()).toEqual(['Genel durum', 'Kurallar', 'LLM çağrıları', 'Zamanlama ve e-posta', 'Kullanıcılar']);
   });
 
   it('offers the SQL connection section in nonprod only to the super admin who may edit it', async () => {
@@ -132,28 +134,6 @@ describe('application shell', () => {
     expect(railLinks()).toContain('Zamanlama ve e-posta');
   });
 
-  it('hides the nonprod SQL connection section from the rule manager while the super admin manages it', async () => {
-    vi.restoreAllMocks();
-    proposalMenu(false, false);
-    pageViews();
-    vi.spyOn(ConnectionService, 'llm').mockResolvedValue({
-      environment: 'nonprod',
-      editable: false,
-      chat_api: 'openai',
-      model: 'm',
-    });
-    const sql = vi.spyOn(ConnectionService, 'sql').mockResolvedValue({
-      environment: 'nonprod',
-      editable: false,
-      configured: true,
-      managed_by: 'super_admin',
-    });
-    renderApp('kural-yoneticisi', '/yonetim');
-    await openRail();
-    await waitFor(() => expect(sql).toHaveBeenCalled());
-    expect(railLinks()).not.toContain('SQL bağlantısı');
-  });
-
   it('adds user administration and the e-mail state for the super admin', async () => {
     renderApp('super_admin', '/yonetim');
     await screen.findByRole('link', {name: 'Kullanıcılar'});
@@ -170,7 +150,7 @@ describe('application shell', () => {
   });
 
   it('shows the pending count on Yönetim and on "Kural onayları" to the super admin', async () => {
-    proposalMenu(true, true, {proposals: 2, requests: 1});
+    proposalMenu(true, true, 3);
     renderApp('super_admin', '/yonetim');
     const nav = await screen.findByRole('navigation', {name: messages['shell.navigation']});
     const link = await within(nav).findByRole('link', {name: /Yönetim/});
@@ -180,13 +160,8 @@ describe('application shell', () => {
     expect(await within(approvals).findByLabelText('3 bekleyen')).toHaveTextContent('3');
   });
 
-  it.each(['/kural-onaylari', '/kurallar', '/yonetim'])('shows the forbidden screen when a reviewer opens %s', async (path) => {
+  it.each(['/kural-onaylari', '/kurallar', '/yonetim', '/yonetim/onaylar', '/ayarlar/llm'])('shows the forbidden screen when a user opens %s', async (path) => {
     renderApp('inceleyici', path);
-    expect(await screen.findByRole('heading', {name: messages['access.forbidden.title']})).toBeInTheDocument();
-  });
-
-  it('keeps the approvals section for the super admin even when a rule manager types its address', async () => {
-    renderApp('kural-yoneticisi', '/yonetim/onaylar');
     expect(await screen.findByRole('heading', {name: messages['access.forbidden.title']})).toBeInTheDocument();
   });
 
@@ -217,7 +192,7 @@ describe('application shell', () => {
     renderApp('inceleyici');
     const banner = await screen.findByRole('banner');
     expect(within(banner).getByText('Ayşe İnceleyici')).toBeInTheDocument();
-    expect(within(banner).getByText(/· İnceleyici/)).toBeInTheDocument();
+    expect(within(banner).getByText(/· Kullanıcı/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: messages['auth.session.signOut']}));
     await screen.findByLabelText(messages['auth.login.username']);
     expect(logout).toHaveBeenCalledTimes(1);

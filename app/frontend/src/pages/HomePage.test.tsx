@@ -9,7 +9,6 @@ function capabilities(canPropose: boolean, canDecide: boolean, pending = 0) {
   vi.spyOn(ReviewService, 'runs').mockResolvedValue({items: [], page: 1, page_size: 5, total: 0});
   vi.spyOn(RuleProposalService, 'capabilities').mockResolvedValue({can_propose: canPropose, can_decide: canDecide});
   vi.spyOn(RuleProposalService, 'list').mockResolvedValue({items: [], page: 1, page_size: 1, total: pending});
-  vi.spyOn(RuleProposalService, 'publishRequests').mockResolvedValue({items: [], page: 1, page_size: 1, total: 0});
 }
 
 describe('platform home', () => {

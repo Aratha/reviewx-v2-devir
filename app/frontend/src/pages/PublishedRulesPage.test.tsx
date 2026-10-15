@@ -36,7 +36,7 @@ function mockVersions() {
 }
 
 describe('published rules page', () => {
-  it.each<TestRole>(['inceleyici', 'kural-yoneticisi'])('is read-only for %s', async (role) => {
+  it.each<TestRole>(['inceleyici'])('is read-only for %s', async (role) => {
     mockVersions();
     vi.spyOn(RuleSetService, 'latest').mockResolvedValue(version(2, 'İkinci metin'));
     renderWithSession(<PublishedRulesPage />, {role});
@@ -96,7 +96,7 @@ describe('published rules page — simple view (rule-management Requirement 12)'
     return detail;
   }
 
-  it.each<TestRole>(['inceleyici', 'kural-yoneticisi'])('shows %s one sentence per rule', async (role) => {
+  it.each<TestRole>(['inceleyici'])('shows %s one sentence per rule', async (role) => {
     mockVersions();
     vi.spyOn(RuleSetService, 'latest').mockResolvedValue(summarized());
     renderWithSession(<PublishedRulesPage />, {role});

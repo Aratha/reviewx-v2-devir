@@ -15,6 +15,8 @@ Decision 12), kural gruplarının CSV'nin son sütununda ve SQL yorumunda kural�
 Decision 3) geçmiş ve dışa aktarıma etkisiyle (Requirement 3 ve 12) ve önceki sahip kararlarıyla kabul
 etti.
 
+**1.x revizyon notu (2026-10-15):** [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md) 1.3.0 Decision 14 ile `kural-yoneticisi` rolü kaldırıldı; kullanıcılar `inceleyici` (arayüzde "Kullanıcı") ve süper yöneticidir. Bu belgede kural yöneticisine verilen yetkiler (taslağı düzenleme ve yayımlama, bağlantı ayarları, LLM çağrı özetleri, tüm incelemeleri görme) süper yöneticidedir; "inceleyici" geçen yerler her kullanıcıyı anlatır.
+
 ## Amaç
 
 Biten her inceleme koşumu sunucuda saklanır. İnceleyici geçmiş koşumlarını hangi bilgisayardan

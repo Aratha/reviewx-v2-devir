@@ -5,7 +5,6 @@ type Schemas = components['schemas'];
 
 export type UserSummary = Schemas['UserSummary'];
 export type UserPage = Schemas['UserPage'];
-export type ApplicationRole = Schemas['RoleChange']['role'];
 
 export type RuleItem = Schemas['RuleItem'];
 export type RuleGroupItem = Schemas['RuleGroupItem'];
@@ -22,12 +21,6 @@ export type RuleProposalItem = Schemas['RuleProposalItem'];
 export type RuleProposalDetail = Schemas['RuleProposalDetail'];
 export type RuleProposalPage = Schemas['RuleProposalPage'];
 export type RuleProposalStatus = Schemas['RuleProposalItem']['status'];
-export type PublishRequestItem = Schemas['PublishRequestItem'];
-export type PublishRequestDetail = Schemas['PublishRequestDetail'];
-export type PublishRequestPage = Schemas['PublishRequestPage'];
-export type PublishRequestStatus = Schemas['PublishRequestItem']['status'];
-export type RuleSetDiffView = Schemas['RuleSetDiffView'];
-export type DiffRuleItem = Schemas['DiffRuleItem'];
 
 export type SqlConnectionView = Schemas['SqlConnectionView'];
 export type SqlConnectionChange = Schemas['SqlConnectionChange'];

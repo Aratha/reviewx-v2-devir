@@ -20,7 +20,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Final, cast
 
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -125,6 +125,7 @@ EVENT_QUEUE_MAX_EVENTS = 256
 LIVE_RESULTS_MAX_OBJECTS = 50
 
 EventSink = Callable[[ReviewEvent], Awaitable[None]]
+_ENDED: Final = object()
 
 
 def _thousands(value: int) -> str:
@@ -334,7 +335,9 @@ class ReviewExecution:
         self._plan = plan
         self._runtime = runtime
         self._catalog = catalog
-        self._queue: asyncio.Queue[ReviewEvent] = asyncio.Queue(EVENT_QUEUE_MAX_EVENTS)
+        # The queue also carries _ENDED once the task is over, so a reader of a run stopped by
+        # request (which ends without a final event) returns at once.
+        self._queue: asyncio.Queue[ReviewEvent | object] = asyncio.Queue(EVENT_QUEUE_MAX_EVENTS)
         self.task: asyncio.Task[None] | None = None
 
     @property
@@ -349,6 +352,7 @@ class ReviewExecution:
 
         if self.task is None:
             self.task = asyncio.create_task(self._run(self._queue.put))
+            self.task.add_done_callback(self._mark_ended)
             self._runtime.registry.track(self.task, self._plan.run_public_id)
 
     def cancel(self) -> None:
@@ -364,32 +368,31 @@ class ReviewExecution:
         """
 
         self.start()
-        task = self.task
-        assert task is not None
         try:
             while True:
-                if task.done() and self._queue.empty():
-                    # A run stopped by request ends without a final event; so does its reader.
-                    return
-                getter = asyncio.ensure_future(self._queue.get())
                 try:
-                    await asyncio.wait(
-                        {getter, task}, timeout=idle_seconds, return_when=asyncio.FIRST_COMPLETED
-                    )
-                finally:
-                    if not getter.done():
-                        getter.cancel()
-                if not getter.done() or getter.cancelled():
-                    if not task.done():
-                        yield None
+                    item = await asyncio.wait_for(self._queue.get(), idle_seconds)
+                except TimeoutError:
+                    if self.task is not None and self.task.done() and self._queue.empty():
+                        return
+                    yield None
                     continue
-                event = getter.result()
+                if item is _ENDED:
+                    return
+                event = cast(ReviewEvent, item)
                 yield event
                 if isinstance(event, (CompleteEvent, ErrorEvent)):
                     return
         finally:
             # Nothing here awaits: this may run inside an already cancelled scope.
             self.cancel()
+
+    def _mark_ended(self, _: asyncio.Task[None]) -> None:
+        try:
+            self._queue.put_nowait(_ENDED)
+        except asyncio.QueueFull:
+            # The reader drains the queue first and then sees the task done on its next wait.
+            pass
 
     async def _run(self, emit: EventSink) -> None:
         plan = self._plan

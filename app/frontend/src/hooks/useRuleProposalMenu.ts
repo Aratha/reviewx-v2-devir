@@ -11,8 +11,7 @@ export function notifyRuleApprovalsChanged(): void {
 
 /**
  * Whether "Kural önerilerim" and "Kural onayları" belong in the menu, and how many decisions wait
- * (sql-review rule-proposals Requirement 7). The count is the pending proposals plus the pending
- * publish requests; it is read again when `refreshKey` changes, such as on navigation, and after
+ * (sql-review rule-proposals Requirement 7). The count is the pending proposals; it is read again when `refreshKey` changes, such as on navigation, and after
  * every decision.
  */
 export function useRuleProposalMenu(
@@ -33,12 +32,9 @@ export function useRuleProposalMenu(
   const proposals = useResource(canDecide ? `rule-proposals:pending-count:${key}` : null, (signal) =>
     RuleProposalService.list('pending', 1, 1, signal),
   );
-  const requests = useResource(canDecide ? `publish-requests:pending-count:${key}` : null, (signal) =>
-    RuleProposalService.publishRequests('bekliyor', 1, 1, signal),
-  );
   return {
     canPropose: capabilities.data?.can_propose === true,
     canDecide,
-    pending: (proposals.data?.total ?? 0) + (requests.data?.total ?? 0),
+    pending: proposals.data?.total ?? 0,
   };
 }

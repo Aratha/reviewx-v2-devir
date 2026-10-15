@@ -1,4 +1,4 @@
-import type {PublishRequestStatus, RuleProposalStatus} from '@/types/sqlReview';
+import type {RuleProposalStatus} from '@/types/sqlReview';
 
 type Tone = 'neutral' | 'success' | 'danger' | 'warning' | 'info';
 
@@ -10,15 +10,8 @@ export const PROPOSAL_STATUS: Record<RuleProposalStatus, string> = {
   geri_cekildi: 'Geri çekildi',
 };
 
-/** Turkish labels of the publish request states (rule-proposals Requirement 6). */
-export const REQUEST_STATUS: Record<PublishRequestStatus, string> = {
-  bekliyor: 'onay bekliyor',
-  onaylandi: 'onaylandı',
-  reddedildi: 'reddedildi',
-  gecersiz: 'geçersiz (taslak sonradan değişti veya yeni istek gönderildi)',
-};
-
-export function proposalStatusTone(status: RuleProposalStatus | PublishRequestStatus): Tone {
+/** The badge tone of a proposal state. */
+export function proposalStatusTone(status: RuleProposalStatus): Tone {
   if (status === 'onaylandi') return 'success';
   if (status === 'reddedildi') return 'danger';
   if (status === 'bekliyor') return 'warning';

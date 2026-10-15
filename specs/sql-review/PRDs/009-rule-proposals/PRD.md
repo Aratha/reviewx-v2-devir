@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Version: 1.1.0
+Version: 1.2.0
 
 Acceptance date: 2026-10-15
 
@@ -11,7 +11,9 @@ Domain: [sql-review](../../DOMAIN.md)
 Kabul kaydı: Proje sahibi bu PRD'yi 2026-10-14'te Decision 1–5 ile kabul etti. Kural özetinin veri ve
 gösterim kuralları [rule-management](../001-rule-management/PRD.md) 1.1.0'dadır. 1.1.0 revizyonunu
 proje sahibi 2026-10-15'te "herkes onaya yollayabilsin" kararıyla kabul etti (Decision 6): öneri
-yetkisi listesi kalkar, her inceleyici ve kural yöneticisi öneri gönderir.
+yetkisi listesi kalkar, her inceleyici ve kural yöneticisi öneri gönderir. 1.2.0 revizyonunu proje
+sahibi 2026-10-15'te kabul etti (Decision 7): kural yöneticisi rolü kalktığı için yayın isteği akışı
+(Requirement 6) kaldırılır; taslağı yalnız süper yönetici düzenler ve doğrudan yayımlar.
 
 ## Amaç
 
@@ -209,6 +211,11 @@ formu yayımlanmış kuralları özetleriyle aranabilir listede seçtirir. Tüm 
   gönderir. Karar yine yalnız süper yöneticidedir. Proje sahibinin 2026-10-15 kararı ("kuralı eskiden
   herkes öneremiyordu … herkes yollayabilsin onaya"). Gerekçe: öneri yalnız onaya düşer; yayın yine tek
   yetkili denetimden geçer.
+- Decision 7: Yayın isteği (Requirement 6) kaldırılır: [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md)
+  Decision 14 ile kural yöneticisi rolü kalktı; taslağı süper yönetici düzenler ve doğrudan yayımlar.
+  `/rule-set/publish-requests` uçları ve "Yayın istekleri" sekmesi kalkar; yayın isteği tablosu
+  sonraki göçte kaldırılır. Kural onaylarında yalnız kural ve grup önerileri kalır. Proje sahibinin
+  2026-10-15 kararı.
 
 ## Açık sorular
 

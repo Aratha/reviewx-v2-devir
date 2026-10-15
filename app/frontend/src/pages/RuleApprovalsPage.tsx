@@ -1,6 +1,5 @@
 import {useId, useState} from 'react';
 import {ApprovalFlow} from '@/components/rules/ApprovalFlow';
-import {RuleSetDiff} from '@/components/rules/RuleSetDiff';
 import {Alert} from '@/components/ui/Alert';
 import {Badge} from '@/components/ui/Badge';
 import {Button} from '@/components/ui/Button';
@@ -14,20 +13,16 @@ import {formatDateTime} from '@/lib/format';
 import {displaySummary} from '@/lib/rules';
 import {RuleProposalService} from '@/services/ruleProposals';
 import {RuleSetService} from '@/services/ruleSet';
-import type {
-  PublishRequestItem,
-  RuleProposalItem,
-  RuleSetVersionDetail,
-} from '@/types/sqlReview';
+import type {RuleProposalItem, RuleSetVersionDetail} from '@/types/sqlReview';
 
-type Tab = 'rule' | 'group' | 'publish';
+type Tab = 'rule' | 'group';
 const REASON_LIMIT = 500;
 
 /**
  * "Kural onayları" (sql-review rule-proposals Requirement 1, 5-7): the super admin reads every
  * pending rule proposal, group proposal and publish request in detail, approves it — which
  * publishes a new version at once — or rejects it with a reason the requester sees. Every
- * reviewer and rule manager may propose (Decision 6). The backend checks the super admin on every request.
+ * user may propose (Decision 6). The backend checks the super admin on every request.
  */
 export default function RuleApprovalsPage() {
   const [tab, setTab] = useState<Tab>('rule');
@@ -35,13 +30,9 @@ export default function RuleApprovalsPage() {
   const proposals = useResource(`rule-proposals:pending:${generation}`, (signal) =>
     RuleProposalService.list('pending', 1, 100, signal),
   );
-  const requests = useResource(`publish-requests:pending:${generation}`, (signal) =>
-    RuleProposalService.publishRequests('bekliyor', 1, 100, signal),
-  );
   const latest = useResource(`rule-set-version:latest:${generation}`, (signal) => RuleSetService.latest(signal));
   const ruleItems = proposals.data?.items.filter((item) => item.kind === 'rule') ?? [];
   const groupItems = proposals.data?.items.filter((item) => item.kind === 'group') ?? [];
-  const publishCount = requests.data?.items.length ?? 0;
   const refresh = () => {
     setGeneration((value) => value + 1);
     notifyRuleApprovalsChanged();
@@ -51,7 +42,7 @@ export default function RuleApprovalsPage() {
     <div className="page">
       <PageHeader
         title="Kural onayları"
-        description="Onayladığınız öneri veya yayın isteği hemen yeni sürüm olarak yayımlanır; ret gerekçesi isteyene görünür."
+        description="Onayladığınız öneri hemen yeni sürüm olarak yayımlanır; ret gerekçesi öneri sahibine görünür."
       />
       <Tabs
         label="Kural onayları"
@@ -60,7 +51,6 @@ export default function RuleApprovalsPage() {
         items={[
           {id: 'rule', label: 'Kural önerileri', count: ruleItems.length, attention: true},
           {id: 'group', label: 'Grup önerileri', count: groupItems.length, attention: true},
-          {id: 'publish', label: 'Yayın istekleri', count: publishCount, attention: true},
         ]}
       />
       {(tab === 'rule' || tab === 'group') && proposals.status === 'error' && (
@@ -75,10 +65,6 @@ export default function RuleApprovalsPage() {
       {tab === 'group' && proposals.data && (
         <ProposalQueue items={groupItems} version={latest.data} empty="Bekleyen grup önerisi yok" onDecided={refresh} />
       )}
-      {tab === 'publish' && requests.status === 'error' && (
-        <ErrorState message={describeError(requests.error)} onRetry={requests.reload} />
-      )}
-      {tab === 'publish' && requests.data && <RequestQueue items={requests.data.items} onDecided={refresh} />}
       <ApprovalFlow role="decider" />
     </div>
   );
@@ -172,44 +158,6 @@ function ProposalCard({
   );
 }
 
-function RequestQueue({items, onDecided}: {items: PublishRequestItem[]; onDecided: () => void}) {
-  if (items.length === 0) return <EmptyState title="Bekleyen yayın isteği yok" icon="check" />;
-  return (
-    <ul className="list stack">
-      {items.map((item) => (
-        <RequestCard key={item.id} item={item} onDecided={onDecided} />
-      ))}
-    </ul>
-  );
-}
-
-function RequestCard({item, onDecided}: {item: PublishRequestItem; onDecided: () => void}) {
-  const detail = useResource(`publish-request:${item.id}`, (signal) =>
-    RuleProposalService.publishRequest(item.id, signal),
-  );
-  const title = `${item.requester_name} · ${formatDateTime(item.created_at)}`;
-  return (
-    <li className="card card-body stack" aria-label={`Yayın isteği: ${title}`}>
-      <div className="row">
-        <strong className="grow">Yayın isteği · {title}</strong>
-        <span className="subtle">taslak değişiklik no {item.draft_revision}</span>
-      </div>
-      {item.draft_changed && (
-        <Alert tone="warning">Taslak bu istekten sonra değişti; onaylanamaz. Kural yöneticisi yeniden göndermelidir.</Alert>
-      )}
-      {detail.status === 'error' && <Alert tone="error">{describeError(detail.error)}</Alert>}
-      {detail.data?.diff && <RuleSetDiff diff={detail.data.diff} />}
-      <Decision
-        label="Yayın isteği"
-        onApprove={() => RuleProposalService.approveRequest(item.id)}
-        onReject={(reason) => RuleProposalService.rejectRequest(item.id, reason)}
-        onDecided={onDecided}
-      />
-    </li>
-  );
-}
-
-/** Approve, or reject with a 1–500 character reason the requester sees. */
 function Decision({
   label,
   onApprove,

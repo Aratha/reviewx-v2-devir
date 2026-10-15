@@ -125,7 +125,7 @@ class ScheduledReviewRepository:
     async def open_run(self, definition_id: int) -> ScheduledReviewRun | None:
         """The definition's queued or running record, locked for the stop request."""
 
-        return await self.session.scalar(
+        record: ScheduledReviewRun | None = await self.session.scalar(
             select(ScheduledReviewRun)
             .where(
                 ScheduledReviewRun.scheduled_review_id == definition_id,
@@ -135,6 +135,7 @@ class ScheduledReviewRepository:
             .limit(1)
             .with_for_update()
         )
+        return record
 
     # --- run records ------------------------------------------------------------------------
 

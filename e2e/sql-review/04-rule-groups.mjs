@@ -71,7 +71,7 @@ function ruleIdsOf(detail) {
 
 await withBrowser('rule groups: define, publish, review with a group plus a rule and with every rule', async ({page, assert, newPage}) => {
   const manager = page;
-  await signIn(manager, accounts.ruleManager);
+  await signIn(manager, accounts.superAdmin);
   const previousLlm = (await apiStatus(manager, '/llm-connection')).body;
   const reviewer = await newPage();
   await signIn(reviewer, accounts.reviewer);
@@ -79,7 +79,7 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
   await signIn(admin, accounts.superAdmin);
   let changed = false;
   try {
-    // Rule manager: two groups, rule A in both and rule B in the second, save and publish.
+    // Super admin: two groups, rule A in both and rule B in the second, save and publish.
     await openAdminSection(manager, 'Kurallar');
     const before = await apiStatus(manager, '/rule-set');
     assert.equal(before.status, 200);
@@ -95,16 +95,9 @@ await withBrowser('rule groups: define, publish, review with a group plus a rule
     await manager.getByRole('button', {name: 'Taslağı kaydet'}).click();
     await manager.getByText('Taslak kaydedildi.').waitFor();
     changed = true;
-    // rule-proposals Decision 3: the draft goes to the super admin, whose approval publishes it.
-    await manager.getByRole('button', {name: 'Onaya gönder'}).click();
-    await manager.getByText('Taslak onaya gönderildi.', {exact: false}).waitFor();
-    const pending = await apiStatus(admin, '/rule-set/publish-requests?status=bekliyor');
-    assert.equal(pending.body.items.length, 1);
-    const approved = await apiStatus(admin, `/rule-set/publish-requests/${pending.body.items[0].id}/approve`, {
-      method: 'POST',
-    });
-    assert.equal(approved.status, 200);
-    assert.equal(approved.body.published_version_number, previousVersion + 1);
+    // directory-login Decision 14: the super admin publishes the draft directly.
+    await manager.getByRole('button', {name: 'Yayınla'}).click();
+    await manager.getByText(`Sürüm ${previousVersion + 1} yayımlandı.`, {exact: false}).waitFor();
 
     const published = (await apiStatus(manager, '/rule-set/versions/latest')).body;
     const groupA = published.groups.find((group) => group.name === GROUP_A);

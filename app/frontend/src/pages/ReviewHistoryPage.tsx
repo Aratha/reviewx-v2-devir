@@ -27,7 +27,7 @@ type PendingDelete = {kind: 'one'; run: ReviewRunSummary} | {kind: 'all'};
 
 /**
  * Review history stored on the server (sql-review review-history-export Requirement 1–5, 10, 11):
- * own runs for everyone, all runs read-only for the rule manager, details with false-positive
+ * own runs for everyone, all runs read-only for the super admin, details with false-positive
  * marks, CSV and SQL downloads and deletion of own finished runs.
  */
 export default function ReviewHistoryPage() {

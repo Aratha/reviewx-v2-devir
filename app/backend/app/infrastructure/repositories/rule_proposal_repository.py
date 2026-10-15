@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +9,7 @@ from sqlalchemy.orm import aliased
 
 from app.domain.models.rule_proposal import (
     ProposalStatus,
-    PublishRequestStatus,
     RuleProposal,
-    RulePublishRequest,
 )
 from app.domain.models.user import User
 
@@ -21,13 +18,6 @@ from app.domain.models.user import User
 class ProposalRow:
     proposal: RuleProposal
     proposer_name: str
-    decided_by_name: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class PublishRequestRow:
-    request: RulePublishRequest
-    requester_name: str
     decided_by_name: str | None
 
 
@@ -105,98 +95,3 @@ class RuleProposalRepository:
         return [ProposalRow(*row) for row in rows.all()], int(total or 0)
 
     # --- Publish requests -----------------------------------------------------------------------
-
-    async def invalidate_pending_requests(
-        self, tenant_id: int, *, actor_user_id: int, now: datetime
-    ) -> list[str]:
-        """Mark the tenant's pending publish request invalid; returns the affected public ids."""
-
-        rows = await self.session.scalars(
-            select(RulePublishRequest)
-            .where(
-                RulePublishRequest.tenant_id == tenant_id,
-                RulePublishRequest.status == PublishRequestStatus.PENDING.value,
-                RulePublishRequest.is_deleted.is_(False),
-            )
-            .with_for_update()
-        )
-        changed = []
-        for row in rows:
-            row.status = PublishRequestStatus.INVALID.value
-            row.decided_at = now
-            row.updated_by = actor_user_id
-            changed.append(row.public_id)
-        await self.session.flush()
-        return changed
-
-    async def add_request(self, request: RulePublishRequest) -> RulePublishRequest:
-        self.session.add(request)
-        await self.session.flush()
-        return request
-
-    async def lock_request(self, tenant_id: int, public_id: str) -> RulePublishRequest | None:
-        statement = (
-            select(RulePublishRequest)
-            .where(
-                RulePublishRequest.tenant_id == tenant_id,
-                RulePublishRequest.public_id == public_id,
-                RulePublishRequest.is_deleted.is_(False),
-            )
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-        return (await self.session.execute(statement)).scalar_one_or_none()
-
-    async def request_row(self, tenant_id: int, public_id: str) -> PublishRequestRow | None:
-        rows, _ = await self._request_rows(
-            tenant_id, [RulePublishRequest.public_id == public_id], offset=0, limit=1
-        )
-        return rows[0] if rows else None
-
-    async def list_requests(
-        self,
-        tenant_id: int,
-        *,
-        requester_user_id: int | None,
-        status: PublishRequestStatus | None,
-        offset: int,
-        limit: int,
-    ) -> tuple[list[PublishRequestRow], int]:
-        filters: list[ColumnElement[bool]] = []
-        if requester_user_id is not None:
-            filters.append(RulePublishRequest.requester_user_id == requester_user_id)
-        if status is not None:
-            filters.append(RulePublishRequest.status == status.value)
-        return await self._request_rows(tenant_id, filters, offset=offset, limit=limit)
-
-    async def _request_rows(
-        self,
-        tenant_id: int,
-        extra: Sequence[ColumnElement[bool]],
-        *,
-        offset: int,
-        limit: int,
-    ) -> tuple[list[PublishRequestRow], int]:
-        filters = [
-            RulePublishRequest.tenant_id == tenant_id,
-            RulePublishRequest.is_deleted.is_(False),
-            *extra,
-        ]
-        total = await self.session.scalar(
-            select(func.count()).select_from(RulePublishRequest).where(*filters)
-        )
-        requester = aliased(User)
-        decider = aliased(User)
-        rows = await self.session.execute(
-            select(RulePublishRequest, requester.display_name, decider.display_name)
-            .join(requester, requester.user_id == RulePublishRequest.requester_user_id)
-            .outerjoin(decider, decider.user_id == RulePublishRequest.decided_by_user_id)
-            .where(*filters)
-            .order_by(
-                RulePublishRequest.created_at.desc(),
-                RulePublishRequest.rule_publish_request_id.desc(),
-            )
-            .offset(offset)
-            .limit(limit)
-        )
-        return [PublishRequestRow(*row) for row in rows.all()], int(total or 0)

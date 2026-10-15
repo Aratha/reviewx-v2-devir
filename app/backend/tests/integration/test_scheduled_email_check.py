@@ -84,7 +84,7 @@ async def test_only_the_super_admin_reads_the_status_and_sends_a_test(
     auth: AuthHarness, role_sessions: RoleSessions
 ) -> None:
     auth.use_settings(mail_allowed_domains=DOMAIN)
-    for session in (await role_sessions.reviewer(), await role_sessions.rule_manager()):
+    for session in (await role_sessions.reviewer(), await role_sessions.reviewer()):
         assert (await auth.client.get(_url(auth), headers=session.headers)).status_code == 403
         sent = await auth.client.post(
             _url(auth, "/test"),

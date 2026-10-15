@@ -20,10 +20,8 @@ from app.domain.models.mixins import new_public_id
 from app.domain.models.rule_proposal import (
     PROPOSAL_REASON_MAX_LENGTH,
     ProposalStatus,
-    PublishRequestStatus,
     RuleProposal,
     RuleProposalKind,
-    RulePublishRequest,
 )
 from app.domain.models.rule_set import RulePriorityGroup
 from app.domain.models.tenant import Tenant
@@ -32,15 +30,12 @@ from app.domain.rule_proposal import (
     ProposalConflictError,
     ProposedGroup,
     ProposedRule,
-    RuleSetDiff,
-    diff_rule_sets,
     validate_group_proposal,
     validate_rule_proposal,
     with_group_proposal,
     with_rule_proposal,
 )
 from app.domain.rule_set import (
-    Rule,
     RuleGroups,
     RuleSetValidationError,
     fold_group_name,
@@ -48,29 +43,20 @@ from app.domain.rule_set import (
 )
 from app.infrastructure.repositories.rule_proposal_repository import (
     ProposalRow,
-    PublishRequestRow,
     RuleProposalRepository,
 )
 from app.infrastructure.repositories.rule_set_repository import RuleSetRepository
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.schemas.rule_proposals.contracts import (
-    ChangedGroup,
-    ChangedRule,
-    DiffRuleItem,
     ProposalScopeValue,
-    PublishRequestDetail,
-    PublishRequestItem,
-    PublishRequestPage,
     RuleProposalCapabilities,
     RuleProposalCreate,
     RuleProposalDetail,
     RuleProposalItem,
     RuleProposalPage,
-    RuleSetDiffView,
 )
-from app.schemas.rule_set.contracts import RuleGroupItem
 from app.services.request_scope import acting_user, active_tenant
-from app.services.rule_set_service import RuleSetService, draft_conflict, rule_set_empty
+from app.services.rule_set_service import RuleSetService
 
 logger = logging.getLogger("app.rule_proposals")
 
@@ -89,12 +75,6 @@ def _decision_forbidden() -> ApplicationError:
 def _proposal_not_found() -> ApplicationError:
     return ApplicationError(
         status.HTTP_404_NOT_FOUND, "rule_proposal_not_found", "Kural önerisi bulunamadı."
-    )
-
-
-def _request_not_found() -> ApplicationError:
-    return ApplicationError(
-        status.HTTP_404_NOT_FOUND, "publish_request_not_found", "Yayın isteği bulunamadı."
     )
 
 
@@ -145,43 +125,6 @@ def _proposal_detail(row: ProposalRow, actor: User) -> RuleProposalDetail:
             "rule_codes": list(proposal.rule_codes),
             "rationale": proposal.rationale,
         }
-    )
-
-
-def _diff_rule(tier: RulePriorityGroup, rule: Rule) -> DiffRuleItem:
-    return DiffRuleItem(
-        id=rule.code,
-        text=rule.text,
-        summary=rule.summary,
-        requires_metadata=rule.requires_metadata,
-        rule_group_ids=list(rule.rule_group_ids),
-        priority=tier.value,
-    )
-
-
-def _group_item(group_id: str, name: str, description: str) -> RuleGroupItem:
-    return RuleGroupItem(id=group_id, name=name, description=description)
-
-
-def _diff_view(diff: RuleSetDiff) -> RuleSetDiffView:
-    return RuleSetDiffView(
-        added_rules=[_diff_rule(tier, rule) for tier, rule in diff.added_rules],
-        changed_rules=[
-            ChangedRule(before=_diff_rule(old_tier, old), after=_diff_rule(new_tier, new))
-            for old_tier, old, new_tier, new in diff.changed_rules
-        ],
-        removed_rules=[_diff_rule(tier, rule) for tier, rule in diff.removed_rules],
-        added_groups=[_group_item(g.public_id, g.name, g.description) for g in diff.added_groups],
-        changed_groups=[
-            ChangedGroup(
-                before=_group_item(old.public_id, old.name, old.description),
-                after=_group_item(new.public_id, new.name, new.description),
-            )
-            for old, new in diff.changed_groups
-        ],
-        removed_groups=[
-            _group_item(g.public_id, g.name, g.description) for g in diff.removed_groups
-        ],
     )
 
 
@@ -436,186 +379,3 @@ class RuleProposalService:
             user_public_id=actor.public_id,
         )
         return await self._detail(tenant, actor, proposal_id)
-
-    # --- Publish requests (Requirement 6) ------------------------------------------------------
-
-    async def create_request(
-        self, context: RequestContext, base_revision: int
-    ) -> PublishRequestDetail:
-        tenant, actor = await self._scope(context)
-        draft = await self.rules.lock_draft(tenant.tenant_id, actor_user_id=actor.user_id)
-        if draft.revision != base_revision:
-            raise draft_conflict()
-        if (await self.rules.draft_rules(draft)).is_empty:
-            raise rule_set_empty()
-        now = datetime.now(UTC)
-        for replaced in await self.proposals.invalidate_pending_requests(
-            tenant.tenant_id, actor_user_id=actor.user_id, now=now
-        ):
-            log_event(logger, "rule_publish_request.stale", request_public_id=replaced)
-        request = await self.proposals.add_request(
-            RulePublishRequest(
-                public_id=new_public_id(),
-                tenant_id=tenant.tenant_id,
-                requester_user_id=actor.user_id,
-                draft_revision=draft.revision,
-                created_by=actor.user_id,
-                updated_by=actor.user_id,
-            )
-        )
-        log_event(
-            logger,
-            "rule_publish_request.created",
-            request_public_id=request.public_id,
-            revision=draft.revision,
-            user_public_id=actor.public_id,
-        )
-        return await self._request_detail(tenant, actor, request.public_id, context)
-
-    async def list_requests(
-        self,
-        context: RequestContext,
-        *,
-        status_filter: PublishRequestStatus | None,
-        page: int,
-        page_size: int,
-    ) -> PublishRequestPage:
-        tenant, actor = await self._scope(context)
-        rows, total = await self.proposals.list_requests(
-            tenant.tenant_id,
-            requester_user_id=None if context.is_super_admin else actor.user_id,
-            status=status_filter,
-            offset=(page - 1) * page_size,
-            limit=page_size,
-        )
-        draft = await self.rules.get_draft(tenant.tenant_id)
-        revision = None if draft is None else draft.revision
-        return PublishRequestPage(
-            items=[
-                PublishRequestItem.model_validate(self._request_item(row, actor, revision))
-                for row in rows
-            ],
-            page=page,
-            page_size=page_size,
-            total=total,
-        )
-
-    @staticmethod
-    def _request_item(
-        row: PublishRequestRow, actor: User, revision: int | None
-    ) -> dict[str, object]:
-        request = row.request
-        pending = request.status == PublishRequestStatus.PENDING.value
-        return {
-            "id": request.public_id,
-            "status": request.status,
-            "requester_name": row.requester_name,
-            "created_at": request.created_at,
-            "draft_revision": request.draft_revision,
-            "draft_changed": pending and revision != request.draft_revision,
-            "decided_by_name": row.decided_by_name,
-            "decided_at": request.decided_at,
-            "rejection_reason": request.rejection_reason,
-            "published_version_number": request.published_version_number,
-            "owned": request.requester_user_id == actor.user_id,
-        }
-
-    async def request(self, context: RequestContext, request_id: str) -> PublishRequestDetail:
-        tenant, actor = await self._scope(context)
-        return await self._request_detail(tenant, actor, request_id, context)
-
-    async def _request_detail(
-        self, tenant: Tenant, actor: User, request_id: str, context: RequestContext
-    ) -> PublishRequestDetail:
-        row = await self.proposals.request_row(tenant.tenant_id, request_id)
-        if row is None or not (
-            context.is_super_admin or row.request.requester_user_id == actor.user_id
-        ):
-            raise _request_not_found()
-        draft = await self.rules.get_draft(tenant.tenant_id)
-        revision = None if draft is None else draft.revision
-        diff = None
-        if row.request.status == PublishRequestStatus.PENDING.value and draft is not None:
-            latest_number, latest = await self._latest_rules(tenant.tenant_id)
-            diff = _diff_view(
-                diff_rule_sets(
-                    None if latest_number is None else latest, await self.rules.draft_rules(draft)
-                )
-            )
-        return PublishRequestDetail.model_validate(
-            {**self._request_item(row, actor, revision), "diff": diff}
-        )
-
-    async def approve_request(
-        self, context: RequestContext, request_id: str
-    ) -> PublishRequestDetail:
-        tenant, actor = await self._scope(context)
-        draft = await self.rules.lock_draft(tenant.tenant_id, actor_user_id=actor.user_id)
-        request = await self.proposals.lock_request(tenant.tenant_id, request_id)
-        if request is None:
-            raise _request_not_found()
-        if request.status != PublishRequestStatus.PENDING.value:
-            raise ApplicationError(
-                status.HTTP_409_CONFLICT,
-                "publish_request_not_pending",
-                "Yayın isteği artık beklemiyor; sayfayı yenileyin.",
-            )
-        now = datetime.now(UTC)
-        if draft.revision != request.draft_revision:
-            request.status = PublishRequestStatus.INVALID.value
-            request.decided_at = now
-            request.updated_by = actor.user_id
-            # The request stays invalid although the approval is refused.
-            await self.session.commit()
-            log_event(logger, "rule_publish_request.stale", request_public_id=request_id)
-            raise ApplicationError(
-                status.HTTP_409_CONFLICT,
-                "publish_request_stale",
-                "Taslak istekten sonra değişti; kural yöneticisi yeniden onaya göndermelidir.",
-            )
-        rules = await self.rules.draft_rules(draft)
-        if rules.is_empty:
-            raise rule_set_empty()
-        version, _ = await self.rule_sets.publish_rules(tenant.tenant_id, actor, rules)
-        request.status = PublishRequestStatus.APPROVED.value
-        request.decided_by_user_id = actor.user_id
-        request.decided_at = now
-        request.published_version_number = version.number
-        request.updated_by = actor.user_id
-        await self.session.flush()
-        log_event(
-            logger,
-            "rule_publish_request.approved",
-            request_public_id=request.public_id,
-            number=version.number,
-            user_public_id=actor.public_id,
-        )
-        return await self._request_detail(tenant, actor, request_id, context)
-
-    async def reject_request(
-        self, context: RequestContext, request_id: str, reason: str
-    ) -> PublishRequestDetail:
-        tenant, actor = await self._scope(context)
-        text = _reason(reason)
-        request = await self.proposals.lock_request(tenant.tenant_id, request_id)
-        if request is None:
-            raise _request_not_found()
-        if request.status != PublishRequestStatus.PENDING.value:
-            raise ApplicationError(
-                status.HTTP_409_CONFLICT,
-                "publish_request_not_pending",
-                "Yayın isteği artık beklemiyor; sayfayı yenileyin.",
-            )
-        request.status = PublishRequestStatus.REJECTED.value
-        request.decided_by_user_id = actor.user_id
-        request.decided_at = datetime.now(UTC)
-        request.rejection_reason = text
-        request.updated_by = actor.user_id
-        await self.session.flush()
-        log_event(
-            logger,
-            "rule_publish_request.rejected",
-            request_public_id=request.public_id,
-            user_public_id=actor.public_id,
-        )
-        return await self._request_detail(tenant, actor, request_id, context)

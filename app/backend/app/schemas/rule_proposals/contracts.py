@@ -10,7 +10,6 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, StrictBool
 
 from app.domain.models.rule_set import RULE_GROUP_DESCRIPTION_MAX_LENGTH
-from app.schemas.rule_set.contracts import RuleGroupItem, RuleItem
 
 ProposalKindValue = Literal["rule", "group"]
 ProposalStatusValue = Literal["bekliyor", "onaylandi", "reddedildi", "geri_cekildi"]
@@ -106,61 +105,3 @@ class DecisionReason(BaseModel):
         max_length=_TRANSPORT_REASON_MAX_LENGTH,
         description="Rejection reason, 1-500 characters after trimming; shown to the requester.",
     )
-
-
-class PublishRequestCreate(BaseModel):
-    base_revision: int = Field(ge=0, description="The draft revision the rule manager saw.")
-
-
-class DiffRuleItem(RuleItem):
-    priority: PriorityValue
-
-
-class ChangedRule(BaseModel):
-    before: DiffRuleItem
-    after: DiffRuleItem
-
-
-class ChangedGroup(BaseModel):
-    before: RuleGroupItem
-    after: RuleGroupItem
-
-
-class RuleSetDiffView(BaseModel):
-    """The draft against the latest published version (rule-proposals Requirement 6)."""
-
-    added_rules: list[DiffRuleItem]
-    changed_rules: list[ChangedRule]
-    removed_rules: list[DiffRuleItem]
-    added_groups: list[RuleGroupItem]
-    changed_groups: list[ChangedGroup]
-    removed_groups: list[RuleGroupItem]
-
-
-class PublishRequestItem(BaseModel):
-    id: str = Field(description="public_id of the publish request.")
-    status: PublishRequestStatusValue
-    requester_name: str
-    created_at: datetime
-    draft_revision: int
-    draft_changed: bool = Field(
-        description="True while pending when the draft changed after the request; approving fails."
-    )
-    decided_by_name: str | None
-    decided_at: datetime | None
-    rejection_reason: str | None
-    published_version_number: int | None
-    owned: bool
-
-
-class PublishRequestDetail(PublishRequestItem):
-    diff: RuleSetDiffView | None = Field(
-        description="Draft against the latest version while the request is pending; else empty."
-    )
-
-
-class PublishRequestPage(BaseModel):
-    items: list[PublishRequestItem]
-    page: int
-    page_size: int
-    total: int

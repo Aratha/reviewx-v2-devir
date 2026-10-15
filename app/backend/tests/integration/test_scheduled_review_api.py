@@ -157,7 +157,7 @@ async def test_only_the_owner_and_the_super_admin_see_and_change_a_definition(
     owner = await role_sessions.reviewer()
     definition = (await auth.client.post(_url(auth), json=_body(), headers=owner.headers)).json()
     path = f"/{definition['id']}"
-    for stranger in (await role_sessions.reviewer(), await role_sessions.rule_manager()):
+    for stranger in (await role_sessions.reviewer(), await role_sessions.reviewer()):
         assert (
             await auth.client.get(_url(auth, path), headers=stranger.headers)
         ).status_code == 404

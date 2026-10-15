@@ -112,7 +112,7 @@ class ScheduledEmailCheck:
             return None
 
     @staticmethod
-    def _log(user_public_id: object, outcome: str, error_code: str | None) -> None:
+    def _log(user_public_id: str, outcome: str, error_code: str | None) -> None:
         log_event(
             logger,
             "scheduled_review.email_test",

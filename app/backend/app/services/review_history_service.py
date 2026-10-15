@@ -30,7 +30,6 @@ from app.domain.models.review import (
     ReviewRunKind,
     ReviewRunStatus,
 )
-from app.domain.models.role import ROLE_RULE_MANAGER
 from app.domain.models.user import User
 from app.domain.review import SCRIPT_DEFAULT_LABEL
 from app.infrastructure.repositories.review_repository import (
@@ -288,7 +287,7 @@ class ReviewHistoryService:
         row = await self.reviews.get_run(tenant_id, run_id)
         if row is None:
             raise _not_found()
-        if row.run.owner_user_id == actor.user_id or context.has_role(ROLE_RULE_MANAGER):
+        if row.run.owner_user_id == actor.user_id or context.is_super_admin:
             return row, actor
         if (
             recipient_reads
@@ -310,11 +309,11 @@ class ReviewHistoryService:
         self, context: RequestContext, *, scope: str, page: int, page_size: int
     ) -> ReviewRunPage:
         tenant_id, actor = await self._caller(context)
-        if scope == "all" and not context.has_role(ROLE_RULE_MANAGER):
+        if scope == "all" and not context.is_super_admin:
             raise ApplicationError(
                 status.HTTP_403_FORBIDDEN,
                 "review_scope_forbidden",
-                "Tüm koşumları yalnız kural yöneticisi görebilir.",
+                "Tüm koşumları yalnız süper yönetici görebilir.",
             )
         rows, total = await self.reviews.list_runs(
             tenant_id,

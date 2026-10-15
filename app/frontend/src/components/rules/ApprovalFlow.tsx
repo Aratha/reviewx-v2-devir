@@ -1,6 +1,6 @@
 import {Card} from '@/components/ui/Card';
 
-export type ApprovalFlowRole = 'manager' | 'proposer' | 'decider';
+export type ApprovalFlowRole = 'proposer' | 'decider';
 
 interface Step {
   title: string;
@@ -14,27 +14,6 @@ interface Step {
  * admin; only the super admin publishes directly.
  */
 const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
-  manager: {
-    title: 'Taslak nasıl yayımlanır?',
-    steps: [
-      {title: 'Taslağı düzenleyin', where: 'Yönetim → Kurallar', text: 'Kural ekleyin, tek cümlelik özet yazın, gruplara atayın.'},
-      {
-        title: 'Onaya gönderin',
-        where: 'Yönetim → Kurallar → Onaya gönder',
-        text: 'Değişiklikler kaydedilir ve yayın isteği süper yöneticiye düşer.',
-      },
-      {
-        title: 'Süper yönetici inceler',
-        where: 'Yönetim → Kural onayları',
-        text: 'Yayımlanmış sürüme göre eklenen, değişen ve silinen kuralları görür.',
-      },
-      {
-        title: 'Karar',
-        where: 'Bu sayfanın üstü',
-        text: 'Onaylanınca yeni sürüm hemen yayımlanır; reddedilirse gerekçe burada görünür.',
-      },
-    ],
-  },
   proposer: {
     title: 'Öneriniz nasıl yayımlanır?',
     steps: [
@@ -61,12 +40,12 @@ const STEPS: Record<ApprovalFlowRole, {title: string; steps: Step[]}> = {
       {
         title: 'Gelen işler',
         where: 'Yönetim → Kural onayları',
-        text: 'Yetkili kullanıcıların kural ve grup önerileri ile kural yöneticilerinin yayın istekleri buraya düşer.',
+        text: 'Kullanıcıların kural ve grup önerileri buraya düşer.',
       },
       {
         title: 'İnceleyin',
         where: 'Sekmeler',
-        text: 'Ayrıntılı kural metnini ve yayın isteğinin farkını görün.',
+        text: 'Ayrıntılı kural metnini ve gerekçeyi görün.',
       },
       {
         title: 'Onaylayın veya reddedin',

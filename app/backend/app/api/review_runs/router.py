@@ -14,7 +14,7 @@ from app.api.auth.dependencies import CurrentContext, require_any_role
 from app.api.integrations import get_review_registry
 from app.api.validation import envelope_validation_route
 from app.db.session import get_db
-from app.domain.models.role import ROLE_REVIEWER, ROLE_RULE_MANAGER
+from app.domain.models.role import ROLE_REVIEWER
 from app.schemas.review_runs.contracts import (
     DeletedRuns,
     FalsePositiveState,
@@ -38,7 +38,7 @@ router = APIRouter(
     prefix="/review-runs",
     tags=["review-runs"],
     route_class=envelope_validation_route(status.HTTP_422_UNPROCESSABLE_CONTENT),
-    dependencies=[Depends(require_any_role(ROLE_REVIEWER, ROLE_RULE_MANAGER))],
+    dependencies=[Depends(require_any_role(ROLE_REVIEWER))],
     responses={401: {"description": "Oturum yok"}, 403: {"description": "Rol yetkisi yok"}},
 )
 

@@ -8,7 +8,7 @@ import {mainMenu, openAdminSection, openReview} from './navigation.mjs';
  */
 await withBrowser('connection pages, object review errors and user administration', async ({page, assert, newPage}) => {
   const manager = page;
-  await signIn(manager, accounts.ruleManager);
+  await signIn(manager, accounts.superAdmin);
 
   // Local environment: both connection sections are on the Yönetim page and editable.
   await openAdminSection(manager, 'SQL bağlantısı');
@@ -46,22 +46,21 @@ await withBrowser('connection pages, object review errors and user administratio
   await reviewer.getByRole('button', {name: 'Listeyi yenile'}).waitFor();
   assert.equal(await reviewer.getByRole('button', {name: 'İnceleme için en az bir nesne seçin'}).isDisabled(), true);
 
-  // Super admin: change the second reviewer's role and status, then restore both.
+  // Super admin: deactivate the second user, who is signed out and cannot sign in; then restore.
   const admin = await newPage();
   await signIn(admin, accounts.superAdmin);
   await openAdminSection(admin, 'Kullanıcılar');
   const target = accounts.secondReviewer.username;
   const other = await newPage();
   await signIn(other, accounts.secondReviewer);
-  const role = admin.getByRole('combobox', {name: `${target} rolü`});
+  // directory-login Decision 14: there is no role to choose; everyone else is a user.
+  assert.equal(await admin.getByRole('combobox', {name: `${target} rolü`}).count(), 0);
   try {
-    await role.selectOption('kural-yoneticisi');
-    await admin.getByText(`${target} için rol “Kural yöneticisi” oldu.`).waitFor();
-    // The role change closed the user's refresh sessions (directory-login Requirement 5).
-    const refreshed = await other.evaluate(async () => (await fetch('/api/dwhcodereview/v1/auth/refresh', {method: 'POST'})).status);
-    assert.equal(refreshed, 401);
     await admin.getByRole('button', {name: `${target} hesabını pasifleştir`}).click();
     await admin.getByText(`${target} hesabı pasifleştirildi.`).waitFor();
+    // Deactivation closed the user's refresh sessions (directory-login Requirement 5).
+    const refreshed = await other.evaluate(async () => (await fetch('/api/dwhcodereview/v1/auth/refresh', {method: 'POST'})).status);
+    assert.equal(refreshed, 401);
     await other.goto(baseUrl + '/login');
     await other.getByLabel(message('auth.login.username')).fill(target);
     await other.getByLabel(message('auth.login.password')).fill(accounts.secondReviewer.password);
@@ -71,10 +70,6 @@ await withBrowser('connection pages, object review errors and user administratio
     if (await admin.getByRole('button', {name: `${target} hesabını etkinleştir`}).count()) {
       await admin.getByRole('button', {name: `${target} hesabını etkinleştir`}).click();
       await admin.getByText(`${target} hesabı etkinleştirildi.`).waitFor();
-    }
-    if ((await role.inputValue()) !== 'inceleyici') {
-      await role.selectOption('inceleyici');
-      await admin.getByText(`${target} için rol “İnceleyici” oldu.`).waitFor();
     }
   }
 }, {

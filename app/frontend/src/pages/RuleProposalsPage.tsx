@@ -1,10 +1,12 @@
 import {useId, useState, type FormEvent} from 'react';
+import {ApprovalFlow} from '@/components/rules/ApprovalFlow';
 import {Alert} from '@/components/ui/Alert';
 import {Badge} from '@/components/ui/Badge';
 import {Button} from '@/components/ui/Button';
 import {Field} from '@/components/ui/Field';
 import {PageHeader} from '@/components/ui/PageHeader';
 import {EmptyState, ErrorState, LoadingState} from '@/components/ui/States';
+import {Tabs} from '@/components/ui/Tabs';
 import {useResource} from '@/hooks/useResource';
 import {describeError} from '@/lib/errorMessages';
 import {formatDateTime} from '@/lib/format';
@@ -55,7 +57,9 @@ export default function RuleProposalsPage() {
     return (
       <div className="page">
         <PageHeader title="Kural önerilerim" />
-        <EmptyState title="Kural önerme yetkiniz yok">Yetki için süper yöneticiye başvurun.</EmptyState>
+        <EmptyState title="Kural önerme yetkiniz yok" icon="lightbulb">
+          Yetki için süper yöneticiye başvurun; yetki verildiğinde bu sayfadan kural ve grup önerebilirsiniz.
+        </EmptyState>
       </div>
     );
 
@@ -70,22 +74,11 @@ export default function RuleProposalsPage() {
         title="Kural önerilerim"
         description="Önerdiğiniz kural veya grup, süper yönetici onaylayınca yeni sürümle herkesin kullanımına açılır."
       />
-      <div className="row" role="tablist" aria-label="Kural önerileri">
-        {TABS.map((item) => (
-          <Button
-            key={item.id}
-            role="tab"
-            aria-selected={tab === item.id}
-            variant={tab === item.id ? 'primary' : 'secondary'}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs label="Kural önerileri" items={TABS} value={tab} onChange={setTab} />
       {tab === 'rule' && <RuleProposalForm version={latest.data} onSent={proposed} />}
       {tab === 'group' && <GroupProposalForm version={latest.data} onSent={proposed} />}
       {tab === 'history' && <ProposalHistory key={sent} />}
+      <ApprovalFlow role="proposer" />
     </div>
   );
 }
@@ -184,9 +177,9 @@ function RuleProposalForm({version, onSent}: {version: RuleSetVersionDetail | un
           <legend id={`${id}-groups`} className="field-label">
             Katılacağı kural grupları (isteğe bağlı)
           </legend>
-          <div className="row">
+          <div className="chip-row">
             {version?.groups.map((group) => (
-              <label key={group.id} className="check">
+              <label key={group.id} className="chip">
                 <input
                   type="checkbox"
                   checked={groups.includes(group.id)}
@@ -254,7 +247,7 @@ function GroupProposalForm({version, onSent}: {version: RuleSetVersionDetail | u
     }
   }
 
-  if (version === undefined) return <EmptyState title="Henüz yayımlanmış kural yok" />;
+  if (version === undefined) return <EmptyState title="Henüz yayımlanmış kural yok" icon="book" />;
   return (
     <form className="card card-body stack" aria-label="Yeni grup önerisi" onSubmit={(event) => void submit(event)}>
       <Field id={`${id}-name`} label="Grup adı (zorunlu)" error={nameError}>
@@ -284,12 +277,12 @@ function GroupProposalForm({version, onSent}: {version: RuleSetVersionDetail | u
           placeholder="Kural kimliği veya özet ara…"
           onChange={(event) => setSearch(event.target.value)}
         />
-        <ul className="list stack-tight rule-pick-list">
+        <ul className="option-list">
           {rules
             .filter((rule) => ruleMatchesSearch(rule, search))
             .map((rule) => (
               <li key={rule.id}>
-                <label className="check">
+                <label className="option-row">
                   <input
                     type="checkbox"
                     checked={codes.includes(rule.id)}
@@ -299,8 +292,9 @@ function GroupProposalForm({version, onSent}: {version: RuleSetVersionDetail | u
                       )
                     }
                   />
-                  <span>
-                    <span className="mono">{rule.id}</span> <span className="subtle">{displaySummary(rule)}</span>
+                  <span className="option-main">
+                    <span className="option-title mono">{rule.id}</span>
+                    <span className="option-text">{displaySummary(rule)}</span>
                   </span>
                 </label>
               </li>
@@ -353,7 +347,12 @@ function ProposalHistory() {
 
   if (history.status === 'error') return <ErrorState message={describeError(history.error)} onRetry={history.reload} />;
   if (history.data === undefined) return <LoadingState />;
-  if (history.data.items.length === 0) return <EmptyState title="Henüz öneriniz yok" />;
+  if (history.data.items.length === 0)
+    return (
+      <EmptyState title="Henüz öneriniz yok" icon="lightbulb">
+        "Kural öner" veya "Grup öner" sekmesinden ilk önerinizi gönderin.
+      </EmptyState>
+    );
   return (
     <section className="card" aria-label="Önerilerim">
       {error && <Alert tone="error">{error}</Alert>}

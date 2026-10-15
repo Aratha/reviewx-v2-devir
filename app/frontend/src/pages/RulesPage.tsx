@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {ApprovalFlow} from '@/components/rules/ApprovalFlow';
 import {RuleEditorColumn, type RuleEditorActions} from '@/components/rules/RuleEditorColumn';
 import {RuleGroupManager} from '@/components/rules/RuleGroupManager';
 import {Alert} from '@/components/ui/Alert';
@@ -229,10 +230,10 @@ function RulesEditor({
           <div className="stack-tight">
             <span className="subtle">{latestVersionLine(workspace.latest_version)}</span>
             {workspace.draft_differs && <Badge tone="warning">Taslakta yayımlanmamış değişiklik var</Badge>}
-            {!superAdmin && <LatestPublishRequest key={sent} />}
           </div>
         }
       />
+      {!superAdmin && <LatestPublishRequest key={sent} />}
       {notice && (
         <Alert tone={notice.tone}>
           <div className="row">
@@ -287,6 +288,7 @@ function RulesEditor({
           actions={actionsFor('normal')}
         />
       </div>
+      {!superAdmin && <ApprovalFlow role="manager" />}
       <div className="card card-footer sticky-footer">
         <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || !dirty || blocked} busy={busy === 'save'}>
           {busy === 'save' ? 'Kaydediliyor…' : 'Taslağı kaydet'}
@@ -320,11 +322,15 @@ function LatestPublishRequest() {
   );
   const request = latest.data?.items[0];
   if (!request) return null;
+  const tone =
+    request.status === 'onaylandi' ? 'success' : request.status === 'bekliyor' ? 'info' : 'warning';
   return (
-    <span className="subtle">
-      Son yayın isteği: {REQUEST_STATUS[request.status]}
-      {request.published_version_number !== null && ` · sürüm ${request.published_version_number}`}
-      {request.rejection_reason && ` · gerekçe: ${request.rejection_reason}`}
-    </span>
+    <Alert tone={tone}>
+      <p>
+        Son yayın isteği: {REQUEST_STATUS[request.status]}
+        {request.published_version_number !== null && ` · sürüm ${request.published_version_number}`}
+        {request.rejection_reason && ` · gerekçe: ${request.rejection_reason}`}
+      </p>
+    </Alert>
   );
 }

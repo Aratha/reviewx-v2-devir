@@ -88,11 +88,16 @@ function PublishedVersion({version, search}: {version: RuleSetVersionDetail; sea
       </p>
       {version.groups.length > 0 && (
         <section className="card" aria-label="Kural grupları">
-          <div className="card-body stack-tight">
+          <header className="card-header">
             <h2>Kural grupları</h2>
-            <ul className="list stack-tight">
+            <span className="subtle">{version.groups.length} grup</span>
+          </header>
+          <div className="card-body">
+            <ul className="list chip-row">
               {version.groups.map((group) => (
-                <li key={group.id}>{group.description ? `${group.name}: ${group.description}` : group.name}</li>
+                <li key={group.id} className="chip" title={group.description || undefined}>
+                  {group.description ? `${group.name}: ${group.description}` : group.name}
+                </li>
               ))}
             </ul>
           </div>
@@ -136,8 +141,8 @@ function ReadOnlyColumn({
         ) : (
           <ol className="list stack-tight">
             {visible.map((rule) => (
-              <li key={rule.id} className="rule-line">
-                <div className="row">
+              <li key={rule.id} className="rule-row">
+                <div className="rule-row-head">
                   <strong className="mono">{rule.id}</strong>
                   {rule.requires_metadata && <Badge tone="primary">Nesne meta verisi gerekir</Badge>}
                   {(rule.rule_group_ids ?? [])
@@ -148,13 +153,13 @@ function ReadOnlyColumn({
                       </Badge>
                     ))}
                 </div>
-                {detailed ? (
-                  <>
-                    {rule.summary?.trim() && <p className="subtle">Özet: {rule.summary}</p>}
+                <p className="rule-row-summary">{displaySummary(rule)}</p>
+                {/* rule-management Requirement 12: only the super admin reads the detailed text. */}
+                {detailed && (
+                  <details className="rule-details">
+                    <summary>Ayrıntılı metni göster</summary>
                     <p className="rule-text">{rule.text}</p>
-                  </>
-                ) : (
-                  <p>{displaySummary(rule)}</p>
+                  </details>
                 )}
               </li>
             ))}

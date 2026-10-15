@@ -1,10 +1,13 @@
 import {useId, useState} from 'react';
+import {ApprovalFlow} from '@/components/rules/ApprovalFlow';
 import {RuleSetDiff} from '@/components/rules/RuleSetDiff';
 import {Alert} from '@/components/ui/Alert';
 import {Badge} from '@/components/ui/Badge';
 import {Button} from '@/components/ui/Button';
+import {Icon, type IconName} from '@/components/ui/Icon';
 import {PageHeader} from '@/components/ui/PageHeader';
 import {EmptyState, ErrorState, LoadingState} from '@/components/ui/States';
+import {Tabs} from '@/components/ui/Tabs';
 import {useResource} from '@/hooks/useResource';
 import {notifyRuleApprovalsChanged} from '@/hooks/useRuleProposalMenu';
 import {describeError} from '@/lib/errorMessages';
@@ -41,11 +44,11 @@ export default function RuleApprovalsPage() {
   const latest = useResource(`rule-set-version:latest:${generation}`, (signal) => RuleSetService.latest(signal));
   const ruleItems = proposals.data?.items.filter((item) => item.kind === 'rule') ?? [];
   const groupItems = proposals.data?.items.filter((item) => item.kind === 'group') ?? [];
-  const tabs: {id: Tab; label: string}[] = [
-    {id: 'rule', label: `Kural önerileri (${ruleItems.length})`},
-    {id: 'group', label: `Grup önerileri (${groupItems.length})`},
-    {id: 'publish', label: `Yayın istekleri (${requests.data?.items.length ?? 0})`},
-    {id: 'proposers', label: 'Öneri yetkisi'},
+  const publishCount = requests.data?.items.length ?? 0;
+  const stats: {id: Tab; icon: IconName; label: string; count: number}[] = [
+    {id: 'rule', icon: 'lightbulb', label: 'Bekleyen kural önerisi', count: ruleItems.length},
+    {id: 'group', icon: 'listChecks', label: 'Bekleyen grup önerisi', count: groupItems.length},
+    {id: 'publish', icon: 'send', label: 'Bekleyen yayın isteği', count: publishCount},
   ];
   const refresh = () => {
     setGeneration((value) => value + 1);
@@ -58,19 +61,36 @@ export default function RuleApprovalsPage() {
         title="Kural onayları"
         description="Onayladığınız öneri veya yayın isteği hemen yeni sürüm olarak yayımlanır; ret gerekçesi isteyene görünür."
       />
-      <div className="row" role="tablist" aria-label="Kural onayları">
-        {tabs.map((item) => (
-          <Button
-            key={item.id}
-            role="tab"
-            aria-selected={tab === item.id}
-            variant={tab === item.id ? 'primary' : 'secondary'}
-            onClick={() => setTab(item.id)}
+      <div className="stat-grid">
+        {stats.map((stat) => (
+          <button
+            key={stat.id}
+            type="button"
+            className={`stat${stat.count > 0 ? ' is-attention' : ''}`}
+            onClick={() => setTab(stat.id)}
+            aria-label={`${stat.label}: ${stat.count}`}
           >
-            {item.label}
-          </Button>
+            <span className="stat-icon">
+              <Icon name={stat.icon} />
+            </span>
+            <span>
+              <span className="stat-value">{stat.count}</span>
+              <span className="stat-label">{stat.label}</span>
+            </span>
+          </button>
         ))}
       </div>
+      <Tabs
+        label="Kural onayları"
+        value={tab}
+        onChange={setTab}
+        items={[
+          {id: 'rule', label: 'Kural önerileri', count: ruleItems.length, attention: true},
+          {id: 'group', label: 'Grup önerileri', count: groupItems.length, attention: true},
+          {id: 'publish', label: 'Yayın istekleri', count: publishCount, attention: true},
+          {id: 'proposers', label: 'Öneri yetkisi'},
+        ]}
+      />
       {(tab === 'rule' || tab === 'group') && proposals.status === 'error' && (
         <ErrorState message={describeError(proposals.error)} onRetry={proposals.reload} />
       )}
@@ -88,6 +108,7 @@ export default function RuleApprovalsPage() {
       )}
       {tab === 'publish' && requests.data && <RequestQueue items={requests.data.items} onDecided={refresh} />}
       {tab === 'proposers' && <ProposerAdmin />}
+      <ApprovalFlow role="decider" />
     </div>
   );
 }
@@ -103,7 +124,7 @@ function ProposalQueue({
   empty: string;
   onDecided: () => void;
 }) {
-  if (items.length === 0) return <EmptyState title={empty} />;
+  if (items.length === 0) return <EmptyState title={empty} icon="check" />;
   return (
     <ul className="list stack">
       {items.map((item) => (
@@ -150,7 +171,7 @@ function ProposalCard({
             ))}
           </div>
           <p className="subtle">Ayrıntılı kural metni:</p>
-          <p className="rule-text">{detail.data.text}</p>
+          <p className="rule-text detail-box">{detail.data.text}</p>
         </div>
       )}
       {detail.data && item.kind === 'group' && (
@@ -181,7 +202,7 @@ function ProposalCard({
 }
 
 function RequestQueue({items, onDecided}: {items: PublishRequestItem[]; onDecided: () => void}) {
-  if (items.length === 0) return <EmptyState title="Bekleyen yayın isteği yok" />;
+  if (items.length === 0) return <EmptyState title="Bekleyen yayın isteği yok" icon="check" />;
   return (
     <ul className="list stack">
       {items.map((item) => (

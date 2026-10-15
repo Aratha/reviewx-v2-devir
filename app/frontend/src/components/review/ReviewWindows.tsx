@@ -89,7 +89,7 @@ function LiveReviewDialog() {
         <p className="rule-text">
           <strong>{kindLabel(session)}:</strong> {session.title}
         </p>
-        {session.subtitle && <p className="subtle mono">{session.subtitle}</p>}
+        {session.subtitle && <p className="subtle mono wrap-anywhere">{session.subtitle}</p>}
         {progress?.ruleVersion != null && <p className="subtle">Kural sürümü {progress.ruleVersion}</p>}
       </div>
       <div className="stack-tight">

@@ -213,7 +213,7 @@ function RunRow({
         <span className="subtle">{formatDateTime(run.started_at)}</span>
       </span>
       <strong>{run.title}</strong>
-      {run.subtitle && <span className="subtle mono">{run.subtitle}</span>}
+      {run.subtitle && <span className="subtle mono clamp-2" title={run.subtitle}>{run.subtitle}</span>}
       {run.error_code && run.status !== 'cancelled' && (
         <span className="field-error">{messageForCode(run.error_code) ?? run.error_message}</span>
       )}
@@ -271,7 +271,7 @@ function RunDetail({runId}: {runId: string}) {
           {formatDateTime(run.started_at)} · kural sürümü {run.rule_version} · {run.object_count} nesne ·{' '}
           {run.finding_count} bulgu · {run.owner_display_name}
         </p>
-        {run.subtitle && <p className="subtle mono">{run.subtitle}</p>}
+        {run.subtitle && <p className="subtle mono wrap-anywhere">{run.subtitle}</p>}
         <p className="subtle">{selectionLine(run)}</p>
         {!run.owned && <Alert tone="info">Bu inceleme başka bir kullanıcıya ait; yalnız okunabilir.</Alert>}
         {run.status === 'cancelled' && <Alert tone="info">Bu inceleme durduruldu; kısmi sonuç saklanmaz.</Alert>}

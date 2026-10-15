@@ -157,7 +157,8 @@ describe('application shell', () => {
   it('offers "Kural onayları" with the pending count to the super admin', async () => {
     proposalMenu(true, true, {proposals: 2, requests: 1});
     renderApp('super_admin');
-    const link = await screen.findByRole('link', {name: /Kural onayları/});
+    const nav = await screen.findByRole('navigation', {name: messages['shell.navigation']});
+    const link = await within(nav).findByRole('link', {name: /Kural onayları/});
     expect(await within(link).findByLabelText('3 bekleyen')).toHaveTextContent('3');
   });
 

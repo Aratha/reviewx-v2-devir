@@ -257,7 +257,7 @@ function RuleResultLine({rule, findings, control}: {rule: RuleResult; findings: 
             {name}
           </Badge>
         ))}
-        {rule.decision_basis && <span className="subtle mono">{rule.decision_basis}</span>}
+        {rule.decision_basis && <span className="subtle mono wrap-anywhere">{rule.decision_basis}</span>}
         {findings.length > 0 && <span className="subtle">{findings.length} bulgu</span>}
         {markable && (
           <FalsePositiveToggle

@@ -55,22 +55,37 @@ export function RuleSelectionPicker({
   }
 
   return (
-    <fieldset className="field" role="group" aria-labelledby={legendId}>
-      <legend id={legendId} className="field-label">
-        Kurallar
-      </legend>
+    <fieldset className="card card-body picker" role="group" aria-labelledby={legendId}>
+      <div className="picker-head">
+        <legend id={legendId} className="picker-title">
+          Kurallar
+        </legend>
+        <span className="row">
+          <Badge tone={selected.size === 0 ? 'neutral' : 'primary'}>
+            {selected.size === 0 ? 'Tüm kurallar' : `${selected.size} / ${rules.length} seçili`}
+          </Badge>
+          {selected.size > 0 && (
+            <Button size="sm" variant="ghost" disabled={disabled} onClick={() => onChange([])}>
+              Seçimi temizle
+            </Button>
+          )}
+        </span>
+      </div>
       <p className="field-hint">
-        {selected.size === 0
-          ? 'Hiçbir kural seçilmezse tüm kurallar çalışır.'
-          : `${selected.size} / ${rules.length} kural seçildi.`}
+        <span>
+          {selected.size === 0
+            ? 'Hiçbir kural seçilmezse tüm kurallar çalışır.'
+            : `${selected.size} / ${rules.length} kural seçildi.`}
+        </span>{' '}
+        <span>Bir grubu işaretlemek o gruptaki bütün kuralları seçer.</span>
       </p>
       {groups.length > 0 && (
-        <div className="row" role="group" aria-label="Grupla seç">
+        <div className="chip-row" role="group" aria-label="Grupla seç">
           {groups.map((group) => {
             const members = rules.filter((rule) => (rule.rule_group_ids ?? []).includes(group.id));
             const chosen = members.filter((rule) => selected.has(rule.id)).length;
             return (
-              <label key={group.id} className="check">
+              <label key={group.id} className="chip">
                 <input
                   type="checkbox"
                   checked={members.length > 0 && chosen === members.length}
@@ -88,41 +103,34 @@ export function RuleSelectionPicker({
           })}
         </div>
       )}
-      <div className="row">
-        <div className="field grow">
-          <label className="sr-only" htmlFor={searchId}>
-            Kural ara
-          </label>
-          <input
-            id={searchId}
-            className="input"
-            type="search"
-            value={search}
-            placeholder="Kural kimliği veya metin ara…"
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-        {selected.size > 0 && (
-          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => onChange([])}>
-            Seçimi temizle
-          </Button>
-        )}
+      <div>
+        <label className="sr-only" htmlFor={searchId}>
+          Kural ara
+        </label>
+        <input
+          id={searchId}
+          className="input"
+          type="search"
+          value={search}
+          placeholder="Kural kimliği veya metin ara…"
+          onChange={(event) => setSearch(event.target.value)}
+        />
       </div>
       {visible.length === 0 ? (
         <p className="muted">Eşleşen kural yok.</p>
       ) : (
-        <ul className="list stack-tight rule-pick-list">
+        <ul className="option-list">
           {visible.map((rule) => (
             <li key={rule.id}>
-              <label className="check">
+              <label className="option-row">
                 <input
                   type="checkbox"
                   checked={selected.has(rule.id)}
                   disabled={disabled}
                   onChange={(event) => toggleRule(rule.id, event.target.checked)}
                 />
-                <span className="stack-tight">
-                  <span className="row">
+                <span className="option-main">
+                  <span className="option-title">
                     <span className="mono">{rule.id}</span>
                     {critical.has(rule.id) && <Badge tone="danger">Kritik</Badge>}
                     {groupNamesOf(rule, groups).map((name) => (
@@ -132,7 +140,7 @@ export function RuleSelectionPicker({
                     ))}
                   </span>
                   {/* rule-management Requirement 12: one sentence, not the detailed text. */}
-                  <span className="subtle">{displaySummary(rule)}</span>
+                  <span className="option-text">{displaySummary(rule)}</span>
                 </span>
               </label>
             </li>

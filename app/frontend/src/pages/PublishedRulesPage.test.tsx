@@ -100,12 +100,14 @@ describe('published rules page — simple view (rule-management Requirement 12)'
     expect(screen.queryByText(/amaç açıklanmalıdır/)).toBeNull();
   });
 
-  it('shows the super admin the summary and the detailed text', async () => {
+  it('shows the super admin the summary and the detailed text behind a disclosure', async () => {
     mockVersions();
     vi.spyOn(RuleSetService, 'latest').mockResolvedValue(summarized());
     renderWithSession(<PublishedRulesPage />, {role: 'super_admin'});
-    expect(await screen.findByText('Yorum satırı bulunmalıdır ve amaç açıklanmalıdır.')).toBeInTheDocument();
-    expect(screen.getByText('Özet: Yorum yazılır.')).toBeInTheDocument();
+    expect(await screen.findByText('Yorum yazılır.')).toBeInTheDocument();
+    const detail = screen.getByText('Yorum satırı bulunmalıdır ve amaç açıklanmalıdır.');
+    expect(detail.closest('details')).not.toBeNull();
     expect(screen.getByText('NOLOCK kullanılmamalıdır. Kirli okuma yanlış sonuç üretir.')).toBeInTheDocument();
+    expect(screen.getAllByText('Ayrıntılı metni göster')).toHaveLength(2);
   });
 });

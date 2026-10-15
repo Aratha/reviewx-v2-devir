@@ -24,7 +24,7 @@ export function RuleSetDiff({diff}: {diff: RuleSetDiffView}) {
       <RuleList title="Eklenen kurallar" rules={diff.added_rules} tone="success" />
       {diff.changed_rules.length > 0 && (
         <section className="stack-tight" aria-label="Değişen kurallar">
-          <h3>Değişen kurallar ({diff.changed_rules.length})</h3>
+          <h3 className="section-title">Değişen kurallar ({diff.changed_rules.length})</h3>
           <ul className="list stack">
             {diff.changed_rules.map(({before, after}) => (
               <li key={after.id} className="rule-line stack-tight">
@@ -42,7 +42,7 @@ export function RuleSetDiff({diff}: {diff: RuleSetDiffView}) {
       <GroupList title="Eklenen gruplar" groups={diff.added_groups} />
       {diff.changed_groups.length > 0 && (
         <section className="stack-tight" aria-label="Değişen gruplar">
-          <h3>Değişen gruplar ({diff.changed_groups.length})</h3>
+          <h3 className="section-title">Değişen gruplar ({diff.changed_groups.length})</h3>
           <ul className="list stack-tight">
             {diff.changed_groups.map(({before, after}) => (
               <li key={after.id}>
@@ -62,7 +62,7 @@ function RuleList({title, rules, tone}: {title: string; rules: DiffRuleItem[]; t
   if (rules.length === 0) return null;
   return (
     <section className="stack-tight" aria-label={title}>
-      <h3>
+      <h3 className="section-title">
         {title} ({rules.length})
       </h3>
       <ul className="list stack">
@@ -89,14 +89,14 @@ function RuleLine({rule, tone}: {rule: DiffRuleItem; tone: 'success' | 'danger' 
 }
 
 function RuleBody({rule}: {rule: DiffRuleItem}) {
-  return <p className="rule-text">{rule.text}</p>;
+  return <p className="rule-text detail-box">{rule.text}</p>;
 }
 
 function GroupList({title, groups}: {title: string; groups: RuleGroupItem[]}) {
   if (groups.length === 0) return null;
   return (
     <section className="stack-tight" aria-label={title}>
-      <h3>
+      <h3 className="section-title">
         {title} ({groups.length})
       </h3>
       <ul className="list stack-tight">

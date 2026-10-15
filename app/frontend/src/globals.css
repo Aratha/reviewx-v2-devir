@@ -880,3 +880,32 @@ details.rule-details[open] > summary { margin-bottom: var(--space-2); }
 .pane-tabs { padding-bottom: 0; border-bottom: 0; }
 .pane-tabs .tabs { margin: 0; }
 
+/* Scheduled reviews: one card per definition; facts in a row, actions on the right. */
+.schedule-list { display: grid; gap: var(--space-3); }
+.schedule-card {
+  display: grid; gap: var(--space-3); padding: var(--space-4);
+  grid-template-columns: minmax(14rem, 1.1fr) minmax(0, 2.6fr) auto; align-items: center;
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.schedule-card:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-sm); }
+.schedule-card.is-live { border-color: var(--color-accent); box-shadow: inset 4px 0 0 var(--color-accent); }
+.schedule-title { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.schedule-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); margin: 0; }
+.schedule-facts > div { min-width: 0; }
+.schedule-facts dt { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-fg-subtle); }
+.schedule-facts dd { margin: 0.15rem 0 0; font-size: 0.88rem; }
+.schedule-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); max-width: 30rem; }
+.schedule-card > .row { grid-column: 1 / -1; }
+.block { display: block; }
+@media (max-width: 90rem) {
+  .schedule-card { grid-template-columns: minmax(0, 1fr) auto; }
+  .schedule-facts { grid-column: 1 / -1; grid-row: 2; }
+  .schedule-actions { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 48rem) {
+  .schedule-card { grid-template-columns: minmax(0, 1fr); }
+  .schedule-actions { grid-column: auto; grid-row: auto; justify-content: flex-start; max-width: none; }
+  .schedule-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+

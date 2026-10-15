@@ -73,7 +73,7 @@ await withBrowser('scheduled review: define, run in the background, open the rep
 
     // The page lists the definition with its period; pause and resume change its state.
     await openReview(owner, 'Zamanlanmış', 'Zamanlanmış incelemeler');
-    const row = owner.getByRole('row').filter({hasText: NAME});
+    const row = owner.getByRole('article', {name: NAME});
     await row.getByText('Her gün 03:00 (Europe/Istanbul)').waitFor();
     await owner.getByRole('button', {name: `${NAME} tanımını duraklat`}).click();
     await owner.getByText('Tanım duraklatıldı.').waitFor();

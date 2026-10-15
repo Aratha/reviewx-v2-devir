@@ -89,5 +89,5 @@ oturumda çalışır. Bu görevlerin L1/L2 kanıtı oradan alınmalıdır.
 ## 1.3.0 revizyonu (2026-10-15)
 
 - [x] T-R11.1 Requirement 11, Decision 15: `POST /scheduled-reviews/{id}/stop`; sıradaki koşum hemen, süren koşum iptal isteğiyle "iptal edildi" olur; e-posta gitmez.
-- [x] T-R11.2 Acceptance 6: `test_the_owner_stops_a_queued_run_and_nothing_else_is_stopped`.
+- [x] T-R11.2 Acceptance 6: `test_the_owner_stops_a_queued_run_and_nothing_else_is_stopped` ve `test_the_owner_stops_a_running_run_and_no_e_mail_goes_out`.
 - [x] T-R11.3 Ön yüz: "Durdur" düğmesi ve açık koşum varken listenin 5 saniyede bir yenilenmesi.

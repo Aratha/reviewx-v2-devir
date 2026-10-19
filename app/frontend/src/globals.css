@@ -10,8 +10,10 @@
   --color-bg-glow-1: rgba(139, 92, 255, 0.2);
   --color-bg-glow-2: rgba(255, 93, 214, 0.09);
   --color-bg-glow-3: rgba(40, 70, 190, 0.16);
-  --color-code-text: rgba(168, 177, 218, 0.13);
-  --color-scan: rgba(124, 244, 255, 0.85);
+  --color-mark-1: rgba(124, 244, 255, 0.07);
+  --color-mark-2: rgba(139, 92, 255, 0.07);
+  --color-scan: rgba(124, 244, 255, 0.5);
+  --color-scan-trail: rgba(124, 244, 255, 0.05);
   --color-side: rgba(8, 11, 26, 0.82);
   --color-surface: rgba(17, 22, 48, 0.72);
   --color-surface-solid: #0e1330;
@@ -134,8 +136,28 @@ kbd {
   border: 1px solid var(--color-border-strong); border-bottom-width: 2px; background: var(--color-surface-sunken); color: var(--color-fg-muted);
 }
 
-/* ---------- Backdrop: faint SQL under a review scan ---------- */
-.backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+/* ---------- Backdrop: the X as a faint watermark, one review line now and then ---------- */
+.backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.backdrop-mark {
+  position: absolute; right: -6vmin; bottom: -8vmin; width: 62vmin; height: 62vmin;
+  fill: none; stroke: url(#backdrop-mark-light); stroke-width: 9; stroke-linecap: round;
+}
+.backdrop-mark-stop-1 { stop-color: var(--color-mark-1); }
+.backdrop-mark-stop-2 { stop-color: var(--color-mark-2); }
+.backdrop-scan {
+  position: absolute; left: 0; right: 0; top: -6rem; height: 6rem;
+  background: linear-gradient(to bottom, transparent, var(--color-scan-trail));
+  border-bottom: 1px solid var(--color-scan); opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop-scan { animation: review-line 14s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  @keyframes review-line {
+    0% { transform: translateY(0); opacity: 0; }
+    6% { opacity: 1; }
+    54% { opacity: 1; }
+    60%, 100% { transform: translateY(calc(100vh + 6rem)); opacity: 0; }
+  }
+}
 
 /* ---------- Brand and icons ---------- */
 .brand-mark { display: block; flex: none; }

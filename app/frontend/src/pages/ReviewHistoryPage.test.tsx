@@ -150,7 +150,7 @@ describe('review history page', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'Sil'}));
     await screen.findByText('İnceleme silindi.');
     expect(remove).toHaveBeenCalledWith('run-1');
-    expect(ReviewService.runs).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(ReviewService.runs).toHaveBeenCalledTimes(2));
   });
 
   it('deletes all own runs after confirmation and reports the count', async () => {

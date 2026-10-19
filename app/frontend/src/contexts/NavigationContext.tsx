@@ -31,10 +31,10 @@ function useNavigationModel(enabled: boolean): AppNavigation {
 
   const adminSections: AdminSection[] = [
     ...(access.manageRules
-      ? [{id: 'kurallar' as const, label: 'Kurallar', icon: 'pencil' as const, summary: 'Kural taslağını düzenleyin; yayımlayın ya da onaya gönderin.'}]
+      ? [{id: 'kurallar' as const, label: 'Kurallar', icon: 'pencil' as const, summary: 'Kural taslağını düzenleyin ve yayımlayın.'}]
       : []),
     ...(proposals.canDecide
-      ? [{id: 'onaylar' as const, label: 'Kural onayları', icon: 'inbox' as const, summary: 'Bekleyen kural önerilerine ve yayın isteklerine karar verin.', count: proposals.pending}]
+      ? [{id: 'onaylar' as const, label: 'Kural onayları', icon: 'inbox' as const, summary: 'Bekleyen kural ve grup önerilerine karar verin.', count: proposals.pending}]
       : []),
     ...(access.manageRules && connections.sql
       ? [{id: 'sql' as const, label: 'SQL bağlantısı', icon: 'plug' as const, summary: 'Nesne listelerinin okunduğu SQL Server bağlantısı.'}]

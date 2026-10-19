@@ -1,4 +1,4 @@
-import {fireEvent, screen} from '@testing-library/react';
+import {fireEvent, screen, within} from '@testing-library/react';
 import {useState} from 'react';
 import {describe, expect, it, vi} from 'vitest';
 import {RuleSelectionPicker} from './RuleSelectionPicker';
@@ -43,8 +43,9 @@ function Harness({onChange}: {onChange: (codes: string[]) => void}) {
   );
 }
 
+/** The checkbox of the row whose rule code is exactly `code` (text match, no regular expression). */
 function ruleBox(code: string): HTMLElement {
-  return screen.getByRole('checkbox', {name: new RegExp(`^${code}`)});
+  return within(screen.getByText(code, {selector: '.option-title > .mono'}).closest('label')!).getByRole('checkbox');
 }
 
 describe('rule selection picker (rule-group-selection Requirement 8, Decision 6)', () => {

@@ -8,11 +8,13 @@ export function mainMenu(page) {
 /**
  * Open a section of the single Yönetim page (Kurallar, Kural onayları, SQL bağlantısı, ...): the
  * main menu's "Yönetim", then the section in the rail; the section title is a second-level heading.
+ * The rail link is found by its label as text (a pending count may follow it), never by a regular
+ * expression built from the argument.
  */
 export async function openAdminSection(page, section, heading = section) {
   await mainMenu(page).getByRole('link', {name: /^Yönetim/}).click();
   const rail = page.getByRole('navigation', {name: 'Yönetim bölümleri'});
-  await rail.getByRole('link', {name: new RegExp(`^${section}`)}).click();
+  await rail.getByRole('link', {name: section}).click();
   await page.getByRole('heading', {name: heading, level: 2}).waitFor();
 }
 

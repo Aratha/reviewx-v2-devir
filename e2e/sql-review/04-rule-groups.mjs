@@ -54,8 +54,12 @@ async function exportText(page, path) {
   );
 }
 
+/** The checkbox of the row whose rule code is exactly ruleId (text match, no regular expression). */
 function ruleBox(page, ruleId) {
-  return page.getByRole('checkbox', {name: new RegExp(`^${ruleId}\\b`)});
+  return page
+    .locator('label.option-row')
+    .filter({has: page.getByText(ruleId, {exact: true})})
+    .getByRole('checkbox');
 }
 
 async function finishedRun(page, label) {

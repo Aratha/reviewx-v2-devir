@@ -1,9 +1,7 @@
 import {createContext, useContext, type ReactNode} from 'react';
-import {useLocation} from 'react-router';
 import {useAuth} from '@/contexts/AuthContext';
 import {useConnectionMenu} from '@/hooks/useConnectionMenu';
-import {useRuleProposalMenu} from '@/hooks/useRuleProposalMenu';
-import {LIBRARY_PATHS, REVIEW_PATHS, type AdminSection, type AppNavigation, type NavItem} from '@/lib/navigation';
+import type {AdminSection, AppNavigation, NavGroup, NavItem} from '@/lib/navigation';
 
 const NavigationContext = createContext<AppNavigation | null>(null);
 
@@ -25,16 +23,11 @@ export function useAppNavigation(): AppNavigation {
 
 function useNavigationModel(enabled: boolean): AppNavigation {
   const {access} = useAuth();
-  const {pathname} = useLocation();
   const connections = useConnectionMenu(enabled && access.manageRules);
-  const proposals = useRuleProposalMenu(enabled && access.review, pathname);
 
   const adminSections: AdminSection[] = [
     ...(access.manageRules
-      ? [{id: 'kurallar' as const, label: 'Kurallar', icon: 'pencil' as const, summary: 'Kural taslağını düzenleyin ve yayımlayın.'}]
-      : []),
-    ...(proposals.canDecide
-      ? [{id: 'onaylar' as const, label: 'Kural onayları', icon: 'inbox' as const, summary: 'Bekleyen kural ve grup önerilerine karar verin.', count: proposals.pending}]
+      ? [{id: 'kurallar' as const, label: 'Kurallar', icon: 'pencil' as const, summary: 'Kural taslağını ve grupları düzenleyin, yayımlayın.'}]
       : []),
     ...(access.manageRules && connections.sql
       ? [{id: 'sql' as const, label: 'SQL bağlantısı', icon: 'plug' as const, summary: 'Nesne listelerinin okunduğu SQL Server bağlantısı.'}]
@@ -53,33 +46,23 @@ function useNavigationModel(enabled: boolean): AppNavigation {
       : []),
   ];
 
-  const primary: NavItem[] = [
+  const work: NavItem[] = [
     {to: '/', label: 'Ana sayfa', icon: 'home', match: ['/']},
     ...(access.review
       ? [
-          {to: '/inceleme', label: 'İnceleme', icon: 'database' as const, match: REVIEW_PATHS},
+          {to: '/inceleme', label: 'Nesne incelemesi', icon: 'database' as const, match: ['/inceleme']},
+          {to: '/sql-inceleme', label: 'SQL betiği', icon: 'code' as const, match: ['/sql-inceleme']},
+          {to: '/zamanlanmis-incelemeler', label: 'Zamanlanmış', icon: 'clock' as const, match: ['/zamanlanmis-incelemeler']},
           {to: '/gecmis', label: 'Geçmiş', icon: 'history' as const, match: ['/gecmis']},
-          {to: '/yayimlanmis-kurallar', label: 'Kural kitaplığı', icon: 'book' as const, match: LIBRARY_PATHS},
+          {to: '/yayimlanmis-kurallar', label: 'Kural kitaplığı', icon: 'book' as const, match: ['/yayimlanmis-kurallar']},
         ]
       : []),
-    ...(adminSections.length > 0
-      ? [{to: '/yonetim', label: 'Yönetim', icon: 'sliders' as const, match: ['/yonetim'], count: proposals.canDecide ? proposals.pending : undefined}]
-      : []),
   ];
+  // Every administration screen lives on the one Yönetim page.
+  const admin: NavItem[] =
+    adminSections.length > 0 ? [{to: '/yonetim', label: 'Yönetim', icon: 'sliders', match: ['/yonetim']}] : [];
 
-  return {
-    primary,
-    reviewModes: [
-      {to: '/inceleme', label: 'Nesneler', icon: 'database'},
-      {to: '/sql-inceleme', label: 'SQL betiği', icon: 'code'},
-      {to: '/zamanlanmis-incelemeler', label: 'Zamanlanmış', icon: 'clock'},
-    ],
-    libraryModes: [
-      {to: '/yayimlanmis-kurallar', label: 'Yayımlanmış kurallar', icon: 'book'},
-      ...(proposals.canPropose ? [{to: '/kural-onerilerim', label: 'Kural önerilerim', icon: 'lightbulb' as const}] : []),
-    ],
-    adminSections,
-    canPropose: proposals.canPropose,
-    pending: proposals.pending,
-  };
+  const groups: NavGroup[] = [{items: work}, {items: admin}].filter((group) => group.items.length > 0);
+
+  return {groups, adminSections};
 }

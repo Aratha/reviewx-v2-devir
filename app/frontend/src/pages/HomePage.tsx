@@ -1,14 +1,12 @@
 import {useEffect} from "react";
 import {Link} from "react-router";
 import {QualityPulse} from "@/components/review/QualityPulse";
-import {ApprovalFlow} from "@/components/rules/ApprovalFlow";
 import {Badge} from "@/components/ui/Badge";
 import {Icon, type IconName} from "@/components/ui/Icon";
 import {EmptyState, ErrorState, LoadingState} from "@/components/ui/States";
 import {useAuth} from "@/contexts/AuthContext";
 import {useIntl} from "@/contexts/IntlContext";
 import {useResource} from "@/hooks/useResource";
-import {useRuleProposalMenu} from "@/hooks/useRuleProposalMenu";
 import {roleLabel} from "@/lib/access";
 import {config} from "@/lib/config";
 import {describeError} from "@/lib/errorMessages";
@@ -29,66 +27,41 @@ const START: Action[] = [
   {to: "/zamanlanmis-incelemeler", icon: "clock", title: "Zamanlanmış incelemeler", text: "Düzenli çalışsın, özeti e-postayla gelsin."},
 ];
 
-function greeting(hour: number): string {
-  if (hour < 6) return "İyi geceler";
-  if (hour < 12) return "Günaydın";
-  if (hour < 18) return "İyi günler";
-  return "İyi akşamlar";
-}
-
 /**
- * The signed-in start page: one screen with the three ways to start a review, the user's latest
- * reviews and, for rule changes, what waits for whom (sql-review rule-proposals Requirement 7).
+ * The signed-in start page: a short welcome, the three ways to start a review, the user's latest
+ * reviews and the quality pulse.
  */
 export default function HomePage() {
   const {user, access} = useAuth();
   const {t} = useIntl();
-  const menu = useRuleProposalMenu(access.review, "home");
   useEffect(() => {
     document.title = config.productName;
   }, []);
 
-  const firstName = (user?.display_name || user?.username || "").split(" ")[0];
-  const shortcuts: Action[] = [
-    ...(access.review
-      ? [
-          {to: "/gecmis", icon: "history" as const, title: "İnceleme geçmişi", text: "Önceki incelemeler, CSV ve SQL dışa aktarımı."},
-          {to: "/yayimlanmis-kurallar", icon: "book" as const, title: "Yayımlanmış kurallar", text: "İncelemelerde kullanılan kurallar."},
-        ]
-      : []),
-    ...(menu.canPropose
-      ? [{to: "/kural-onerilerim", icon: "lightbulb" as const, title: "Kural önerilerim", text: "Kural veya grup önerin, kararı izleyin."}]
-      : []),
-    ...(access.manageRules
-      ? [{to: "/yonetim/kurallar", icon: "pencil" as const, title: "Kurallar", text: "Taslağı düzenleyin ve yayımlayın."}]
-      : []),
-  ];
-
   return (
-    <div className="page page-fill home">
-      <section className="home-hero" aria-labelledby="home-title">
-        <div className="home-hero-text">
-          <p className="home-greeting">
-            {greeting(new Date().getHours())}
-            {firstName ? `, ${firstName}` : ""}
-          </p>
+    <div className="page home">
+      <section className="home-welcome" aria-labelledby="home-title">
+        <div className="stack-tight">
           <h1 id="home-title">{config.productName}</h1>
           <p className="home-lead">SQL kodunuzu yayımlanmış kurallarla, kurum içi LLM ile inceleyin; bulguları satır satır görün.</p>
-          <div className="row">
-            <Badge tone="primary">{user?.is_super_admin ? t("home.overview.superAdmin") : roleLabel(user?.role)}</Badge>
-            <span className="subtle">
-              <kbd>Ctrl</kbd> + <kbd>K</kbd> ile her yere hızlı geçin
-            </span>
-          </div>
         </div>
-        {access.review && (
-          <nav className="home-start" aria-label="İncelemeye başla">
+        <div className="home-welcome-side">
+          <Badge tone="primary">{user?.is_super_admin ? t("home.overview.superAdmin") : roleLabel(user?.role)}</Badge>
+          <span className="subtle">
+            <kbd>Ctrl</kbd> + <kbd>K</kbd> ile her yere hızlı geçin
+          </span>
+        </div>
+      </section>
+
+      {access.review && (
+        <>
+          <nav className="start-grid" aria-label="İncelemeye başla">
             {START.map((action) => (
               <Link key={action.to} to={action.to} className="start-card">
                 <span className="start-icon">
                   <Icon name={action.icon} />
                 </span>
-                <span className="stack-tight">
+                <span className="stack-tight grow">
                   <strong>{action.title}</strong>
                   <span className="action-text">{action.text}</span>
                 </span>
@@ -96,54 +69,12 @@ export default function HomePage() {
               </Link>
             ))}
           </nav>
-        )}
-      </section>
-
-      <div className="home-grid">
-        <div className="home-main">
-          {access.review && <RecentReviews />}
-          {shortcuts.length > 0 && (
-            <section className="stack" aria-labelledby="home-actions">
-              <h2 id="home-actions" className="section-title">Kısayollar</h2>
-              <div className="action-grid">
-                {shortcuts.map((action) => (
-                  <Link key={action.to} to={action.to} className="action-card">
-                    <span className="stat-icon"><Icon name={action.icon} /></span>
-                    <span>
-                      <strong>{action.title}</strong>
-                      <span className="action-text">{action.text}</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-
-        <aside className="home-side" aria-label="Durum">
-          {access.review && <QualityPulse />}
-          {menu.canDecide && (
-            <section className="stack" aria-labelledby="home-approvals">
-              <div className="section-head">
-                <h2 id="home-approvals" className="section-title">Onay bekleyen işler</h2>
-                <Link to="/yonetim/onaylar">Onaylara git</Link>
-              </div>
-              <Link to="/yonetim/onaylar" className={`stat${menu.pending > 0 ? " is-attention" : ""}`}>
-                <span className="stat-icon"><Icon name="inbox" /></span>
-                <span>
-                  <span className="stat-value">{menu.pending}</span>
-                  <span className="stat-label">Karar bekleyen öneri ve yayın isteği</span>
-                </span>
-              </Link>
-            </section>
-          )}
-          {menu.canDecide ? (
-            <ApprovalFlow role="decider" />
-          ) : menu.canPropose ? (
-            <ApprovalFlow role="proposer" />
-          ) : null}
-        </aside>
-      </div>
+          <div className="home-grid">
+            <RecentReviews />
+            <QualityPulse />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -152,7 +83,7 @@ export default function HomePage() {
 function RecentReviews() {
   const runs = useResource("home:recent-runs", (signal) => ReviewService.runs("mine", 1, 5, signal));
   return (
-    <section className="card card-fill" aria-labelledby="home-recent">
+    <section className="card" aria-labelledby="home-recent">
       <div className="card-header">
         <h2 id="home-recent">Son incelemeleriniz</h2>
         <Link to="/gecmis">Tümünü gör</Link>

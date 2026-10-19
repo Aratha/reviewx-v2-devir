@@ -8,8 +8,6 @@ export const ScheduledReviewsPage = lazy(() => import("@/pages/ScheduledReviewsP
 export const ScheduledReviewSettingsPage = lazy(() => import("@/pages/ScheduledReviewSettingsPage"));
 export const PublishedRulesPage = lazy(() => import("@/pages/PublishedRulesPage"));
 export const RulesPage = lazy(() => import("@/pages/RulesPage"));
-export const RuleProposalsPage = lazy(() => import("@/pages/RuleProposalsPage"));
-export const RuleApprovalsPage = lazy(() => import("@/pages/RuleApprovalsPage"));
 export const SqlConnectionPage = lazy(() => import("@/pages/SqlConnectionPage"));
 export const LlmConnectionPage = lazy(() => import("@/pages/LlmConnectionPage"));
 export const LlmCallsPage = lazy(() => import("@/pages/LlmCallsPage"));

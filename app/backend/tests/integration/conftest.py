@@ -277,7 +277,7 @@ class RoleSessions:
         return await self._new_super_admin()
 
     async def super_admin(self) -> RoleSession:
-        """A local super admin; only it publishes directly (sql-review 009-rule-proposals)."""
+        """A local super admin; only it publishes the rules (directory-login Decision 14)."""
 
         if self._super_admin is None:
             self._super_admin = await self._new_super_admin()
@@ -385,7 +385,7 @@ class ReviewEnv:
             f"{self.prefix}/rule-set/draft", json=body, headers=manager.headers
         )
         assert saved.status_code == 200, saved.text
-        # Only the super admin publishes directly (009-rule-proposals); in the caller's tenant.
+        # Only the super admin publishes (directory-login Decision 14); in the caller's tenant.
         tenant_header = self.auth.settings.tenant_header
         admin = await self.sessions.super_admin()
         published = await client.post(

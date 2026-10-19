@@ -8,9 +8,9 @@ import messages from '@/locales/tr.json';
 import {AuthService} from '@/services/auth';
 import {ConnectionService} from '@/services/connections';
 import {ReviewService} from '@/services/reviews';
-import {RuleProposalService} from '@/services/ruleProposals';
+import {RuleSetService} from '@/services/ruleSet';
 import {ScheduledReviewService} from '@/services/scheduledReviews';
-import {testUser, type TestRole} from '@/test/render';
+import {apiError, testUser, type TestRole} from '@/test/render';
 import {MemoryRouter} from 'react-router';
 
 function renderApp(role: TestRole, path = '/') {
@@ -27,26 +27,31 @@ function renderApp(role: TestRole, path = '/') {
   );
 }
 
+function menu(): HTMLElement {
+  return screen.getByRole('navigation', {name: messages['shell.navigation']});
+}
+
 function menuLinks(): string[] {
-  const nav = screen.getByRole('navigation', {name: messages['shell.navigation']});
-  return within(nav)
+  return within(menu())
     .getAllByRole('link')
     .map((link) => link.textContent ?? '');
 }
 
-function railLinks(): string[] {
-  const rail = screen.getByRole('navigation', {name: 'Yönetim bölümleri'});
-  return within(rail)
+function tabLinks(): string[] {
+  return within(screen.getByRole('navigation', {name: 'Yönetim bölümleri'}))
     .getAllByRole('link')
     .map((link) => link.textContent ?? '');
 }
 
-function openRail(): Promise<HTMLElement> {
+function openTabs(): Promise<HTMLElement> {
   return screen.findByRole('navigation', {name: 'Yönetim bölümleri'});
 }
 
+const WORK = ['Ana sayfa', 'Nesne incelemesi', 'SQL betiği', 'Zamanlanmış', 'Geçmiş', 'Kural kitaplığı'];
+
 function pageViews() {
   vi.spyOn(ReviewService, 'runs').mockResolvedValue({items: [], page: 1, page_size: 5, total: 0});
+  vi.spyOn(RuleSetService, 'latest').mockRejectedValue(apiError(404, 'no_published_rule_set'));
   vi.spyOn(ScheduledReviewService, 'settings').mockResolvedValue({max_concurrent_runs: 2});
   vi.spyOn(ScheduledReviewService, 'emailStatus').mockResolvedValue({
     scheduler_enabled: true,
@@ -62,12 +67,6 @@ function connectionViews(editable: boolean) {
   const managed_by = editable ? 'local_process' : 'deployment';
   vi.spyOn(ConnectionService, 'sql').mockResolvedValue({environment, editable, configured: true, managed_by});
   vi.spyOn(ConnectionService, 'llm').mockResolvedValue({environment, editable, chat_api: 'openai', model: 'm'});
-  proposalMenu(false, false);
-}
-
-function proposalMenu(canPropose: boolean, canDecide: boolean, pending = 0) {
-  vi.spyOn(RuleProposalService, 'capabilities').mockResolvedValue({can_propose: canPropose, can_decide: canDecide});
-  vi.spyOn(RuleProposalService, 'list').mockResolvedValue({items: [], page: 1, page_size: 1, total: pending});
 }
 
 describe('application shell', () => {
@@ -76,18 +75,19 @@ describe('application shell', () => {
     pageViews();
   });
 
-  it('offers a reviewer four places and no administration, without asking for settings', async () => {
+  it('offers a user the daily work and no administration, without asking for settings', async () => {
     renderApp('inceleyici');
     await screen.findByRole('navigation', {name: messages['shell.navigation']});
-    expect(menuLinks()).toEqual(['Ana sayfa', 'İnceleme', 'Geçmiş', 'Kural kitaplığı']);
+    expect(menuLinks()).toEqual(WORK);
     expect(ConnectionService.sql).not.toHaveBeenCalled();
   });
 
-  it('gives the super admin every administration screen on one Yönetim page', async () => {
+  it('gathers every administration screen under one Yönetim entry for the super admin', async () => {
     renderApp('super_admin', '/yonetim');
-    await screen.findByRole('link', {name: 'SQL bağlantısı'});
-    expect(menuLinks()).toEqual(['Ana sayfa', 'İnceleme', 'Geçmiş', 'Kural kitaplığı', 'Yönetim']);
-    expect(railLinks()).toEqual([
+    await within(await openTabs()).findByRole('link', {name: 'SQL bağlantısı'});
+    expect(menuLinks()).toEqual([...WORK, 'Yönetim']);
+    expect(within(menu()).getByRole('link', {name: 'Yönetim'})).toHaveAttribute('aria-current', 'page');
+    expect(tabLinks()).toEqual([
       'Genel durum',
       'Kurallar',
       'SQL bağlantısı',
@@ -104,15 +104,14 @@ describe('application shell', () => {
     pageViews();
     connectionViews(false);
     renderApp('super_admin', '/yonetim');
-    await openRail();
+    await openTabs();
     await waitFor(() => expect(ConnectionService.llm).toHaveBeenCalled());
-    expect(railLinks()).toEqual(['Genel durum', 'Kurallar', 'LLM çağrıları', 'Zamanlama ve e-posta', 'Kullanıcılar']);
+    expect(tabLinks()).toEqual(['Genel durum', 'Kurallar', 'LLM çağrıları', 'Zamanlama ve e-posta', 'Kullanıcılar']);
   });
 
   it('offers the SQL connection section in nonprod only to the super admin who may edit it', async () => {
     // sql-server-connection Requirement 5: the backend reports editable only to the super admin.
     vi.restoreAllMocks();
-    proposalMenu(false, false);
     pageViews();
     vi.spyOn(ConnectionService, 'llm').mockResolvedValue({
       environment: 'nonprod',
@@ -128,57 +127,50 @@ describe('application shell', () => {
       password_set: false,
     });
     renderApp('super_admin', '/yonetim');
-    await screen.findByRole('link', {name: 'SQL bağlantısı'});
-    expect(railLinks()).not.toContain('LLM bağlantısı');
-    expect(railLinks()).toContain('Kullanıcılar');
-    expect(railLinks()).toContain('Zamanlama ve e-posta');
+    await within(await openTabs()).findByRole('link', {name: 'SQL bağlantısı'});
+    expect(tabLinks()).not.toContain('LLM bağlantısı');
+    expect(tabLinks()).toContain('Kullanıcılar');
   });
 
-  it('adds user administration and the e-mail state for the super admin', async () => {
+  it('shows the health of the system on Genel durum', async () => {
     renderApp('super_admin', '/yonetim');
-    await screen.findByRole('link', {name: 'Kullanıcılar'});
-    expect(railLinks()).toContain('Kurallar');
-    expect(await screen.findByText('E-posta yapılandırılmadı')).toBeInTheDocument();
+    const health = await screen.findByRole('region', {name: 'Sistem durumu'});
+    expect(await within(health).findByText('Bağlı')).toBeInTheDocument();
+    expect(await within(health).findByText('Yapılandırılmadı')).toBeInTheDocument();
+    expect(await within(health).findByText('Yayımlanmadı')).toBeInTheDocument();
   });
 
-  it('offers "Kural önerilerim" in the rule library to a user the super admin allowed to propose', async () => {
-    proposalMenu(true, false);
-    renderApp('inceleyici', '/kural-onerilerim');
-    const library = await screen.findByRole('navigation', {name: 'Kural kitaplığı'});
-    expect(await within(library).findByRole('link', {name: 'Kural önerilerim'})).toHaveAttribute('aria-current', 'page');
-    expect(menuLinks()).not.toContain('Yönetim');
-  });
+  it.each(['/kurallar', '/yonetim', '/yonetim/kullanicilar', '/ayarlar/llm'])(
+    'shows the forbidden screen when a user opens %s',
+    async (path) => {
+      renderApp('inceleyici', path);
+      expect(await screen.findByRole('heading', {name: messages['access.forbidden.title']})).toBeInTheDocument();
+    },
+  );
 
-  it('shows the pending count on Yönetim and on "Kural onayları" to the super admin', async () => {
-    proposalMenu(true, true, 3);
-    renderApp('super_admin', '/yonetim');
-    const nav = await screen.findByRole('navigation', {name: messages['shell.navigation']});
-    const link = await within(nav).findByRole('link', {name: /Yönetim/});
-    expect(await within(link).findByLabelText('3 bekleyen')).toHaveTextContent('3');
-    const rail = await openRail();
-    const approvals = await within(rail).findByRole('link', {name: /Kural onayları/});
-    expect(await within(approvals).findByLabelText('3 bekleyen')).toHaveTextContent('3');
-  });
-
-  it.each(['/kural-onaylari', '/kurallar', '/yonetim', '/yonetim/onaylar', '/ayarlar/llm'])('shows the forbidden screen when a user opens %s', async (path) => {
+  it.each([
+    ['/kural-onerilerim', 'Yayımlanmış kurallar'],
+    ['/inceleme', 'Nesne incelemesi'],
+  ])('takes %s to its page', async (path, heading) => {
     renderApp('inceleyici', path);
-    expect(await screen.findByRole('heading', {name: messages['access.forbidden.title']})).toBeInTheDocument();
+    expect(await screen.findByRole('heading', {name: heading, level: 1})).toBeInTheDocument();
   });
 
   it('takes an old administration address to its section on the Yönetim page', async () => {
     renderApp('super_admin', '/ayarlar/zamanlama');
     expect(await screen.findByRole('heading', {name: 'Zamanlama ve e-posta', level: 2})).toBeInTheDocument();
-    const rail = await openRail();
-    expect(within(rail).getByRole('link', {name: 'Zamanlama ve e-posta'})).toHaveAttribute('aria-current', 'page');
+    const tabs = await openTabs();
+    expect(within(tabs).getByRole('link', {name: 'Zamanlama ve e-posta'})).toHaveAttribute('aria-current', 'page');
   });
 
   it('opens quick navigation with Ctrl+K and goes to the chosen place', async () => {
     renderApp('super_admin');
-    await screen.findByRole('navigation', {name: messages['shell.navigation']});
-    await screen.findByRole('link', {name: /Yönetim/});
+    await within(await screen.findByRole('navigation', {name: messages['shell.navigation']})).findByRole('link', {
+      name: 'Yönetim',
+    });
     fireEvent.keyDown(window, {key: 'k', ctrlKey: true});
     const input = await screen.findByRole('combobox', {name: 'Gidilecek sayfa'});
-    fireEvent.change(input, {target: {value: 'e-posta'}});
+    fireEvent.change(input, {target: {value: 'zamanlama ve'}});
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(1);
     expect(options[0]).toHaveTextContent('Zamanlama ve e-posta');
@@ -190,10 +182,10 @@ describe('application shell', () => {
   it('shows the display name and role, and signs out through the server', async () => {
     const logout = vi.spyOn(AuthService, 'logout').mockResolvedValue(undefined);
     renderApp('inceleyici');
-    const banner = await screen.findByRole('banner');
-    expect(within(banner).getByText('Ayşe İnceleyici')).toBeInTheDocument();
-    expect(within(banner).getByText(/· Kullanıcı/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', {name: messages['auth.session.signOut']}));
+    const side = await screen.findByRole('complementary');
+    expect(within(side).getByText('Ayşe İnceleyici')).toBeInTheDocument();
+    expect(within(side).getByText('Kullanıcı')).toBeInTheDocument();
+    fireEvent.click(within(side).getByRole('button', {name: messages['auth.session.signOut']}));
     await screen.findByLabelText(messages['auth.login.username']);
     expect(logout).toHaveBeenCalledTimes(1);
     expect(readAccessToken()).toBeNull();

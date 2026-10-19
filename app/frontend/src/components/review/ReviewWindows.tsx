@@ -288,14 +288,6 @@ export function GlobalReviewIndicator() {
         : session.phase === 'cancelled'
           ? 'Son inceleme durduruldu'
           : 'Son inceleme hata verdi';
-  const short =
-    session.phase === 'running'
-      ? `%${percent}`
-      : session.phase === 'completed'
-        ? 'Bitti'
-        : session.phase === 'cancelled'
-          ? 'Durduruldu'
-          : 'Hata';
   return (
     <Button
       size="sm"
@@ -310,7 +302,7 @@ export function GlobalReviewIndicator() {
       ) : (
         <Icon name={session.phase === 'completed' ? 'check' : 'activity'} />
       )}
-      <span className="tabular">{short}</span>
+      <span className="grow truncate tabular">{text}</span>
     </Button>
   );
 }

@@ -79,16 +79,16 @@ async def save_draft(
     dependencies=RuleManager,
     responses={
         200: {"description": "Taslak en son sürümle aynı; var olan sürüm döner"},
-        403: {"description": "Yalnız süper yönetici doğrudan yayımlar (publish_requires_approval)"},
+        403: {"description": "Süper yönetici değil"},
         409: {"description": "Taslak başka biri tarafından değiştirildi"},
     },
 )
 async def publish(
     body: RuleSetPublishRequest, response: Response, context: CurrentContext, service: Service
 ) -> RuleSetVersionDetail:
-    """Publish the draft as the next immutable version; only the super admin (rule-proposals).
+    """Publish the draft as the next immutable version; only the super admin (Decision 14).
 
-    An unchanged draft returns the latest version. A rule manager sends a publish request instead.
+    An unchanged draft returns the latest version.
     """
 
     outcome = await service.publish(context, base_revision=body.base_revision)

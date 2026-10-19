@@ -5,7 +5,7 @@
   "auth.login.title": "Hesabınızla oturum açın",
   "auth.login.subtitle": "Kurum kullanıcı adınız ve parolanızla giriş yapın.",
   "auth.login.help.suffix": "Kurum sonekini (@ ile başlayan kısım) yazmanız gerekmez; kendiliğinden eklenir.",
-  "auth.login.help.firstLogin": "Kurum hesabınızla ilk girişte kullanıcı olarak başlarsınız; inceleme yapar ve kural önerebilirsiniz.",
+  "auth.login.help.firstLogin": "Kurum hesabınızla ilk girişte kullanıcı olarak başlarsınız; incelemeleri hemen yapabilirsiniz.",
   "auth.login.help.localAccount": "Yerel yönetici hesabınız varsa aynı formu kullanın.",
   "auth.login.hero.objectReview.title": "Nesne incelemesi",
   "auth.login.hero.objectReview.body": "SQL Server'daki saklı yordam, görünüm ve fonksiyonları seçip birlikte inceleyin.",

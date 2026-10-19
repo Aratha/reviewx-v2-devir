@@ -2,8 +2,8 @@ import {Suspense, useEffect, useState} from 'react';
 import {Link, Outlet, useLocation} from 'react-router';
 import {BrandMark} from '@/components/brand/BrandMark';
 import {CommandPalette} from '@/components/layout/CommandPalette';
+import {Backdrop} from '@/components/layout/Backdrop';
 import {GlobalReviewIndicator, ReviewWindows} from '@/components/review/ReviewWindows';
-import {Button} from '@/components/ui/Button';
 import {Icon} from '@/components/ui/Icon';
 import {LoadingState} from '@/components/ui/States';
 import {useAuth} from '@/contexts/AuthContext';
@@ -15,8 +15,9 @@ import {roleLabel} from '@/lib/access';
 import {config} from '@/lib/config';
 
 /**
- * Signed-in layout: one slim top bar with the role-aware destinations, Ctrl+K quick navigation,
- * the live review indicator, the user and sign-out; the page fills the rest of the screen.
+ * Signed-in layout, "Evren": a star field behind everything, one side menu with the daily work
+ * and the super admin's Yönetim, Ctrl+K quick navigation, the live review and the user at the
+ * foot; the page fills the rest of the screen. On a narrow screen the menu folds behind a button.
  * Hiding a destination is not authorization; every page's data comes from role-checked endpoints.
  */
 export function AppShell() {
@@ -51,6 +52,8 @@ function ShellLayout() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen(true);
+      } else if (event.key === 'Escape') {
+        setMenuOpen(false);
       }
     }
     window.addEventListener('keydown', onKeyDown);
@@ -67,71 +70,92 @@ function ShellLayout() {
   }
 
   return (
-    <div className="shell">
+    <div className="shell" data-menu={menuOpen ? 'open' : 'closed'}>
+      <Backdrop />
       <a className="skip-link" href="#main-content">
         {t('shell.skipToContent')}
       </a>
-      <header className="topbar" data-open={menuOpen}>
-        <div className="topbar-inner">
-          <Link to="/" className="topbar-brand" aria-label={`${config.productName} ana sayfa`}>
-            <BrandMark />
-            <span className="topbar-brand-name" aria-hidden="true">
-              {config.productName}
+      <header className="mobilebar">
+        <Link to="/" className="side-brand" aria-label={`${config.productName} ana sayfa`}>
+          <BrandMark />
+          <span className="side-brand-text" aria-hidden="true">
+            <b>{config.productName}</b>
+          </span>
+        </Link>
+        <button
+          type="button"
+          className="icon-button"
+          aria-expanded={menuOpen}
+          aria-controls="side-menu"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <Icon name="menu" />
+          <span>{t('shell.menu')}</span>
+        </button>
+      </header>
+      <aside id="side-menu" className="side">
+        <Link to="/" className="side-brand" aria-label={`${config.productName} ana sayfa`}>
+          <BrandMark />
+          <span className="side-brand-text" aria-hidden="true">
+            <b>{config.productName}</b>
+            <small>{t('shell.tagline')}</small>
+          </span>
+        </Link>
+        <button
+          type="button"
+          className="cmdk-trigger"
+          onClick={() => setPaletteOpen(true)}
+          aria-keyshortcuts="Control+K"
+          aria-label="Hızlı geçiş (Ctrl+K)"
+        >
+          <Icon name="search" />
+          <span className="grow">Ara veya git…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <nav className="menu" aria-label={t('shell.navigation')}>
+          {navigation.groups.map((group, index) => (
+            <div key={index} className="menu-group">
+              {group.items.map((item) => (
+                <Link key={item.to} to={item.to} aria-current={isCurrent(item, pathname) ? 'page' : undefined}>
+                  <Icon name={item.icon} />
+                  <span className="grow truncate">{item.label}</span>
+                  {reviewing &&
+                    ((item.to === '/inceleme' && session.kind === 'object') ||
+                      (item.to === '/sql-inceleme' && session.kind === 'script')) && (
+                      <span className="pulse-dot" role="img" aria-label="İnceleme sürüyor" />
+                    )}
+                </Link>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="side-foot">
+          <GlobalReviewIndicator />
+          <div className="side-user">
+            <span className="avatar" aria-hidden="true">
+              {initials(displayName)}
             </span>
-          </Link>
-          <nav id="main-navigation" className="topnav" aria-label={t('shell.navigation')}>
-            {navigation.primary.map((item) => (
-              <Link key={item.to} to={item.to} aria-current={isCurrent(item, pathname) ? 'page' : undefined}>
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-                {item.to === '/inceleme' && reviewing && (
-                  <span className="pulse-dot" role="img" aria-label="İnceleme sürüyor" />
-                )}
-                {item.count !== undefined && item.count > 0 && (
-                  <span className="nav-count" aria-label={`${item.count} bekleyen`}>
-                    {item.count}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </nav>
-          <div className="topbar-tools">
-            <GlobalReviewIndicator />
+            <span className="side-user-text">
+              <strong className="truncate">{displayName}</strong>
+              <span className="truncate">{role}</span>
+            </span>
             <button
               type="button"
-              className="cmdk-trigger"
-              onClick={() => setPaletteOpen(true)}
-              aria-keyshortcuts="Control+K"
-              aria-label="Hızlı geçiş (Ctrl+K)"
+              className="icon-button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              aria-busy={signingOut || undefined}
+              title={t('auth.session.signOut')}
             >
-              <Icon name="search" />
-              <span className="cmdk-trigger-text">Ara</span>
-              <kbd>Ctrl K</kbd>
+              <Icon name="logOut" />
+              <span className="sr-only">{t('auth.session.signOut')}</span>
             </button>
-            <div className="topbar-user">
-              <span className="avatar" aria-hidden="true">
-                {initials(displayName)}
-              </span>
-              <span className="topbar-user-text">
-                <strong className="truncate">{displayName}</strong>
-                <span className="subtle truncate">· {role}</span>
-              </span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={() => void signOut()} disabled={signingOut} busy={signingOut}>
-              {t('auth.session.signOut')}
-            </Button>
-            <Button
-              size="sm"
-              className="menu-toggle"
-              aria-expanded={menuOpen}
-              aria-controls="main-navigation"
-              onClick={() => setMenuOpen(!menuOpen)}
-            >
-              {t('shell.menu')}
-            </Button>
           </div>
         </div>
-      </header>
+      </aside>
+      {menuOpen && (
+        <button type="button" className="side-scrim" aria-label="Menüyü kapat" onClick={() => setMenuOpen(false)} />
+      )}
       <main id="main-content" className="shell-main" tabIndex={-1}>
         <Suspense fallback={<LoadingState />}>
           <Outlet />

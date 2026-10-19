@@ -330,8 +330,8 @@ Requirement 5'teki değişiklik kaydı tablosunda kalıcı saklanır (Decision 1
   verilince çalışır; yerel test hesapları Decision 9'daki komutla açılmaya devam eder.
 - Decision 14: Tek uygulama rolü vardır: `inceleyici` (arayüzde "Kullanıcı"). Kural taslağını
   düzenleme ve yayımlama, SQL Server ve LLM bağlantı ayarları, LLM çağrı özetleri, tüm incelemeleri
-  görme, zamanlama ayarı ve kullanıcı yönetimi süper yöneticidedir. Kullanıcı kural ve grup önerir;
-  süper yönetici onaylar (sql-review rule-proposals). `kural-yoneticisi` rolü 202610150001 göçüyle
+  görme, zamanlama ayarı ve kullanıcı yönetimi süper yöneticidedir. Kural ve grup önerileri
+  sql-review rule-proposals 2.0.0 Decision 8 ile 2026-10-19'da kaldırıldı. `kural-yoneticisi` rolü 202610150001 göçüyle
   emekliye ayrılır: atamaları `inceleyici` olur, rol ve eski atamalar yumuşak silinir; rol değiştirme
   ucu (`PUT /admin/users/{id}/role`) kaldırılır. Proje sahibinin 2026-10-15 kararı. Gerekçe: iki kademeli
   yetki ve yayın isteği akışı küçük ekip için gereksiz karmaşıklıktır; her yayın tek yetkiliden geçer.

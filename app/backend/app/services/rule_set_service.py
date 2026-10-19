@@ -2,8 +2,8 @@
 
 sql-review/PRDs/001-rule-management Requirement 1-8, 12. Save and publish lock the tenant draft
 row, so concurrent requests serialize: a stale ``base_revision`` receives 409 and two publishes of
-the same draft produce one version. Only the super admin publishes directly; every other publish
-goes through an approval of sql-review/PRDs/009-rule-proposals, which uses ``publish_rules``.
+the same draft produce one version. Only the super admin edits the draft and publishes it
+(directory-login Decision 14; rule-proposals Decision 8 retired the proposals).
 Rule text, summaries and draft content are never logged.
 """
 

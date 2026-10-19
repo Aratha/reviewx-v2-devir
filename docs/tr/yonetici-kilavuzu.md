@@ -2,8 +2,8 @@
 
 Bu kılavuz iki kişi içindir:
 
-- **Süper yönetici (uygulama yöneticisi):** İnceleme kurallarını düzenler ve yayımlar, kullanıcıların
-  önerilerini onaylar, yapay zekâ çağrılarını izler, hesapları kapatır; test ortamında SQL Server
+- **Süper yönetici (uygulama yöneticisi):** İnceleme kurallarını ve gruplarını düzenler ve yayımlar,
+  yapay zekâ çağrılarını izler, hesapları kapatır; test ortamında SQL Server
   bağlantısını girer. Uygulamada başka yetkili rol yoktur; diğer herkes **Kullanıcı**dır.
 - **Dağıtımı yöneten ekip:** Test ortamına (nonprod: ekibin ortak kullandığı, kurum sunucularında
   çalışan sürüm) kurulumu yapan Azure DevOps işini (kodu sunucuya kuran kurum aracı) ve gizli
@@ -72,8 +72,9 @@ grubuyla sınırlamak açık bir iştir (dizin girişi PRD'sindeki Task 14).
 
 ## Kuralları düzenlemek ve yayımlamak
 
-Süper yönetici menüde **Yönetim → Kurallar** sayfasını görür. Kullanıcılar kural değişikliğini
-**Kural kitaplığı → Kural önerilerim** sayfasından önerir; öneriler **Yönetim → Kural onayları**na düşer.
+Süper yönetici menüde **Yönetim → Kurallar** sekmesini görür. Kural ve grup değişikliklerini yalnız
+süper yönetici yapar; kullanıcıların öneri gönderdiği bir onay akışı yoktur. **Yönetim → Genel durum**
+kuralların son sürümünü, SQL Server, LLM ve e-posta durumunu tek bakışta gösterir.
 
 - Kuralların bir **taslağı** ve numaralı **yayımlanmış sürümleri** vardır. İncelemeler yalnız en son
   yayımlanmış sürümü kullanır; taslaktaki değişiklik **Yayınla**'ya basılana kadar hiçbir incelemeyi

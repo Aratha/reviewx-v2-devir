@@ -12,10 +12,15 @@ interface Command {
   keywords: string;
 }
 
-const REVIEW_LABELS: Record<string, string> = {
-  '/inceleme': 'Nesne incelemesi',
-  '/sql-inceleme': 'SQL betiği incelemesi',
-  '/zamanlanmis-incelemeler': 'Zamanlanmış incelemeler',
+/** Extra words a destination answers to, beside its label and group. */
+const KEYWORDS: Record<string, string> = {
+  '/': 'genel baslangic',
+  '/inceleme': 'nesne incele review prosedur view',
+  '/sql-inceleme': 'betik script yapistir incele',
+  '/zamanlanmis-incelemeler': 'zaman periyot e-posta',
+  '/gecmis': 'gecmis rapor csv indir',
+  '/yayimlanmis-kurallar': 'kural kitap grup',
+  '/yonetim': 'yonetim durum saglik',
 };
 
 /** Turkish-aware, accent-tolerant folding for matching typed text. */
@@ -38,29 +43,17 @@ export function CommandPalette({onClose}: {onClose: () => void}) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
 
-  const commands = useMemo<Command[]>(() => {
-    const seen = new Set<string>();
-    const all: Command[] = [
-      {to: '/', label: 'Ana sayfa', group: 'Git', icon: 'home', keywords: 'genel baslangic'},
-      ...(navigation.primary.some((item) => item.to === '/inceleme')
-        ? [
-            ...navigation.reviewModes.map((mode) => ({
-              to: mode.to,
-              label: REVIEW_LABELS[mode.to] ?? mode.label,
-              group: 'İnceleme',
-              icon: mode.icon,
-              keywords: 'incele review kontrol',
-            })),
-            {to: '/gecmis', label: 'İnceleme geçmişi', group: 'İnceleme', icon: 'history' as const, keywords: 'gecmis rapor csv'},
-            ...navigation.libraryModes.map((mode) => ({
-              to: mode.to,
-              label: mode.label,
-              group: 'Kural kitaplığı',
-              icon: mode.icon,
-              keywords: 'kural oneri',
-            })),
-          ]
-        : []),
+  const commands = useMemo<Command[]>(
+    () => [
+      ...navigation.groups.flatMap((group) =>
+        group.items.map((item) => ({
+          to: item.to,
+          label: item.label,
+          group: item.to === '/yonetim' ? 'Yönetim' : 'Git',
+          icon: item.icon,
+          keywords: KEYWORDS[item.to] ?? '',
+        })),
+      ),
       ...navigation.adminSections.map((section) => ({
         to: `/yonetim/${section.id}`,
         label: section.label,
@@ -68,9 +61,9 @@ export function CommandPalette({onClose}: {onClose: () => void}) {
         icon: section.icon,
         keywords: `yonetim ayar ${section.summary}`,
       })),
-    ];
-    return all.filter((command) => !seen.has(command.to) && seen.add(command.to));
-  }, [navigation]);
+    ],
+    [navigation],
+  );
 
   const needle = fold(query.trim());
   const shown = needle

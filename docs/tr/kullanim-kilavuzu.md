@@ -52,20 +52,25 @@ Kaynak: [dizin girişi PRD'si](../../specs/application-foundation/PRDs/001-direc
 
 ## Roller ve menü
 
-Her kullanıcının tek rolü vardır. Menüde yalnız rolünüzün açabildiği sayfalar görünür.
+Her kullanıcının tek rolü vardır. Menü ekranın solundadır; yalnız rolünüzün açabildiği sayfalar
+görünür. Dar ekranda menü **Menü** düğmesinin arkasına katlanır. **Ctrl K** ile her sayfaya hızlıca
+geçebilirsiniz.
 
-| Menü | Sayfa | Kullanıcı | Süper yönetici |
-|---|---|:---:|:---:|
-| Ana sayfa | Ana sayfa | ✓ | ✓ |
-| İnceleme | Nesneler, SQL betiği, Zamanlanmış | ✓ | ✓ |
-| Geçmiş | İnceleme geçmişi | Kendi incelemeleri | Herkesinki (salt okunur) |
-| Kural kitaplığı | Yayımlanmış kurallar, Kural önerilerim | ✓ | ✓ |
-| Yönetim | Kurallar, Kural onayları, SQL ve LLM bağlantısı, LLM çağrıları, Zamanlama ve e-posta, Kullanıcılar | — | ✓ |
+| Menü | Kullanıcı | Süper yönetici |
+|---|:---:|:---:|
+| Ana sayfa | ✓ | ✓ |
+| Nesne incelemesi | ✓ | ✓ |
+| SQL betiği | ✓ | ✓ |
+| Zamanlanmış | ✓ | ✓ |
+| Geçmiş | Kendi incelemeleri | Herkesinki (salt okunur) |
+| Kural kitaplığı (yayımlanmış kurallar) | ✓ | ✓ |
+| Yönetim: Genel durum, Kurallar, SQL ve LLM bağlantısı, LLM çağrıları, Zamanlama ve e-posta, Kullanıcılar | — | ✓ |
 
-- **Kullanıcı:** İnceleme yapar, kendi sonuçlarını görür, işaretler ve indirir; yeni kural ve kural
-  grubu önerir.
-- **Süper yönetici:** Kuralları düzenler ve yayımlar, önerileri onaylar ya da gerekçesiyle reddeder,
-  bağlantıları ve kullanıcıları yönetir, herkesin incelemesini salt okunur görür.
+- **Kullanıcı:** İnceleme yapar, kendi sonuçlarını görür, işaretler ve indirir; yayımlanmış kuralları
+  okur.
+- **Süper yönetici:** Kuralları ve grupları düzenler ve yayımlar, bağlantıları ve kullanıcıları
+  yönetir, herkesin incelemesini salt okunur görür. Bütün yönetim ekranları menüdeki tek **Yönetim**
+  sayfasında, sekmeler halindedir.
 
 Menüde bir sayfanın görünmemesi tek güvence değildir; sunucu her istekte rolünüzü ayrıca denetler.
 
@@ -141,7 +146,7 @@ Kaynak: [SQL betiği incelemesi PRD'si](../../specs/sql-review/PRDs/004-script-r
 - Her kural için kural kimliği (örneğin `Kural05`), **Kritik** ya da **Normal** grubu ve modelin o
   ana kadar ürettiği metin miktarı görünür. Bir kurala yanıt alınamazsa **Yanıt alınamadı** yazar.
 
-İnceleme sürerken başka sayfalara geçebilirsiniz; üst çubukta "İnceleme sürüyor · %n" yazar ve
+İnceleme sürerken başka sayfalara geçebilirsiniz; sol menünün altında "İnceleme sürüyor · %n" yazar ve
 tıklayınca pencere yeniden açılır. **Tarayıcı sekmesini kapatmayın ve sayfayı yenilemeyin:** bağlantı
 koparsa inceleme durur.
 

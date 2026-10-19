@@ -2,9 +2,9 @@
 
 Status: Accepted
 
-Version: 1.2.0
+Version: 2.0.0
 
-Acceptance date: 2026-10-15
+Acceptance date: 2026-10-19
 
 Domain: [sql-review](../../DOMAIN.md)
 
@@ -14,6 +14,8 @@ proje sahibi 2026-10-15'te "herkes onaya yollayabilsin" kararıyla kabul etti (D
 yetkisi listesi kalkar, her inceleyici ve kural yöneticisi öneri gönderir. 1.2.0 revizyonunu proje
 sahibi 2026-10-15'te kabul etti (Decision 7): kural yöneticisi rolü kalktığı için yayın isteği akışı
 (Requirement 6) kaldırılır; taslağı yalnız süper yönetici düzenler ve doğrudan yayımlar.
+
+**2.0.0 — yetenek kaldırıldı (2026-10-19, Decision 8):** Proje sahibinin "onay ve öneri kısımlarını tamamen kaldır" talimatıyla kural ve grup önerileri ile onayları tümüyle kalktı. Bu belgedeki Requirement 1–7 ve Acceptance 1–4 artık uygulanmaz; belge, tabloların ve geçmiş kayıtların neden yerinde durduğunu anlatmak için kalır.
 
 ## Amaç
 
@@ -216,6 +218,16 @@ formu yayımlanmış kuralları özetleriyle aranabilir listede seçtirir. Tüm 
   `/rule-set/publish-requests` uçları ve "Yayın istekleri" sekmesi kalkar; yayın isteği tablosu
   geçmiş kayıtlar sessizce silinmesin diye yerinde kalır, artık yazılmaz. Kural onaylarında yalnız kural ve grup önerileri kalır. Proje sahibinin
   2026-10-15 kararı.
+- Decision 8: Kural ve grup önerileri ile onayları kaldırılır. `/rule-proposals` uçları, öneri hizmeti,
+  deposu, şemaları ve kuralları; ön yüzde "Kural önerilerim", "Kural onayları", onay akışı kartları ve
+  menü sayaçları kalkar; e2e 06 senaryosu silinir. Kuralları, grupları ve taslağı yalnız süper yönetici
+  düzenler ve doğrudan yayımlar ([rule-management](../001-rule-management/PRD.md),
+  [directory-login](../../../application-foundation/PRDs/001-directory-login/PRD.md) Decision 14).
+  `rule_proposal`, `rule_publish_request` ve `rule_proposer` tabloları geçmiş kayıtlar sessizce
+  silinmesin diye yerinde kalır, artık okunmaz ve yazılmaz (rules/41); eski adresler
+  (`/kural-onerilerim`, `/kural-onaylari`) kural kitaplığına ve Yönetim'e yönlendirir. Proje
+  sahibinin 2026-10-19 kararı ("onay ve öneri kısımlarını tamamen kaldır"). Gerekçe: küçük ekipte kural değişikliği doğrudan tek
+  yetkiliden geçer; öneri kuyruğu bakım yükü getirir.
 
 ## Açık sorular
 

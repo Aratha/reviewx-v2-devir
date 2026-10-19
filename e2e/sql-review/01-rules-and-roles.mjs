@@ -49,7 +49,7 @@ await withBrowser('rules edit and publish by the super admin, users read-only', 
     await signIn(reviewer, accounts.reviewer);
     const nav = reviewer.getByRole('navigation', {name: message('shell.navigation')});
     assert.equal(await nav.getByRole('link', {name: 'Kurallar', exact: true}).count(), 0);
-    assert.equal(await nav.getByRole('link', {name: /^Yönetim/}).count(), 0);
+    assert.equal(await nav.getByRole('link', {name: 'Yönetim', exact: true}).count(), 0);
     await reviewer.goto(baseUrl + '/kurallar');
     await reviewer.getByRole('heading', {name: message('access.forbidden.title')}).waitFor();
     const draft = await apiStatus(reviewer, '/rule-set');

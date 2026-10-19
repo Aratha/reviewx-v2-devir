@@ -15,12 +15,6 @@ export type RuleSetVersionSummary = Schemas['RuleSetVersionSummary'];
 export type RuleSetVersionDetail = Schemas['RuleSetVersionDetail'];
 export type RuleSetVersionPage = Schemas['RuleSetVersionPage'];
 
-export type RuleProposalCapabilities = Schemas['RuleProposalCapabilities'];
-export type RuleProposalCreate = Schemas['RuleProposalCreate'];
-export type RuleProposalItem = Schemas['RuleProposalItem'];
-export type RuleProposalDetail = Schemas['RuleProposalDetail'];
-export type RuleProposalPage = Schemas['RuleProposalPage'];
-export type RuleProposalStatus = Schemas['RuleProposalItem']['status'];
 
 export type SqlConnectionView = Schemas['SqlConnectionView'];
 export type SqlConnectionChange = Schemas['SqlConnectionChange'];

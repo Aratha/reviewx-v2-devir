@@ -64,3 +64,16 @@ oturumda çalışır. Bu görevlerin L1/L2 kanıtı oradan alınmalıdır.
 - [x] T-D7.1 Decision 7: yayın isteği uçları, hizmet ve depo yöntemleri, şemalar ve taslak farkı
   (`diff_rule_sets`) kaldırıldı; `test_rule_publish_requests_api.py` silindi; ön yüzde "Yayın istekleri"
   sekmesi, "Onaya gönder" ve son yayın isteği bildirimi kalktı; menü sayacı yalnız önerileri sayar.
+
+## 2.0.0 revizyonu (2026-10-19)
+
+- [x] T-D8.1 Decision 8: `app/api/rule_proposals`, `rule_proposal_service`, `rule_proposal_repository`,
+  `schemas/rule_proposals` ve `domain/rule_proposal` silindi; yönlendirici kaydı kalktı; ORM eşlemeleri
+  tablolar yerinde kaldığı için `retired` notuyla duruyor. `test_rule_proposals_api.py`,
+  `rule_proposal_helpers.py` ve `test_rule_proposal_rules.py` silindi; göç testleri kalır.
+- [x] T-D8.2 Ön yüz: Kural önerilerim ve Kural onayları sayfaları, öneri hizmeti, menü kancası, onay
+  akışı kartı ve hata iletileri kalktı; eski adresler yönlendirir. OpenAPI yapıtı ve ön yüz tipleri
+  yeniden üretildi.
+- [x] T-D8.3 e2e: `06-rule-proposals.mjs` ve QUALITY_MANIFEST satırı kaldırıldı; 01–05 ve auth/01 yerel
+  önizlemede geçti.
+

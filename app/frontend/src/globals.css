@@ -10,12 +10,8 @@
   --color-bg-glow-1: rgba(139, 92, 255, 0.2);
   --color-bg-glow-2: rgba(255, 93, 214, 0.09);
   --color-bg-glow-3: rgba(40, 70, 190, 0.16);
-  --color-mass-1: rgba(124, 244, 255, 0.2);
-  --color-mass-2: rgba(139, 92, 255, 0.3);
-  --color-mass-3: rgba(255, 93, 214, 0.17);
-  --color-dot: rgba(168, 177, 218, 0.16);
-  --color-dot-lit: rgba(124, 244, 255, 0.75);
-  --color-spot: rgba(124, 244, 255, 0.07);
+  --color-code-text: rgba(168, 177, 218, 0.13);
+  --color-scan: rgba(124, 244, 255, 0.85);
   --color-side: rgba(8, 11, 26, 0.82);
   --color-surface: rgba(17, 22, 48, 0.72);
   --color-surface-solid: #0e1330;
@@ -138,39 +134,8 @@ kbd {
   border: 1px solid var(--color-border-strong); border-bottom-width: 2px; background: var(--color-surface-sunken); color: var(--color-fg-muted);
 }
 
-/* ---------- The sky: drifting colour masses, a dot grid lit by the pointer, grain ---------- */
-.backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; --spot-x: 60vw; --spot-y: 30vh; }
-.backdrop-mass { position: absolute; border-radius: 50%; filter: blur(90px); will-change: transform; }
-.backdrop-mass-1 { width: 46vw; height: 46vw; left: 8vw; top: -14vw; background: var(--color-mass-1); }
-.backdrop-mass-2 { width: 52vw; height: 52vw; right: -12vw; top: 8vh; background: var(--color-mass-2); }
-.backdrop-mass-3 { width: 40vw; height: 40vw; left: 30vw; bottom: -18vw; background: var(--color-mass-3); }
-.backdrop-dots {
-  position: absolute; inset: 0;
-  background-image: radial-gradient(var(--color-dot) 1px, transparent 1.4px);
-  background-size: 22px 22px;
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
-  mask-image: radial-gradient(120% 90% at 50% 40%, #000 30%, transparent 85%);
-}
-/* The same grid, bright, seen only through a soft circle around the pointer. */
-.backdrop-dots-lit {
-  background-image: radial-gradient(var(--color-dot-lit) 1px, transparent 1.6px), radial-gradient(circle 260px at var(--spot-x) var(--spot-y), var(--color-spot), transparent 70%);
-  background-size: 22px 22px, 100% 100%;
-  -webkit-mask-image: radial-gradient(circle 220px at var(--spot-x) var(--spot-y), #000, transparent 75%);
-  mask-image: radial-gradient(circle 220px at var(--spot-x) var(--spot-y), #000, transparent 75%);
-}
-.backdrop-grain {
-  position: absolute; inset: -50%; opacity: 0.05; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-@media (prefers-reduced-motion: no-preference) {
-  .backdrop-mass-1 { animation: mass-1 28s ease-in-out infinite alternate; }
-  .backdrop-mass-2 { animation: mass-2 34s ease-in-out infinite alternate; }
-  .backdrop-mass-3 { animation: mass-3 31s ease-in-out infinite alternate; }
-  @keyframes mass-1 { to { transform: translate3d(22vw, 18vh, 0) scale(1.15); } }
-  @keyframes mass-2 { to { transform: translate3d(-26vw, 22vh, 0) scale(0.9); } }
-  @keyframes mass-3 { to { transform: translate3d(-18vw, -30vh, 0) scale(1.2); } }
-}
-@media (hover: none) { .backdrop-dots-lit { display: none; } }
+/* ---------- Backdrop: faint SQL under a review scan ---------- */
+.backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
 
 /* ---------- Brand and icons ---------- */
 .brand-mark { display: block; flex: none; }

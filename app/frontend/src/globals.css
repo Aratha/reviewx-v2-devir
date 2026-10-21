@@ -16,6 +16,8 @@
   --color-star: #eef1ff;
   --color-star-cool: #9fefff;
   --color-star-warm: #ffd7f4;
+  --color-constellation: #7cf4ff;
+  --color-meteor: #e9fbff;
   --color-side: rgba(8, 11, 26, 0.82);
   --color-surface: rgba(17, 22, 48, 0.72);
   --color-surface-solid: #0e1330;
@@ -138,7 +140,7 @@ kbd {
   border: 1px solid var(--color-border-strong); border-bottom-width: 2px; background: var(--color-surface-sunken); color: var(--color-fg-muted);
 }
 
-/* ---------- The sky: a slow star field over a moving nebula ---------- */
+/* ---------- The sky: stars in depth, linked into constellations, over a moving nebula ---------- */
 .backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
 .shell::before, .login-shell::before {
   content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;

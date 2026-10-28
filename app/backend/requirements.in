@@ -1,13 +1,13 @@
 # Runtime dependency authority. Recompile requirements.txt after changing this file.
 cffi==2.1.1
 fastapi==0.141.1
-uvicorn[standard]==0.52.4
+uvicorn[standard]==0.54.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv==1.2.3
-sqlalchemy[asyncio]==2.0.52
+sqlalchemy[asyncio]==2.1.1
 asyncpg==0.31.0
-alembic==1.19.2
+alembic==1.20.0
 PyJWT[crypto]==2.15.0
 pwdlib[argon2]==0.3.1
 PyYAML==6.0.3
@@ -28,6 +28,6 @@ opentelemetry-sdk==1.44.0
 opentelemetry-exporter-otlp-proto-grpc==1.44.0
 # Transitive dependencies of the OTLP/gRPC exporter held at their newest release that is at least
 # 30 days old (rules/54); remove a line once the resolver's own choice is past that window.
-grpcio==1.83.1
-protobuf==7.36.1
-googleapis-common-protos==1.75.3
+grpcio==1.84.0
+protobuf==7.36.2
+googleapis-common-protos==1.75.4
